@@ -4,13 +4,13 @@
    ============================================================ */
 
 /* ---------- Self-hosted fonts (latin subset, variable) ----------
-   Servidas desde el mismo origen para evitar el request render-blocking
-   a Google Fonts en el primer render. font-display: swap → el texto se
-   pinta de inmediato con la fuente de respaldo y cambia al cargar. */
+   Served from the same origin to avoid the render-blocking request to
+   Google Fonts on the first render. font-display: swap → the text is
+   painted immediately with the fallback font and swaps in once loaded. */
 @font-face {
     font-family: "Jost";
     font-style: normal;
-    font-weight: 300 500;            /* variable: cubre 300–500 */
+    font-weight: 300 500;            /* variable: covers 300–500 */
     font-display: swap;
     src: url("../fonts/jost.woff2") format("woff2");
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
@@ -18,7 +18,7 @@
 @font-face {
     font-family: "Playfair Display";
     font-style: normal;
-    font-weight: 400 600;            /* variable: cubre 400–600 */
+    font-weight: 400 600;            /* variable: covers 400–600 */
     font-display: swap;
     src: url("../fonts/playfairdisplay.woff2") format("woff2");
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;

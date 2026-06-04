@@ -29,9 +29,9 @@
     <link rel="icon" type="image/webp" href="{{ url_for('static', filename='img/marca/avatar-perfil-gluck.webp') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/marca/avatar-perfil-gluck.jpg') }}">
 
-    <!-- Fuentes auto-hosteadas: precargamos las dos críticas above-the-fold
-         (Jost = cuerpo, Playfair = título del hero / LCP) para que el swap
-         ocurra cuanto antes y no haya request render-blocking a terceros. -->
+    <!-- Self-hosted fonts: we preload the two critical above-the-fold ones
+         (Jost = body, Playfair = hero title / LCP) so the swap happens as
+         early as possible and there's no render-blocking third-party request. -->
     <link rel="preload" href="{{ url_for('static', filename='fonts/jost.woff2') }}" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="{{ url_for('static', filename='fonts/playfairdisplay.woff2') }}" as="font" type="font/woff2" crossorigin>
 
@@ -103,7 +103,7 @@
             </div>
         </section>
 
-        <!-- ===================== CATEGORÍAS ===================== -->
+        <!-- ===================== CATEGORIES ===================== -->
         <section class="section categorias" id="categorias">
             <div class="section-head reveal">
                 <p class="eyebrow">La colección</p>
@@ -192,7 +192,7 @@
             </div>
         </section>
 
-        <!-- ===================== MATERIA PRIMA (VIDEO) ===================== -->
+        <!-- ===================== RAW MATERIAL (VIDEO) ===================== -->
         <section class="materia" id="materia">
             <video class="materia-video js-lazy-video" muted loop playsinline preload="none"
                    poster="{{ url_for('static', filename='img/video-posters/cuero-materia-prima.jpg') }}"
@@ -200,8 +200,8 @@
                    data-desktop-mp4="{{ url_for('static', filename='video/loops/cuero-loop-desktop.mp4') }}"
                    data-mobile-webm="{{ url_for('static', filename='video/loops/cuero-loop-mobile.webm') }}"
                    data-mobile-mp4="{{ url_for('static', filename='video/loops/cuero-loop-mobile.mp4') }}">
-                <!-- Fuentes inyectadas por main.js según el viewport:
-                     desktop = recorte landscape nítido, mobile = video vertical. -->
+                <!-- Sources injected by main.js based on the viewport:
+                     desktop = sharp landscape crop, mobile = vertical video. -->
             </video>
             <div class="materia-overlay"></div>
             <div class="materia-content reveal">
@@ -215,7 +215,7 @@
             <span class="materia-caption">Detrás de escena · selección de materiales</span>
         </section>
 
-        <!-- ===================== MANIFIESTO ===================== -->
+        <!-- ===================== MANIFESTO ===================== -->
         <section class="section manifiesto" id="manifiesto">
             <div class="manifiesto-inner reveal">
                 <p class="eyebrow">Nosotras</p>
@@ -248,8 +248,10 @@
             <div class="closer-media reveal">
                 <video class="js-lazy-video" muted loop playsinline preload="none"
                        poster="{{ url_for('static', filename='img/video-posters/packaging-unboxing.jpg') }}"
-                       data-src-webm="{{ url_for('static', filename='video/packaging-unboxing.webm') }}"
-                       data-src-mp4="{{ url_for('static', filename='video/packaging-unboxing.mp4') }}">
+                       data-desktop-webm="{{ url_for('static', filename='video/packaging-desktop.webm') }}"
+                       data-desktop-mp4="{{ url_for('static', filename='video/packaging-desktop.mp4') }}"
+                       data-mobile-webm="{{ url_for('static', filename='video/packaging-mobile.webm') }}"
+                       data-mobile-mp4="{{ url_for('static', filename='video/packaging-mobile.mp4') }}">
                 </video>
             </div>
             <div class="closer-text reveal">

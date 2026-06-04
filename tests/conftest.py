@@ -1,9 +1,9 @@
-"""Fixtures compartidos para los tests.
+"""Shared fixtures for the tests.
 
-Levanta el sitio Flask en un servidor WSGI real (en un thread aparte) sobre un
-puerto libre, para que Playwright pueda visitarlo como lo haría un navegador de
-verdad. Esto es necesario para medir performance: el test client de Flask no
-sirve recursos estáticos por HTTP ni ejecuta JavaScript.
+Brings up the Flask site on a real WSGI server (in a separate thread) on a free
+port, so Playwright can visit it like a real browser would. This is needed to
+measure performance: Flask's test client neither serves static resources over
+HTTP nor runs JavaScript.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from app import app as flask_app
 
 
 def _free_port() -> int:
-    """Devuelve un puerto TCP libre asignado por el sistema operativo."""
+    """Returns a free TCP port assigned by the operating system."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
@@ -28,7 +28,7 @@ def _free_port() -> int:
 
 @pytest.fixture(scope="session")
 def live_server() -> Iterator[str]:
-    """Arranca el sitio en un servidor WSGI real y devuelve su URL base."""
+    """Starts the site on a real WSGI server and returns its base URL."""
     port = _free_port()
     server = make_server("127.0.0.1", port, flask_app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -42,7 +42,7 @@ def live_server() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def browser() -> Iterator[Browser]:
-    """Una instancia de Chromium headless reutilizable por toda la sesión."""
+    """A headless Chromium instance reusable across the whole session."""
     with sync_playwright() as pw:
         browser = pw.chromium.launch(headless=True)
         try:

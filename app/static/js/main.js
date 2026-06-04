@@ -3,24 +3,24 @@
 (function () {
   "use strict";
 
-  /* ---- Videos de fondo: lazy load + play/pause según viewport ----
-     Los videos son pesados (varios MB) y decodificarlos de fondo mientras se
-     hace scroll genera jank. Estrategia: no descargar nada hasta que la sección
-     se acerca al viewport; recién ahí inyectar las fuentes, reproducir, y pausar
-     en cuanto sale de pantalla para liberar al decodificador. */
+  /* ---- Background videos: lazy load + play/pause based on viewport ----
+     The videos are heavy (several MB) and decoding them in the background while
+     scrolling causes jank. Strategy: don't download anything until the section
+     approaches the viewport; only then inject the sources, play, and pause as
+     soon as it leaves the screen to free up the decoder. */
   const lazyVideos = document.querySelectorAll(".js-lazy-video");
 
   const sourcesFor = (video) => {
     const d = video.dataset;
     if (d.desktopWebm) {
-      // Video "materia": par desktop (landscape) o mobile (vertical) según viewport.
+      // "materia" video: desktop (landscape) or mobile (vertical) pair based on viewport.
       const isDesktop = window.matchMedia("(min-width: 760px)").matches;
       return [
         [isDesktop ? d.desktopWebm : d.mobileWebm, "video/webm"],
         [isDesktop ? d.desktopMp4 : d.mobileMp4, "video/mp4"],
       ];
     }
-    // Video genérico con una sola fuente webm/mp4.
+    // Generic video with a single webm/mp4 source.
     return [
       [d.srcWebm, "video/webm"],
       [d.srcMp4, "video/mp4"],
@@ -52,12 +52,12 @@
           }
         });
       },
-      // Empezamos a cargar un poco antes de que entre, para que no se vea el poster congelado.
+      // Start loading a bit before it enters, so the frozen poster isn't shown.
       { rootMargin: "200px 0px" }
     );
     lazyVideos.forEach((v) => videoIO.observe(v));
   } else {
-    // Sin IntersectionObserver: cargar y reproducir todo.
+    // Without IntersectionObserver: load and play everything.
     lazyVideos.forEach((v) => {
       loadVideoSources(v);
       const p = v.play();
