@@ -1,0 +1,37 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: gluck-bags-web
+    image: gluck-bags-web
+    environment:
+      FLASK_APP: run.py
+      UPLOAD_FOLDER: ${UPLOAD_FOLDER:-uploads}
+      VIRTUAL_HOST: gluck.nexttech.com.ar
+      VIRTUAL_PORT: 7014
+    ports:
+      - "7014:7014"
+    expose:
+      - "7014"
+    restart: unless-stopped
+    networks:
+      - proxy
+    labels:
+      - "com.github.nginx-proxy.nginx_proxy=true"
+      - com.github.nginxproxy.nginx-proxy.startup_wait=30
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: gluck-bags-web-promtail
+    restart: unless-stopped
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    external: true

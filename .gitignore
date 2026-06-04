@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+instance/
+*.db
+tests/screenshots/
+.pytest_cache/
+ig-gluck_bags/
+.claude/

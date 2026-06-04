@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Open Graph / social link preview (must come first in <head>, before scripts/CSS) -->
+    <meta property="og:type"             content="website">
+    <meta property="og:url"              content="https://gluck.nexttech.com.ar/">
+    <meta property="og:title"            content="{{ brand }} · {{ tagline }}">
+    <meta property="og:description"      content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
+    <meta property="og:image"            content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
+    <meta property="og:image:secure_url" content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
+    <meta property="og:image:type"       content="image/jpeg">
+    <meta property="og:image:width"      content="1200">
+    <meta property="og:image:height"     content="630">
+    <meta property="og:image:alt"        content="Tote de cuero vegano cognac de {{ brand }} en la playa">
+    <meta property="og:locale"           content="es_AR">
+    <meta property="og:site_name"        content="{{ brand }}">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card"        content="summary_large_image">
+    <meta name="twitter:title"       content="{{ brand }} · {{ tagline }}">
+    <meta name="twitter:description" content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
+    <meta name="twitter:image"       content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
+
+    <title>{{ brand }} · {{ tagline }}</title>
+    <meta name="description" content="{{ brand }} — {{ tagline }}. Carteras y bolsos de cuero vegano, hechos a mano con un diseño minimalista y atemporal.">
+
+    <link rel="icon" type="image/webp" href="{{ url_for('static', filename='img/marca/avatar-perfil-gluck.webp') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/marca/avatar-perfil-gluck.jpg') }}">
+
+    <!-- Fuentes auto-hosteadas: precargamos las dos críticas above-the-fold
+         (Jost = cuerpo, Playfair = título del hero / LCP) para que el swap
+         ocurra cuanto antes y no haya request render-blocking a terceros. -->
+    <link rel="preload" href="{{ url_for('static', filename='fonts/jost.woff2') }}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ url_for('static', filename='fonts/playfairdisplay.woff2') }}" as="font" type="font/woff2" crossorigin>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+    <!-- ===================== HEADER ===================== -->
+    <header class="site-header" id="header">
+        <div class="header-inner">
+            <a href="#top" class="wordmark" aria-label="{{ brand }} inicio">{{ brand }}</a>
+
+            <nav class="nav" aria-label="Principal">
+                <a href="#categorias">Colección</a>
+                <a href="#shop">Bolsos</a>
+                <a href="#materia">Materia</a>
+                <a href="#manifiesto">Nosotras</a>
+            </nav>
+
+            <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="header-cta">Comprar</a>
+
+            <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú" aria-expanded="false">
+                <span></span><span></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- mobile menu -->
+    <div class="mobile-menu" id="mobileMenu" hidden>
+        <a href="#categorias">Colección</a>
+        <a href="#shop">Bolsos</a>
+        <a href="#materia">Materia</a>
+        <a href="#manifiesto">Nosotras</a>
+        <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="mobile-cta">Comprar en Instagram</a>
+    </div>
+
+    <main id="top">
+
+        <!-- ===================== HERO ===================== -->
+        <section class="hero">
+            <picture class="hero-media">
+                <source srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa.webp') }}" type="image/webp">
+                <img class="hero-img" src="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa.jpg') }}"
+                     alt="Tote de cuero vegano cognac de GLÜCK en la playa" fetchpriority="high">
+            </picture>
+            <div class="hero-overlay"></div>
+
+            <div class="hero-content">
+                <p class="hero-eyebrow">Cuero vegano · Sin costuras</p>
+                <h1 class="hero-title">{{ tagline }}</h1>
+                <p class="hero-sub">Bolsos de líneas puras, pensados para durar. Sin pieles, sin excesos.</p>
+                <div class="hero-actions">
+                    <a href="#categorias" class="btn btn-light">Ver la colección</a>
+                    <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-ghost">Comprar ahora</a>
+                </div>
+            </div>
+
+            <a href="#categorias" class="hero-scroll" aria-label="Bajar a la colección">
+                <span class="hero-scroll-label">Scroll</span>
+                <span class="hero-scroll-line"></span>
+            </a>
+        </section>
+
+        <!-- ===================== MARQUEE ===================== -->
+        <section class="marquee" aria-hidden="true">
+            <div class="marquee-track">
+                {% set phrases = ["Cuero vegano minimalista", "De una sola pieza", "Diseño atemporal", "Sin crueldad"] %}
+                {% for _ in range(2) %}{% for phrase in phrases %}<span class="marquee-item">{{ phrase }}</span><span class="marquee-sep">✦</span>{% endfor %}{% endfor %}
+            </div>
+        </section>
+
+        <!-- ===================== CATEGORÍAS ===================== -->
+        <section class="section categorias" id="categorias">
+            <div class="section-head reveal">
+                <p class="eyebrow">La colección</p>
+                <h2 class="section-title">Cuatro siluetas, infinitas combinaciones</h2>
+            </div>
+
+            <div class="cat-grid">
+                {% for cat in categories %}
+                <a href="#shop" class="cat-card reveal" style="--i: {{ loop.index0 }}">
+                    <div class="cat-media">
+                        <picture>
+                            <source srcset="{{ url_for('static', filename=cat.image ~ '.webp') }}" type="image/webp">
+                            <img src="{{ url_for('static', filename=cat.image ~ '.jpg') }}" alt="{{ cat.name }}" loading="lazy">
+                        </picture>
+                        <span class="cat-index">{{ '%02d' % loop.index }}</span>
+                        <span class="cat-arrow" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M7 17 17 7M9 7h8v8"/>
+                            </svg>
+                        </span>
+                    </div>
+                    <div class="cat-info">
+                        <h3 class="cat-name">{{ cat.name }}</h3>
+                        <span class="cat-tag">{{ cat.tagline }}</span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- ===================== FEATURE / LIFESTYLE SPLIT ===================== -->
+        <section class="feature">
+            <div class="feature-media reveal">
+                <picture>
+                    <source srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero.webp') }}" type="image/webp">
+                    <img src="{{ url_for('static', filename='img/hero/hero-tote-gris-velero.jpg') }}" alt="Tote GLÜCK en la cubierta de un velero" loading="lazy">
+                </picture>
+            </div>
+            <div class="feature-text reveal">
+                <p class="eyebrow">Diseño de autor</p>
+                <h2 class="section-title">El Tote que te sigue<br>a todas partes</h2>
+                <p class="feature-body">
+                    Cada bolso sale de una sola pieza de cuero vegano: la diseñamos, la
+                    cortamos con láser y la plegamos a mano. Sin costuras —
+                    la forma se sostiene con remaches y broches.
+                </p>
+                <ul class="feature-specs">
+                    <li>De una sola pieza, sin costuras</li>
+                    <li>Cortada con láser desde un molde propio</li>
+                    <li>Plegada y unida con remaches y broches</li>
+                </ul>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark">Quiero el mío</a>
+            </div>
+        </section>
+
+        <!-- ===================== SHOP GRID ===================== -->
+        <section class="section shop" id="shop">
+            <div class="section-head reveal">
+                <p class="eyebrow">Bolsos</p>
+                <h2 class="section-title">Lo último de {{ brand }}</h2>
+            </div>
+
+            <div class="shop-grid">
+                {% for product in products %}
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="product reveal" style="--i: {{ loop.index0 % 3 }}">
+                    <div class="product-media">
+                        <picture>
+                            <source srcset="{{ url_for('static', filename=product.image ~ '.webp') }}" type="image/webp">
+                            <img src="{{ url_for('static', filename=product.image ~ '.jpg') }}" alt="{{ product.name }}" loading="lazy">
+                        </picture>
+                        <span class="product-badge">Ver en Instagram</span>
+                    </div>
+                    <div class="product-info">
+                        <div class="product-meta">
+                            <h3 class="product-name">{{ product.name }}</h3>
+                            <span class="product-cat">{{ product.category }}</span>
+                        </div>
+                        <span class="product-arrow" aria-hidden="true">
+                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M5 12h14M13 6l6 6-6 6"/>
+                            </svg>
+                        </span>
+                    </div>
+                </a>
+                {% endfor %}
+            </div>
+        </section>
+
+        <!-- ===================== MATERIA PRIMA (VIDEO) ===================== -->
+        <section class="materia" id="materia">
+            <video class="materia-video js-lazy-video" muted loop playsinline preload="none"
+                   poster="{{ url_for('static', filename='img/video-posters/cuero-materia-prima.jpg') }}"
+                   data-desktop-webm="{{ url_for('static', filename='video/loops/cuero-loop-desktop.webm') }}"
+                   data-desktop-mp4="{{ url_for('static', filename='video/loops/cuero-loop-desktop.mp4') }}"
+                   data-mobile-webm="{{ url_for('static', filename='video/loops/cuero-loop-mobile.webm') }}"
+                   data-mobile-mp4="{{ url_for('static', filename='video/loops/cuero-loop-mobile.mp4') }}">
+                <!-- Fuentes inyectadas por main.js según el viewport:
+                     desktop = recorte landscape nítido, mobile = video vertical. -->
+            </video>
+            <div class="materia-overlay"></div>
+            <div class="materia-content reveal">
+                <p class="eyebrow light">La materia</p>
+                <h2 class="section-title light">Cuero vegano,<br>elegido a mano</h2>
+                <p class="materia-body">
+                    Seleccionamos cada rollo por su tacto y su color. Materiales libres de origen
+                    animal que envejecen con gracia, para que cada bolso cuente su propia historia.
+                </p>
+            </div>
+            <span class="materia-caption">Detrás de escena · selección de materiales</span>
+        </section>
+
+        <!-- ===================== MANIFIESTO ===================== -->
+        <section class="section manifiesto" id="manifiesto">
+            <div class="manifiesto-inner reveal">
+                <p class="eyebrow">Nosotras</p>
+                <blockquote class="manifiesto-quote">
+                    Creemos en lo simple, en lo que dura y en lo que no le hace daño a nadie.
+                    Cada <em>{{ brand }}</em> nace de esa idea: belleza sin culpa.
+                </blockquote>
+                <div class="manifiesto-values">
+                    <div class="value">
+                        <span class="value-index">01</span>
+                        <h4>100% vegano</h4>
+                        <p>Sin pieles ni derivados animales.</p>
+                    </div>
+                    <div class="value">
+                        <span class="value-index">02</span>
+                        <h4>Sin costuras</h4>
+                        <p>De una sola pieza, plegada y unida con remaches.</p>
+                    </div>
+                    <div class="value">
+                        <span class="value-index">03</span>
+                        <h4>Atemporal</h4>
+                        <p>Diseños que no pasan de moda.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===================== PACKAGING / CTA FINAL ===================== -->
+        <section class="closer">
+            <div class="closer-media reveal">
+                <video class="js-lazy-video" muted loop playsinline preload="none"
+                       poster="{{ url_for('static', filename='img/video-posters/packaging-unboxing.jpg') }}"
+                       data-src-webm="{{ url_for('static', filename='video/packaging-unboxing.webm') }}"
+                       data-src-mp4="{{ url_for('static', filename='video/packaging-unboxing.mp4') }}">
+                </video>
+            </div>
+            <div class="closer-text reveal">
+                <p class="eyebrow">Listo para regalar</p>
+                <h2 class="section-title">Cada pedido llega<br>como un regalo</h2>
+                <p class="feature-body">
+                    Empaque kraft con el sello {{ brand }}. Hacé tu pedido por Instagram y te
+                    acompañamos en todo el proceso.
+                </p>
+                <ul class="feature-specs closer-specs">
+                    <li>Envíos a todo el país</li>
+                    <li>Packaging de regalo incluido</li>
+                    <li>Atención personalizada por mensaje</li>
+                </ul>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-light-on-dark">Escribinos por Instagram</a>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ===================== FOOTER ===================== -->
+    <footer class="site-footer">
+        <div class="footer-cta reveal">
+            <p class="footer-cta-eyebrow">¿Te gustó algo?</p>
+            <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="footer-cta-link">
+                Seguinos en Instagram
+                <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.2">
+                    <path d="M7 17 17 7M9 7h8v8"/>
+                </svg>
+            </a>
+        </div>
+
+        <div class="footer-top">
+            <div class="footer-brand">
+                <span class="footer-wordmark">{{ brand }}</span>
+                <p>{{ tagline }}</p>
+            </div>
+            <nav class="footer-nav" aria-label="Pie de página">
+                <a href="#categorias">Colección</a>
+                <a href="#shop">Bolsos</a>
+                <a href="#materia">Materia</a>
+                <a href="#manifiesto">Nosotras</a>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener">Instagram</a>
+            </nav>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; {{ current_year }} {{ brand }}. Todos los derechos reservados.</p>
+            <a href="#top" class="footer-top-link">Volver arriba ↑</a>
+            <p>Cuero vegano · Hecho a mano</p>
+        </div>
+
+        <!-- Shared Next Tech footer (renders into the site's footer background) -->
+        <script src="https://nexttech.com.ar/static/js/nexttechFooter.js"></script>
+        <nexttech-footer></nexttech-footer>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
