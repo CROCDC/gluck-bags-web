@@ -6,7 +6,7 @@ services:
     container_name: gluck-bags-web
     image: gluck-bags-web
     environment:
-      FLASK_APP: run.py
+      FLASK_DEBUG: "0"
       UPLOAD_FOLDER: ${UPLOAD_FOLDER:-uploads}
       VIRTUAL_HOST: gluck.nexttech.com.ar
       VIRTUAL_PORT: 7014
