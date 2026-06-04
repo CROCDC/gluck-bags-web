@@ -22,12 +22,17 @@ services:
       - com.github.nginxproxy.nginx-proxy.startup_wait=30
 
   promtail:
-    image: grafana/promtail:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.promtail
+    image: gluck-bags-web-promtail
     container_name: gluck-bags-web-promtail
     restart: unless-stopped
     command: -config.file=/etc/promtail/config.yml
     volumes:
-      - ./promtail.yml:/etc/promtail/config.yml:ro
+      # docker.sock is a real host path, so this bind-mount works under Jenkins.
+      # The config is baked into the image (Dockerfile.promtail) instead of
+      # bind-mounted, because the Jenkins workspace isn't visible to the host daemon.
       - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - proxy
