@@ -5,6 +5,7 @@ from typing import Any
 from dotenv import load_dotenv
 from flask import Flask
 from flask_compress import Compress
+from markupsafe import Markup
 
 from app.routes import register_routes
 
@@ -31,11 +32,30 @@ def create_app() -> Flask:
     def _static_cache_buster(endpoint: str, values: dict[str, Any]) -> None:
         if endpoint != "static" or "filename" not in values:
             return
+        # Don't version fonts: they're also referenced from CSS `url()` WITHOUT a
+        # `?v=`, so adding it here would make the <link rel=preload> URL differ from
+        # the @font-face URL — the preload would be wasted and the font downloaded
+        # twice (which delays the font and, with font-display:swap, the LCP).
+        if values["filename"].rsplit(".", 1)[-1].lower() in ("woff2", "woff", "ttf", "otf", "eot"):
+            return
         try:
             mtime = os.stat(os.path.join(app.static_folder, values["filename"])).st_mtime
             values["v"] = int(mtime)
         except OSError:
             pass
+
+    @app.context_processor
+    def inject_inliners() -> dict[str, Any]:
+        def inline_css(filename: str) -> Markup:
+            """Inline a static CSS file as a <style> tag (no render-blocking request).
+            Relative url("../…") refs are rewritten to absolute /static/ so they
+            still resolve once the CSS lives in the HTML document."""
+            with open(os.path.join(app.static_folder, filename), encoding="utf-8") as fh:
+                css = fh.read()
+            css = css.replace('url("../', 'url("/static/').replace("url('../", "url('/static/")
+            return Markup(f"<style>{css}</style>")
+
+        return {"inline_css": inline_css}
 
     @app.context_processor
     def inject_globals() -> dict[str, Any]:

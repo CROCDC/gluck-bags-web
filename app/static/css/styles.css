@@ -375,18 +375,29 @@ h1, h2, h3, h4 { margin: 0; font-weight: 400; }
 }
 .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
 
-/* staggered entrance for hero content */
+/* staggered entrance for hero content. NOTE: the hero-title is the LCP element,
+   so it must NOT start at opacity:0 — the browser doesn't count an invisible
+   element as "painted", which pushes LCP out by the whole animation (delay +
+   duration). It stays visible from the first paint and only slides via transform
+   (transforms don't affect LCP); the rest keep the fade-in. */
 .hero-content > * {
     opacity: 0;
     transform: translateY(20px);
     animation: heroIn 1s var(--ease) forwards;
 }
 .hero-eyebrow { animation-delay: 0.15s; }
-.hero-title   { animation-delay: 0.30s; }
 .hero-sub     { animation-delay: 0.48s; }
 .hero-actions { animation-delay: 0.64s; }
+.hero-title {
+    opacity: 1;
+    animation: heroTitleIn 1s var(--ease) forwards;
+}
 @keyframes heroIn {
     to { opacity: 1; transform: none; }
+}
+@keyframes heroTitleIn {
+    from { transform: translateY(20px); }
+    to   { transform: none; }
 }
 
 .hero-scroll {

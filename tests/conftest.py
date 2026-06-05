@@ -48,7 +48,9 @@ def live_server() -> Iterator[str]:
         yield external.rstrip("/")
         return
     port = _free_port()
-    server = make_server("127.0.0.1", port, flask_app)
+    # threaded=True so resources load in parallel (the single-threaded dev server
+    # serializes requests, which badly skews Lighthouse's simulated throttling).
+    server = make_server("127.0.0.1", port, flask_app, threaded=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     try:

@@ -69,13 +69,23 @@
   const toggle = document.getElementById("menuToggle");
   const menu = document.getElementById("mobileMenu");
 
-  /* ---- Sticky header: solid background after scrolling past the hero edge ---- */
-  const onScroll = () => {
-    if (window.scrollY > 40) header.classList.add("scrolled");
-    else header.classList.remove("scrolled");
-  };
-  window.addEventListener("scroll", onScroll, { passive: true });
-  onScroll();
+  /* ---- Sticky header: solid background after scrolling past the hero edge.
+     Uses an IntersectionObserver on a top sentinel instead of reading
+     window.scrollY in a scroll handler — reading geometry on every scroll frame
+     forces a synchronous reflow (layout thrashing / "reprocesamiento forzado"). */
+  const sentinel = document.createElement("div");
+  sentinel.setAttribute("aria-hidden", "true");
+  sentinel.style.cssText =
+    "position:absolute;top:0;left:0;width:1px;height:40px;pointer-events:none;";
+  document.body.prepend(sentinel);
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(
+      ([entry]) => header.classList.toggle("scrolled", !entry.isIntersecting),
+      { threshold: 0 }
+    ).observe(sentinel);
+  } else {
+    header.classList.add("scrolled");
+  }
 
   /* ---- Mobile menu toggle ---- */
   const closeMenu = () => {

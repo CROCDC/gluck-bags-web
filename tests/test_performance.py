@@ -23,9 +23,10 @@ Operational knobs (env vars, optional — none of them skip a test):
     PERF_TARGET_URL=https://…  test a deployed URL instead of the local server
                                (set in conftest's live_server fixture)
 
-The thresholds below are measured locally without throttling (except the mobile
-tests). Calibrate them to your project. Google Web Vitals reference ("good"):
-LCP < 2500ms, CLS < 0.1, INP < 200ms.
+The warm/cold metric tests run unthrottled; the device matrix (DEVICE_PROFILES)
+emulates real devices Lighthouse-style (viewport + DPR + CPU + network throttle)
+with per-device budgets. Calibrate to your project. Google Web Vitals reference
+("good"): LCP < 2500ms, CLS < 0.1, INP < 200ms.
 """
 
 from __future__ import annotations
@@ -65,9 +66,7 @@ JS_HEAP_BUDGET_MB = 20
 THIRD_PARTY_ORIGINS_BUDGET = 3 # distinct cross-origin hosts on a cold load
 RENDER_BLOCKING_CSS_BUDGET = 2 # render-blocking stylesheets allowed in <head>
 
-# Throttled-mobile budgets (4x CPU, ~Slow 4G) — necessarily looser than warm desktop.
-MOBILE_LCP_BUDGET_MS = 4000
-MOBILE_TBT_BUDGET_MS = 600
+# Per-device budgets (LCP/TBT/CLS) live in DEVICE_PROFILES near the device matrix.
 
 
 # --- Metric collection -------------------------------------------------------
@@ -514,58 +513,104 @@ def test_static_assets_are_cacheable(browser: Browser, live_server: str) -> None
     assert not not_cacheable, f"Static assets not cacheable (>=1 day): {not_cacheable}"
 
 
-# --- Throttled-mobile tests --------------------------------------------------
-# Mid-tier phone on a slow network: 4x CPU slowdown + ~Slow 4G. This is where
-# most real users are, and where render-blocking / heavy JS hurts the most.
+# --- Device matrix (Lighthouse-style emulation) ------------------------------
+# Each profile emulates a device CLASS: viewport + DPR + (mobile UA/touch) + CPU
+# slowdown + network throttle, the way Lighthouse does. LCP/TBT/CLS are measured
+# per device (median of N) against per-device budgets. The low-end mobile profile
+# mirrors Lighthouse's default mobile preset (Moto-G-class, 4x CPU, ~Slow 4G).
+#
+# net = (download Mbps, upload Kbps, RTT ms) or None for no network throttling.
 
-_PIXEL5_UA = (
-    "Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/120.0.0.0 Mobile Safari/537.36"
-)
+_UA = {
+    "android": ("Mozilla/5.0 (Linux; Android 13; moto g power) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"),
+    "iphone": ("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) "
+               "AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"),
+    "ipad": ("Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15 "
+             "(KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"),
+}
+
+DEVICE_PROFILES = [
+    {   # Lighthouse default mobile preset — the strict one.
+        "id": "moto-g-lowend", "viewport": {"width": 412, "height": 823}, "dpr": 1.75,
+        "mobile": True, "ua": _UA["android"], "cpu": 4, "net": (1.6, 750, 150),
+        "lcp": 4000, "tbt": 600, "cls": 0.1,
+    },
+    {   # Mid-range phone on LTE.
+        "id": "iphone-12", "viewport": {"width": 390, "height": 844}, "dpr": 3,
+        "mobile": True, "ua": _UA["iphone"], "cpu": 3, "net": (9, 1500, 60),
+        "lcp": 3000, "tbt": 450, "cls": 0.1,
+    },
+    {   # Tablet, lightly throttled, no network cap.
+        "id": "ipad-mini", "viewport": {"width": 768, "height": 1024}, "dpr": 2,
+        "mobile": True, "ua": _UA["ipad"], "cpu": 2, "net": None,
+        "lcp": 2500, "tbt": 350, "cls": 0.1,
+    },
+    {   # Lighthouse desktop preset — fast, unthrottled.
+        "id": "desktop-1080p", "viewport": {"width": 1350, "height": 940}, "dpr": 1,
+        "mobile": False, "ua": None, "cpu": 1, "net": None,
+        "lcp": 2000, "tbt": 250, "cls": 0.1,
+    },
+]
+
+# How many loads to median per device (throttled loads are noisy). Override with
+# PERF_DEVICE_SAMPLES; min 1.
+try:
+    _DEVICE_SAMPLES = max(1, int(os.environ.get("PERF_DEVICE_SAMPLES", "3")))
+except ValueError:
+    _DEVICE_SAMPLES = 3
 
 
-_MOBILE_SAMPLES = 3
-
-
-@pytest.fixture(scope="session")
-def mobile_samples(browser: Browser, live_server: str) -> list[dict]:
-    """Median-ready metrics from several cold loads emulating a mid-tier phone
-    (mobile viewport + 4x CPU throttle + ~Slow 4G). Throttled measurements are
-    noisy, so we median over a few loads to stay non-flaky."""
+@pytest.fixture(scope="session", params=DEVICE_PROFILES, ids=[p["id"] for p in DEVICE_PROFILES])
+def device_samples(request, browser: Browser, live_server: str) -> tuple[dict, list[dict]]:
+    """(profile, samples) for one emulated device: viewport + DPR + CPU + network
+    throttle applied via CDP, median-ready over a few cold loads."""
+    profile = request.param
     samples: list[dict] = []
-    for _ in range(_MOBILE_SAMPLES):
-        context = browser.new_context(
-            viewport={"width": 412, "height": 915},
-            device_scale_factor=2.625,
-            is_mobile=True,
-            has_touch=True,
-            user_agent=_PIXEL5_UA,
-        )
+    for _ in range(_DEVICE_SAMPLES):
+        ctx: dict = {"viewport": profile["viewport"], "device_scale_factor": profile["dpr"]}
+        if profile["mobile"]:
+            ctx.update(is_mobile=True, has_touch=True)
+        if profile["ua"]:
+            ctx["user_agent"] = profile["ua"]
+        context = browser.new_context(**ctx)
         page = context.new_page()
         client = context.new_cdp_session(page)
-        client.send("Network.emulateNetworkConditions", {
-            "offline": False,
-            "latency": 150,                                  # ~Slow 4G RTT
-            "downloadThroughput": int(1.6 * 1024 * 1024 / 8),
-            "uploadThroughput": int(750 * 1024 / 8),
-        })
-        client.send("Emulation.setCPUThrottlingRate", {"rate": 4})
+        if profile["net"]:
+            down, up, rtt = profile["net"]
+            client.send("Network.emulateNetworkConditions", {
+                "offline": False, "latency": rtt,
+                "downloadThroughput": int(down * 1024 * 1024 / 8),
+                "uploadThroughput": int(up * 1024 / 8),
+            })
+        if profile["cpu"] > 1:
+            client.send("Emulation.setCPUThrottlingRate", {"rate": profile["cpu"]})
         page.goto(live_server, wait_until="load")
         page.wait_for_timeout(500)
         samples.append(page.evaluate(_COLLECT_JS))
         context.close()
-    return samples
+    return profile, samples
 
 
-def test_mobile_throttled_lcp(mobile_samples: list[dict]) -> None:
-    lcp = _median(mobile_samples, "lcp")
-    assert 0 < lcp < MOBILE_LCP_BUDGET_MS, (
-        f"Mobile (throttled) LCP {lcp:.0f}ms exceeds the budget of {MOBILE_LCP_BUDGET_MS}ms"
+def test_device_largest_contentful_paint(device_samples: tuple[dict, list[dict]]) -> None:
+    profile, samples = device_samples
+    lcp = _median(samples, "lcp")
+    assert 0 < lcp < profile["lcp"], (
+        f"[{profile['id']}] LCP {lcp:.0f}ms exceeds the budget of {profile['lcp']}ms"
     )
 
 
-def test_mobile_throttled_total_blocking_time(mobile_samples: list[dict]) -> None:
-    tbt = _median(mobile_samples, "tbt")
-    assert tbt < MOBILE_TBT_BUDGET_MS, (
-        f"Mobile (throttled) TBT {tbt:.0f}ms exceeds the budget of {MOBILE_TBT_BUDGET_MS}ms"
+def test_device_total_blocking_time(device_samples: tuple[dict, list[dict]]) -> None:
+    profile, samples = device_samples
+    tbt = _median(samples, "tbt")
+    assert tbt < profile["tbt"], (
+        f"[{profile['id']}] TBT {tbt:.0f}ms exceeds the budget of {profile['tbt']}ms"
+    )
+
+
+def test_device_cumulative_layout_shift(device_samples: tuple[dict, list[dict]]) -> None:
+    profile, samples = device_samples
+    cls = _median(samples, "cls")
+    assert cls < profile["cls"], (
+        f"[{profile['id']}] CLS {cls:.3f} exceeds the budget of {profile['cls']}"
     )

@@ -35,7 +35,7 @@
     <link rel="preload" href="{{ url_for('static', filename='fonts/jost.woff2') }}" as="font" type="font/woff2" crossorigin>
     <link rel="preload" href="{{ url_for('static', filename='fonts/playfairdisplay.woff2') }}" as="font" type="font/woff2" crossorigin>
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    {{ inline_css('css/styles.css') }}
 
     {% if config.get('UMAMI_WEBSITE_ID') %}
     <script async src="https://analytics.nexttech.com.ar/script.js" data-website-id="{{ config.UMAMI_WEBSITE_ID }}"></script>
@@ -323,10 +323,10 @@
         </div>
 
         <!-- Shared Next Tech footer (renders into the site's footer background) -->
-        <script src="https://nexttech.com.ar/static/js/nexttechFooter.js"></script>
+        <script defer src="https://nexttech.com.ar/static/js/nexttechFooter.js"></script>
         <nexttech-footer source="gluck-bags"></nexttech-footer>
     </footer>
 
-    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
