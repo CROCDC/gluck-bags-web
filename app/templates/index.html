@@ -82,12 +82,12 @@
         <section class="hero">
             <picture class="hero-media">
                 <source type="image/webp"
-                        srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa-720.webp') }} 720w,
+                        srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa-768.webp') }} 768w,
                                 {{ url_for('static', filename='img/hero/hero-tote-cognac-playa.webp') }} 1080w"
                         sizes="100vw">
                 <img class="hero-img"
                      src="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa.jpg') }}"
-                     srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa-720.jpg') }} 720w,
+                     srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa-768.jpg') }} 768w,
                              {{ url_for('static', filename='img/hero/hero-tote-cognac-playa.jpg') }} 1080w"
                      sizes="100vw"
                      width="1080" height="1080"
@@ -162,11 +162,11 @@
             <div class="feature-media reveal">
                 <picture>
                     <source type="image/webp"
-                            srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero-720.webp') }} 720w,
+                            srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero-768.webp') }} 768w,
                                     {{ url_for('static', filename='img/hero/hero-tote-gris-velero.webp') }} 1080w"
                             sizes="(max-width: 980px) 100vw, 50vw">
                     <img src="{{ url_for('static', filename='img/hero/hero-tote-gris-velero.jpg') }}"
-                         srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero-720.jpg') }} 720w,
+                         srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero-768.jpg') }} 768w,
                                  {{ url_for('static', filename='img/hero/hero-tote-gris-velero.jpg') }} 1080w"
                          sizes="(max-width: 980px) 100vw, 50vw"
                          width="1080" height="1080" alt="Tote GLÜCK en la cubierta de un velero" loading="lazy">
@@ -232,7 +232,7 @@
         <!-- ===================== RAW MATERIAL (VIDEO) ===================== -->
         <section class="materia" id="materia">
             <video class="materia-video js-lazy-video" muted loop playsinline preload="none"
-                   poster="{{ url_for('static', filename='img/video-posters/cuero-materia-prima.jpg') }}"
+                   data-poster="{{ url_for('static', filename='img/video-posters/cuero-materia-prima.jpg') }}"
                    data-desktop-webm="{{ url_for('static', filename='video/loops/cuero-loop-desktop.webm') }}"
                    data-desktop-mp4="{{ url_for('static', filename='video/loops/cuero-loop-desktop.mp4') }}"
                    data-mobile-webm="{{ url_for('static', filename='video/loops/cuero-loop-mobile.webm') }}"
@@ -284,7 +284,7 @@
         <section class="closer">
             <div class="closer-media reveal">
                 <video class="js-lazy-video" muted loop playsinline preload="none"
-                       poster="{{ url_for('static', filename='img/video-posters/packaging-unboxing.jpg') }}"
+                       data-poster="{{ url_for('static', filename='img/video-posters/packaging-unboxing.jpg') }}"
                        data-desktop-webm="{{ url_for('static', filename='video/packaging-desktop.webm') }}"
                        data-desktop-mp4="{{ url_for('static', filename='video/packaging-desktop.mp4') }}"
                        data-mobile-webm="{{ url_for('static', filename='video/packaging-mobile.webm') }}"

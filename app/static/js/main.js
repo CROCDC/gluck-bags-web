@@ -30,6 +30,12 @@
   const loadVideoSources = (video) => {
     if (video.dataset.loaded) return;
     video.dataset.loaded = "1";
+    // Poster is deferred (data-poster) so its ~150-180KB JPEG doesn't load
+    // eagerly and steal bandwidth from the initial paint. Set it now — the
+    // observer fires ~200px before the section, so it's painted in time.
+    if (video.dataset.poster && !video.poster) {
+      video.poster = video.dataset.poster;
+    }
     const html = sourcesFor(video)
       .filter(([src]) => src)
       .map(([src, type]) => '<source src="' + src + '" type="' + type + '">')

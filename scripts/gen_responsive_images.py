@@ -30,15 +30,16 @@ BASES = [
 WIDTHS = [400, 600]
 
 # Full-bleed hero / feature images: rendered at 100vw, so they need larger
-# breakpoints than the grid cards. 720w covers high-DPR phones (the Moto G
-# Power emulated by Lighthouse displays the hero at ~721px); 1080w is the
-# source resolution, kept for wider / retina desktops.
+# breakpoints than the grid cards. The Moto G Power emulated by Lighthouse
+# asks for a ~721px slot (412 CSS px x ~1.75 DPR), so the small variant must
+# be >= 721 or the browser rounds *up* to 1080 and downloads the full file.
+# 768w covers that phone with headroom; 1080w is the source res for desktop.
 HERO_BASES = [
     "img/hero/hero-tote-cognac-playa",
     "img/hero/hero-tote-gris-velero",
 ]
 
-HERO_WIDTHS = [720, 1080]
+HERO_WIDTHS = [768, 1080]
 
 
 def _source(base: str) -> str:
