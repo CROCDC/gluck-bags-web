@@ -26,6 +26,10 @@
     <title>{{ brand }} · {{ tagline }}</title>
     <meta name="description" content="{{ brand }} — {{ tagline }}. Carteras y bolsos de cuero vegano, hechos a mano con un diseño minimalista y atemporal.">
 
+    <!-- The shared Next Tech footer script + its assets load from this origin;
+         preconnecting shaves the TLS/connection setup off the critical path. -->
+    <link rel="preconnect" href="https://nexttech.com.ar" crossorigin>
+
     <link rel="icon" type="image/webp" href="{{ url_for('static', filename='img/marca/avatar-perfil-gluck.webp') }}">
     <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/marca/avatar-perfil-gluck.jpg') }}">
 
@@ -77,8 +81,15 @@
         <!-- ===================== HERO ===================== -->
         <section class="hero">
             <picture class="hero-media">
-                <source srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa.webp') }}" type="image/webp">
-                <img class="hero-img" src="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa.jpg') }}"
+                <source type="image/webp"
+                        srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa-720.webp') }} 720w,
+                                {{ url_for('static', filename='img/hero/hero-tote-cognac-playa.webp') }} 1080w"
+                        sizes="100vw">
+                <img class="hero-img"
+                     src="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa.jpg') }}"
+                     srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa-720.jpg') }} 720w,
+                             {{ url_for('static', filename='img/hero/hero-tote-cognac-playa.jpg') }} 1080w"
+                     sizes="100vw"
                      width="1080" height="1080"
                      alt="Tote de cuero vegano cognac de GLÜCK en la playa" fetchpriority="high">
             </picture>
@@ -150,8 +161,15 @@
         <section class="feature">
             <div class="feature-media reveal">
                 <picture>
-                    <source srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero.webp') }}" type="image/webp">
-                    <img src="{{ url_for('static', filename='img/hero/hero-tote-gris-velero.jpg') }}" width="1080" height="1080" alt="Tote GLÜCK en la cubierta de un velero" loading="lazy">
+                    <source type="image/webp"
+                            srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero-720.webp') }} 720w,
+                                    {{ url_for('static', filename='img/hero/hero-tote-gris-velero.webp') }} 1080w"
+                            sizes="(max-width: 980px) 100vw, 50vw">
+                    <img src="{{ url_for('static', filename='img/hero/hero-tote-gris-velero.jpg') }}"
+                         srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero-720.jpg') }} 720w,
+                                 {{ url_for('static', filename='img/hero/hero-tote-gris-velero.jpg') }} 1080w"
+                         sizes="(max-width: 980px) 100vw, 50vw"
+                         width="1080" height="1080" alt="Tote GLÜCK en la cubierta de un velero" loading="lazy">
                 </picture>
             </div>
             <div class="feature-text reveal">

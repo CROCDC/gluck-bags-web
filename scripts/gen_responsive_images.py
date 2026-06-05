@@ -29,6 +29,17 @@ BASES = [
 
 WIDTHS = [400, 600]
 
+# Full-bleed hero / feature images: rendered at 100vw, so they need larger
+# breakpoints than the grid cards. 720w covers high-DPR phones (the Moto G
+# Power emulated by Lighthouse displays the hero at ~721px); 1080w is the
+# source resolution, kept for wider / retina desktops.
+HERO_BASES = [
+    "img/hero/hero-tote-cognac-playa",
+    "img/hero/hero-tote-gris-velero",
+]
+
+HERO_WIDTHS = [720, 1080]
+
 
 def _source(base: str) -> str:
     for ext in (".webp", ".jpg", ".jpeg", ".png"):
@@ -38,20 +49,26 @@ def _source(base: str) -> str:
     raise FileNotFoundError(f"No source image for {base}")
 
 
+def _emit(base: str, widths: list[int]) -> None:
+    src = _source(base)
+    img = Image.open(src)
+    for width in widths:
+        if width >= img.width:
+            continue
+        height = round(img.height * width / img.width)
+        resized = img.resize((width, height), Image.LANCZOS)
+        webp_out = os.path.join(STATIC, f"{base}-{width}.webp")
+        jpg_out = os.path.join(STATIC, f"{base}-{width}.jpg")
+        resized.save(webp_out, "WEBP", quality=80, method=6)
+        resized.convert("RGB").save(jpg_out, "JPEG", quality=82, optimize=True)
+        print(f"{base}-{width}: {width}x{height}")
+
+
 def main() -> None:
     for base in BASES:
-        src = _source(base)
-        img = Image.open(src)
-        for width in WIDTHS:
-            if width >= img.width:
-                continue
-            height = round(img.height * width / img.width)
-            resized = img.resize((width, height), Image.LANCZOS)
-            webp_out = os.path.join(STATIC, f"{base}-{width}.webp")
-            jpg_out = os.path.join(STATIC, f"{base}-{width}.jpg")
-            resized.save(webp_out, "WEBP", quality=80, method=6)
-            resized.convert("RGB").save(jpg_out, "JPEG", quality=82, optimize=True)
-            print(f"{base}-{width}: {width}x{height}")
+        _emit(base, WIDTHS)
+    for base in HERO_BASES:
+        _emit(base, HERO_WIDTHS)
 
 
 if __name__ == "__main__":
