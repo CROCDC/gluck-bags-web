@@ -36,7 +36,7 @@
     /* palette */
     --ink:        #1a1714;   /* near-black, warm */
     --ink-soft:   #5a534b;   /* muted body text */
-    --ink-faint:  #8a8178;   /* captions / meta */
+    --ink-faint:  #655d54;   /* captions / meta — AA contrast (>=4.5:1 on paper) */
     --paper:      #f4efe9;   /* warm off-white */
     --paper-2:    #ebe3d9;   /* slightly deeper neutral */
     --paper-3:    #e2d8cb;   /* deepest neutral / image bg */
@@ -765,7 +765,7 @@ h1, h2, h3, h4 { margin: 0; font-weight: 400; }
     color: var(--cognac);
     margin-bottom: 0.9rem;
 }
-.value h4 {
+.value h3 {
     font-family: var(--serif);
     font-size: 1.35rem;
     margin-bottom: 0.55rem;

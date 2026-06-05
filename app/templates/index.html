@@ -79,6 +79,7 @@
             <picture class="hero-media">
                 <source srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa.webp') }}" type="image/webp">
                 <img class="hero-img" src="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa.jpg') }}"
+                     width="1080" height="1080"
                      alt="Tote de cuero vegano cognac de GLÜCK en la playa" fetchpriority="high">
             </picture>
             <div class="hero-overlay"></div>
@@ -119,8 +120,15 @@
                 <a href="#shop" class="cat-card reveal" style="--i: {{ loop.index0 }}">
                     <div class="cat-media">
                         <picture>
-                            <source srcset="{{ url_for('static', filename=cat.image ~ '.webp') }}" type="image/webp">
-                            <img src="{{ url_for('static', filename=cat.image ~ '.jpg') }}" alt="{{ cat.name }}" loading="lazy">
+                            <source type="image/webp"
+                                    srcset="{{ url_for('static', filename=cat.image ~ '-400.webp') }} 400w,
+                                            {{ url_for('static', filename=cat.image ~ '-600.webp') }} 600w"
+                                    sizes="(max-width: 768px) 50vw, 25vw">
+                            <img src="{{ url_for('static', filename=cat.image ~ '-600.jpg') }}"
+                                 srcset="{{ url_for('static', filename=cat.image ~ '-400.jpg') }} 400w,
+                                         {{ url_for('static', filename=cat.image ~ '-600.jpg') }} 600w"
+                                 sizes="(max-width: 768px) 50vw, 25vw"
+                                 width="600" height="800" alt="{{ cat.name }}" loading="lazy">
                         </picture>
                         <span class="cat-index">{{ '%02d' % loop.index }}</span>
                         <span class="cat-arrow" aria-hidden="true">
@@ -143,7 +151,7 @@
             <div class="feature-media reveal">
                 <picture>
                     <source srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero.webp') }}" type="image/webp">
-                    <img src="{{ url_for('static', filename='img/hero/hero-tote-gris-velero.jpg') }}" alt="Tote GLÜCK en la cubierta de un velero" loading="lazy">
+                    <img src="{{ url_for('static', filename='img/hero/hero-tote-gris-velero.jpg') }}" width="1080" height="1080" alt="Tote GLÜCK en la cubierta de un velero" loading="lazy">
                 </picture>
             </div>
             <div class="feature-text reveal">
@@ -175,8 +183,15 @@
                 <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="product reveal" style="--i: {{ loop.index0 % 3 }}">
                     <div class="product-media">
                         <picture>
-                            <source srcset="{{ url_for('static', filename=product.image ~ '.webp') }}" type="image/webp">
-                            <img src="{{ url_for('static', filename=product.image ~ '.jpg') }}" alt="{{ product.name }}" loading="lazy">
+                            <source type="image/webp"
+                                    srcset="{{ url_for('static', filename=product.image ~ '-400.webp') }} 400w,
+                                            {{ url_for('static', filename=product.image ~ '-600.webp') }} 600w"
+                                    sizes="(max-width: 768px) 50vw, 33vw">
+                            <img src="{{ url_for('static', filename=product.image ~ '-600.jpg') }}"
+                                 srcset="{{ url_for('static', filename=product.image ~ '-400.jpg') }} 400w,
+                                         {{ url_for('static', filename=product.image ~ '-600.jpg') }} 600w"
+                                 sizes="(max-width: 768px) 50vw, 33vw"
+                                 width="640" height="800" alt="{{ product.name }}" loading="lazy">
                         </picture>
                         <span class="product-badge">Ver en Instagram</span>
                     </div>
@@ -230,17 +245,17 @@
                 <div class="manifiesto-values">
                     <div class="value">
                         <span class="value-index">01</span>
-                        <h4>100% vegano</h4>
+                        <h3>100% vegano</h3>
                         <p>Sin pieles ni derivados animales.</p>
                     </div>
                     <div class="value">
                         <span class="value-index">02</span>
-                        <h4>Sin costuras</h4>
+                        <h3>Sin costuras</h3>
                         <p>De una sola pieza, plegada y unida con remaches.</p>
                     </div>
                     <div class="value">
                         <span class="value-index">03</span>
-                        <h4>Atemporal</h4>
+                        <h3>Atemporal</h3>
                         <p>Diseños que no pasan de moda.</p>
                     </div>
                 </div>
