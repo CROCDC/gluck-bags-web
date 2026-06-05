@@ -10,6 +10,7 @@ services:
       UPLOAD_FOLDER: ${UPLOAD_FOLDER:-uploads}
       VIRTUAL_HOST: gluck.nexttech.com.ar
       VIRTUAL_PORT: 7014
+      UMAMI_WEBSITE_ID: 4badbd28-ea2a-4c67-9520-fe0814abcd1d
     ports:
       - "7014:7014"
     expose:

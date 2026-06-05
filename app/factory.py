@@ -14,6 +14,7 @@ def create_app() -> Flask:
     app = Flask(__name__)
 
     app.config["UPLOAD_FOLDER"] = os.environ.get("UPLOAD_FOLDER", "uploads")
+    app.config["UMAMI_WEBSITE_ID"] = os.environ.get("UMAMI_WEBSITE_ID")
 
     @app.context_processor
     def inject_globals() -> dict[str, Any]:
