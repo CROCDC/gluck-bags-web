@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <!-- Open Graph / social link preview (must come first in <head>, before scripts/CSS) -->
     <meta property="og:type"             content="website">
-    <meta property="og:url"              content="https://gluck.nexttech.com.ar/">
+    <meta property="og:url"              content="{{ site_url }}/">
     <meta property="og:title"            content="{{ brand }} · {{ tagline }}">
     <meta property="og:description"      content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
-    <meta property="og:image"            content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
-    <meta property="og:image:secure_url" content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
+    <meta property="og:image"            content="{{ site_url }}/static/img/og-image.jpg">
+    <meta property="og:image:secure_url" content="{{ site_url }}/static/img/og-image.jpg">
     <meta property="og:image:type"       content="image/jpeg">
     <meta property="og:image:width"      content="1200">
     <meta property="og:image:height"     content="630">
@@ -21,10 +21,13 @@
     <meta name="twitter:card"        content="summary_large_image">
     <meta name="twitter:title"       content="{{ brand }} · {{ tagline }}">
     <meta name="twitter:description" content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
-    <meta name="twitter:image"       content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
+    <meta name="twitter:image"       content="{{ site_url }}/static/img/og-image.jpg">
 
     <title>{{ brand }} · {{ tagline }}</title>
     <meta name="description" content="{{ brand }} — {{ tagline }}. Carteras y bolsos de cuero vegano, hechos a mano con un diseño minimalista y atemporal.">
+    <!-- Same content is served on www and the nexttech alias; pin the canonical
+         to the apex domain so search engines don't see duplicate pages. -->
+    <link rel="canonical" href="{{ site_url }}/">
 
     <!-- The shared Next Tech footer script + its assets load from this origin;
          preconnecting shaves the TLS/connection setup off the critical path. -->
