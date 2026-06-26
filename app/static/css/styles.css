@@ -988,3 +988,87 @@ nexttech-footer {
     .hero-actions { flex-direction: column; }
     .hero-actions .btn { width: 100%; }
 }
+
+/* ============================================================
+   PRODUCTS — price on the card + empty state (added with the admin)
+   ============================================================ */
+
+.product-price {
+    flex: none;
+    font-family: var(--serif);
+    font-size: 1.15rem;
+    color: var(--ink);
+    white-space: nowrap;
+}
+.product:hover .product-price { color: var(--cognac); }
+
+.shop-empty {
+    text-align: center;
+    color: var(--ink-faint);
+    font-size: 1.05rem;
+    padding: 2rem 0 1rem;
+}
+
+/* ============================================================
+   PRODUCT DETAIL PAGE (PDP)
+   ============================================================ */
+
+.pdp {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: calc(var(--header-h) + clamp(1.5rem, 4vw, 3rem)) var(--pad) clamp(3rem, 7vw, 6rem);
+}
+.pdp-back {
+    display: inline-block;
+    margin-bottom: clamp(1.2rem, 3vw, 2rem);
+    font-size: 0.8rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    transition: color 0.3s var(--ease);
+}
+.pdp-back:hover { color: var(--cognac); }
+
+.pdp-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+    gap: clamp(1.5rem, 4vw, 4rem);
+    align-items: start;
+}
+.pdp-gallery { display: flex; flex-direction: column; gap: clamp(0.8rem, 2vw, 1.4rem); }
+.pdp-media {
+    width: 100%;
+    display: block;
+    border-radius: 4px;
+    overflow: hidden;
+    background: var(--paper-3);
+}
+.pdp-media img,
+video.pdp-media { width: 100%; height: auto; display: block; }
+.pdp-noimg { width: 100%; aspect-ratio: 4 / 5; background: var(--paper-3); border-radius: 4px; }
+
+.pdp-info { position: sticky; top: calc(var(--header-h) + 1.5rem); }
+.pdp-title {
+    font-family: var(--serif);
+    font-size: clamp(1.9rem, 4vw, 2.8rem);
+    line-height: 1.05;
+    margin: 0.6rem 0 0.4rem;
+}
+.pdp-price {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    color: var(--cognac);
+    margin: 0 0 1.4rem;
+}
+.pdp-desc {
+    white-space: pre-line;          /* keep the admin's line breaks, no raw HTML */
+    color: var(--ink-soft);
+    line-height: 1.7;
+    margin-bottom: 2rem;
+}
+.pdp-cta { width: 100%; text-align: center; }
+
+@media (max-width: 980px) {
+    .pdp-grid { grid-template-columns: 1fr; }
+    .pdp-info { position: static; }
+}
