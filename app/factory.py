@@ -172,6 +172,10 @@ def create_app() -> Flask:
             "brand": "GLÜCK",
             "tagline": "Bolsos minimalistas de cuero vegano",
             "instagram_url": "https://www.instagram.com/gluck_bags/",
+            # Public/canonical origin for absolute OG, Twitter and canonical URLs.
+            # Still the nexttech subdomain for now; flip to https://gluck-bags.com
+            # (via SITE_URL or this default) once we cut over to the real domain.
+            "site_url": os.environ.get("SITE_URL", "https://gluck.nexttech.com.ar").rstrip("/"),
         }
 
     with app.app_context():
