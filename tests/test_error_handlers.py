@@ -146,6 +146,23 @@ def test_unknown_route_returns_clean_404(tmp_path, monkeypatch) -> None:
     assert resp.get_data(as_text=True) != ERROR_500_BODY
 
 
+def test_404_is_branded_and_noindex(tmp_path, monkeypatch) -> None:
+    """The 404 renders the branded Spanish page: correct status, html lang=es,
+    noindex, the brand wordmark/nav, and a link back to the home — not the bare
+    Werkzeug default. (Needs testing=False so the handler actually runs.)"""
+    app = _make_app(tmp_path, monkeypatch, testing=False)
+    resp = app.test_client().get("/definitely-not-a-real-route")
+    html = resp.get_data(as_text=True)
+
+    assert resp.status_code == 404
+    assert '<html lang="es">' in html
+    assert 'name="robots" content="noindex"' in html
+    assert "GLÜCK" in html  # brand chrome (header/footer) is present
+    assert 'href="/"' in html  # a way back into the site
+    # Not the raw Werkzeug body.
+    assert "The requested URL was not found on the server" not in html
+
+
 # --- Smoke: no zero-arg GET route 5xxs on boot --------------------------------
 
 

@@ -1,0 +1,8 @@
+# Fingerprint https://gluckbags.com
+generator: (none)
+wordpress: False
+themes: (none)
+plugins:
+server:
+  server: cloudflare
+  cf-ray: a13780c4ce5ad7c1-EZE

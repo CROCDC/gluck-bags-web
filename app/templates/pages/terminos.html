@@ -1,0 +1,25 @@
+{% extends "pages/_page_base.html" %}
+
+{% block page_body %}
+    <p>Estos términos y condiciones regulan el uso del sitio de {{ brand }} y la compra
+    de nuestros productos. Al navegar o comprar, aceptás estas condiciones.</p>
+
+    {# TODO: revisar / completar con asesoramiento legal antes de publicar. #}
+    <h2>Productos y precios</h2>
+    <p>Las imágenes son ilustrativas. Al tratarse de piezas artesanales pueden existir
+    pequeñas variaciones de color y terminación. Los precios y la disponibilidad pueden
+    cambiar sin previo aviso; el valor final se confirma al coordinar la compra.</p>
+
+    <h2>Compras</h2>
+    <p>Las compras se coordinan a través de Instagram o WhatsApp. La compra se considera
+    confirmada una vez acordados el producto, el pago y el envío.</p>
+
+    <h2>Propiedad intelectual</h2>
+    <p>Las marcas, textos, fotografías y diseños del sitio pertenecen a {{ brand }} y no
+    pueden reproducirse sin autorización.</p>
+
+    <h2>Contacto</h2>
+    <p>Ante cualquier duda, escribinos por
+    <a href="{{ instagram_url }}" target="_blank" rel="noopener">Instagram</a> o desde la
+    página de <a href="{{ url_for('page_contacto') }}">contacto</a>.</p>
+{% endblock %}

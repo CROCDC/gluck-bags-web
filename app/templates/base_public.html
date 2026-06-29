@@ -7,11 +7,11 @@
     <!-- Open Graph / social link preview (must come first in <head>, before scripts/CSS) -->
     {% block social_meta %}
     <meta property="og:type"             content="website">
-    <meta property="og:url"              content="https://gluck.nexttech.com.ar/">
+    <meta property="og:url"              content="{{ site_url }}/">
     <meta property="og:title"            content="{{ brand }} · {{ tagline }}">
     <meta property="og:description"      content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
-    <meta property="og:image"            content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
-    <meta property="og:image:secure_url" content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
+    <meta property="og:image"            content="{{ site_url }}/static/img/og-image.jpg">
+    <meta property="og:image:secure_url" content="{{ site_url }}/static/img/og-image.jpg">
     <meta property="og:image:type"       content="image/jpeg">
     <meta property="og:image:width"      content="1200">
     <meta property="og:image:height"     content="630">
@@ -23,11 +23,16 @@
     <meta name="twitter:card"        content="summary_large_image">
     <meta name="twitter:title"       content="{{ brand }} · {{ tagline }}">
     <meta name="twitter:description" content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
-    <meta name="twitter:image"       content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
+    <meta name="twitter:image"       content="{{ site_url }}/static/img/og-image.jpg">
     {% endblock %}
 
     <title>{% block title %}{{ brand }} · {{ tagline }}{% endblock %}</title>
     <meta name="description" content="{% block description %}{{ brand }} — {{ tagline }}. Carteras y bolsos de cuero vegano, hechos a mano con un diseño minimalista y atemporal.{% endblock %}">
+
+    {# Self-referencing canonical (query string dropped via request.path), so URL
+       variants — ?s=, ?utm=, alternate hosts — all collapse to one indexable URL.
+       Pages with a normalized URL (e.g. product detail) override this block. #}
+    {% block canonical %}<link rel="canonical" href="{{ site_url }}{{ request.path }}">{% endblock %}
 
     <!-- The shared Next Tech footer script + its assets load from this origin;
          preconnecting shaves the TLS/connection setup off the critical path. -->
@@ -103,9 +108,16 @@
             <nav class="footer-nav" aria-label="Pie de página">
                 <a href="{{ home }}#categorias">Colección</a>
                 <a href="{{ home }}#shop">Bolsos</a>
-                <a href="{{ home }}#materia">Materia</a>
-                <a href="{{ home }}#manifiesto">Nosotras</a>
+                <a href="{{ url_for('page_nosotras') }}">Nosotras</a>
+                <a href="{{ url_for('page_contacto') }}">Contacto</a>
+                <a href="{{ url_for('page_envios') }}">Envíos</a>
+                <a href="{{ url_for('page_cambios_y_devoluciones') }}">Cambios</a>
                 <a href="{{ instagram_url }}" target="_blank" rel="noopener">Instagram</a>
+            </nav>
+
+            <nav class="footer-legal" aria-label="Legales">
+                <a href="{{ url_for('page_terminos') }}">Términos</a>
+                <a href="{{ url_for('page_privacidad') }}">Privacidad</a>
             </nav>
         </div>
         <div class="footer-bottom">

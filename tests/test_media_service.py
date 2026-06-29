@@ -196,12 +196,18 @@ class TestProcessImage:
                 assert ji.width == w
             with Image.open(webp) as wi:
                 assert wi.width == w
-        # Exactly the variants we expect, nothing extra.
+        # Exactly the variants we expect: a jpg+webp per width, plus the 1200x630
+        # social-share crop (og.jpg) used for og:image / twitter:image.
         files = sorted(os.listdir(abs_dir))
         expected = sorted(
-            [f"{w}.jpg" for w in result["widths"]] + [f"{w}.webp" for w in result["widths"]]
+            [f"{w}.jpg" for w in result["widths"]]
+            + [f"{w}.webp" for w in result["widths"]]
+            + ["og.jpg"]
         )
         assert files == expected
+        # The og crop is exactly 1200x630.
+        with Image.open(os.path.join(abs_dir, "og.jpg")) as og:
+            assert og.size == (1200, 630)
 
     def test_small_image_only_source_width_plus_smaller_widths(self, app, tmp_path) -> None:
         """A 500-wide source: only 400 is < 500, so widths are [400, 500]."""

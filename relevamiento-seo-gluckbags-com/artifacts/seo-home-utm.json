@@ -1,0 +1,189 @@
+{
+  "key": "home-utm",
+  "pagetype": "home",
+  "requestedUrl": "https://gluckbags.com/?utm_source=newsletter",
+  "captcha_wall": false,
+  "httpStatus": 200,
+  "xRobotsTag": null,
+  "contentType": "text/html; charset=utf-8",
+  "server": "cloudflare",
+  "redirectChain": [],
+  "finalUrl": "https://gluckbags.com/?utm_source=newsletter",
+  "title": "GLÜCK · Bolsos minimalistas de cuero vegano",
+  "titleLen": 43,
+  "metaDescription": "GLÜCK — Bolsos minimalistas de cuero vegano. Carteras y bolsos de cuero vegano, hechos a mano con un diseño minimalista y atemporal.",
+  "metaRobots": null,
+  "metaRobotsGoogle": null,
+  "canonical": "https://gluck.nexttech.com.ar/",
+  "canonicalSelf": false,
+  "htmlLang": "es",
+  "hreflang": [],
+  "headings": [
+    {
+      "level": 1,
+      "text": "Bolsos minimalistas de cuero vegano",
+      "empty": false
+    },
+    {
+      "level": 2,
+      "text": "Cuatro siluetas, infinitas combinaciones",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Tote",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Mini Bag",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Bucket Bag",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Clutch",
+      "empty": false
+    },
+    {
+      "level": 2,
+      "text": "El Tote que te sigue\na todas partes",
+      "empty": false
+    },
+    {
+      "level": 2,
+      "text": "Lo último de GLÜCK",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Tote Cognac",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Tote Gris",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Crossbody Rosa",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Bandolera Rosa",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Clutch Sobre",
+      "empty": false
+    },
+    {
+      "level": 2,
+      "text": "Cuero vegano,\nelegido a mano",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "100% vegano",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Sin costuras",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Atemporal",
+      "empty": false
+    },
+    {
+      "level": 2,
+      "text": "Cada pedido llega\ncomo un regalo",
+      "empty": false
+    }
+  ],
+  "h1Count": 1,
+  "h1Texts": [
+    "Bolsos minimalistas de cuero vegano"
+  ],
+  "headingSkips": [],
+  "emptyHeadings": 0,
+  "wordCount": 369,
+  "links": {
+    "total": 26,
+    "internal": 19,
+    "external": 7,
+    "nofollow": 0,
+    "emptyAnchor": 0,
+    "genericAnchor": 0,
+    "badAnchors": []
+  },
+  "images": {
+    "total": 11,
+    "missingAlt": 0,
+    "emptyAlt": 0,
+    "lazy": 10,
+    "withDims": 11,
+    "formats": {
+      "png": 0,
+      "jpg": 5,
+      "webp": 6,
+      "avif": 0,
+      "gif": 0,
+      "svg": 0,
+      "other": 0
+    },
+    "missingAltSrc": []
+  },
+  "jsonLdTypes": [],
+  "jsonLdCount": 0,
+  "jsonLdErrors": [],
+  "microdataTypes": [],
+  "og": {
+    "og:type": "website",
+    "og:url": "https://gluck.nexttech.com.ar/",
+    "og:title": "GLÜCK · Bolsos minimalistas de cuero vegano",
+    "og:description": "Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.",
+    "og:image": "https://gluck.nexttech.com.ar/static/img/og-image.jpg",
+    "og:image:secure_url": "https://gluck.nexttech.com.ar/static/img/og-image.jpg",
+    "og:image:type": "image/jpeg",
+    "og:image:width": "1200",
+    "og:image:height": "630",
+    "og:image:alt": "Tote de cuero vegano cognac de GLÜCK en la playa",
+    "og:locale": "es_AR",
+    "og:site_name": "GLÜCK"
+  },
+  "twitter": {
+    "twitter:card": "summary_large_image",
+    "twitter:title": "GLÜCK · Bolsos minimalistas de cuero vegano",
+    "twitter:description": "Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.",
+    "twitter:image": "https://gluck.nexttech.com.ar/static/img/og-image.jpg"
+  },
+  "ogImage": "https://gluck.nexttech.com.ar/static/img/og-image.jpg",
+  "twitterCard": "summary_large_image",
+  "viewport": "width=device-width, initial-scale=1.0",
+  "charset": "UTF-8",
+  "favicon": true,
+  "appleTouchIcon": true,
+  "manifest": false,
+  "relNext": null,
+  "relPrev": null,
+  "ampHtml": null,
+  "mobile": {
+    "wordCount": 364,
+    "title": "GLÜCK · Bolsos minimalistas de cuero vegano",
+    "h1Count": 1,
+    "linkCount": 32,
+    "imgCount": 11
+  },
+  "noindex": false,
+  "indexable": true
+}

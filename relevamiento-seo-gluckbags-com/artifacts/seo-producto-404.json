@@ -1,0 +1,86 @@
+{
+  "key": "producto-404",
+  "pagetype": "notfound",
+  "requestedUrl": "https://gluckbags.com/producto/999999",
+  "captcha_wall": false,
+  "httpStatus": 404,
+  "xRobotsTag": null,
+  "contentType": "text/html; charset=utf-8",
+  "server": "cloudflare",
+  "redirectChain": [],
+  "finalUrl": "https://gluckbags.com/producto/999999",
+  "title": "404 Not Found",
+  "titleLen": 13,
+  "metaDescription": null,
+  "metaRobots": null,
+  "metaRobotsGoogle": null,
+  "canonical": null,
+  "canonicalSelf": null,
+  "htmlLang": "en",
+  "hreflang": [],
+  "headings": [
+    {
+      "level": 1,
+      "text": "Not Found",
+      "empty": false
+    }
+  ],
+  "h1Count": 1,
+  "h1Texts": [
+    "Not Found"
+  ],
+  "headingSkips": [],
+  "emptyHeadings": 0,
+  "wordCount": 24,
+  "links": {
+    "total": 0,
+    "internal": 0,
+    "external": 0,
+    "nofollow": 0,
+    "emptyAnchor": 0,
+    "genericAnchor": 0,
+    "badAnchors": []
+  },
+  "images": {
+    "total": 0,
+    "missingAlt": 0,
+    "emptyAlt": 0,
+    "lazy": 0,
+    "withDims": 0,
+    "formats": {
+      "png": 0,
+      "jpg": 0,
+      "webp": 0,
+      "avif": 0,
+      "gif": 0,
+      "svg": 0,
+      "other": 0
+    },
+    "missingAltSrc": []
+  },
+  "jsonLdTypes": [],
+  "jsonLdCount": 0,
+  "jsonLdErrors": [],
+  "microdataTypes": [],
+  "og": {},
+  "twitter": {},
+  "ogImage": null,
+  "twitterCard": null,
+  "viewport": null,
+  "charset": "UTF-8",
+  "favicon": false,
+  "appleTouchIcon": false,
+  "manifest": false,
+  "relNext": null,
+  "relPrev": null,
+  "ampHtml": null,
+  "mobile": {
+    "wordCount": 24,
+    "title": "404 Not Found",
+    "h1Count": 1,
+    "linkCount": 0,
+    "imgCount": 0
+  },
+  "noindex": false,
+  "indexable": false
+}

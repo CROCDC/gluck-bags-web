@@ -1,0 +1,10 @@
+{
+  "generator": "",
+  "themes": [],
+  "plugins": {},
+  "is_wordpress": false,
+  "server_headers": {
+    "server": "cloudflare",
+    "cf-ray": "a13780c4ce5ad7c1-EZE"
+  }
+}

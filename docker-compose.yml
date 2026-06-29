@@ -16,7 +16,12 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       SECRET_KEY: ${SECRET_KEY:-}
       SESSION_COOKIE_SECURE: "1"
-      # Multi-domain: the real apex + www, plus the nexttech alias.
+      # The single canonical/indexable origin (OG, canonical, sitemap).
+      SITE_URL: https://gluckbags.com
+      # Enforce the canonical host: www, the alias and http all 301 to SITE_URL + HSTS.
+      FORCE_CANONICAL_HOST: "1"
+      # Multi-domain: the real apex + www, plus the nexttech alias. The alias and www
+      # are routed here so the app can 301 them to the canonical host.
       VIRTUAL_HOST: gluckbags.com,www.gluckbags.com,gluck.nexttech.com.ar
       VIRTUAL_PORT: 7014
       UMAMI_WEBSITE_ID: 4badbd28-ea2a-4c67-9520-fe0814abcd1d

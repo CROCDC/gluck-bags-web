@@ -41,6 +41,12 @@ HERO_BASES = [
 
 HERO_WIDTHS = [768, 1080]
 
+# AVIF variants for the hero(es): the LCP image. AVIF is markedly smaller than WebP
+# at the same quality, so browsers that support it download far fewer bytes. Emitted
+# at the mobile breakpoint (768) and the full source width (1080, named <base>.avif).
+AVIF_WIDTHS = [768, 1080]
+AVIF_QUALITY = 55
+
 
 def _source(base: str) -> str:
     for ext in (".webp", ".jpg", ".jpeg", ".png"):
@@ -65,11 +71,27 @@ def _emit(base: str, widths: list[int]) -> None:
         print(f"{base}-{width}: {width}x{height}")
 
 
+def _emit_avif(base: str, widths: list[int]) -> None:
+    src = _source(base)
+    img = Image.open(src).convert("RGB")
+    for width in widths:
+        w = min(width, img.width)
+        if w == img.width:
+            resized, out = img, os.path.join(STATIC, f"{base}.avif")
+        else:
+            height = round(img.height * w / img.width)
+            resized = img.resize((w, height), Image.LANCZOS)
+            out = os.path.join(STATIC, f"{base}-{w}.avif")
+        resized.save(out, "AVIF", quality=AVIF_QUALITY)
+        print(f"{os.path.basename(out)}: {resized.width}x{resized.height}")
+
+
 def main() -> None:
     for base in BASES:
         _emit(base, WIDTHS)
     for base in HERO_BASES:
         _emit(base, HERO_WIDTHS)
+        _emit_avif(base, AVIF_WIDTHS)
 
 
 if __name__ == "__main__":

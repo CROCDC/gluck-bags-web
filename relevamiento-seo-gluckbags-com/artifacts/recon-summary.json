@@ -1,0 +1,25 @@
+{
+  "base": "https://gluckbags.com",
+  "host": "gluckbags.com",
+  "platform": "generic",
+  "url_count": 0,
+  "sitemap_count": 0,
+  "sample": [
+    {
+      "url": "https://gluckbags.com/",
+      "key": "gluckbags-com",
+      "pagetype": "home"
+    },
+    {
+      "url": "https://gluckbags.com/?s=seo",
+      "key": "gluckbags-com-s-seo",
+      "pagetype": "search"
+    },
+    {
+      "url": "https://gluckbags.com/zzz-seo-audit-404-test-page/",
+      "key": "gluckbags-com-zzz-seo-audit-404-test-page",
+      "pagetype": "notfound"
+    }
+  ],
+  "robots_present": true
+}

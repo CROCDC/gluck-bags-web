@@ -1,0 +1,30 @@
+{# Compact product card, reused by the category pages and the related-products
+   strip. The home shop grid keeps its own (perf-tuned) markup. #}
+{% macro product_card(product) %}
+{% set cover = product.cover %}
+<a href="{{ url_for('product_detail', product_id=product.id) }}" class="product">
+    <div class="product-media">
+        {% if cover and cover.is_image and cover.smallest_width %}
+        <picture>
+            <source type="image/webp" srcset="{{ cover.image_srcset('webp', 600) }}"
+                    sizes="(max-width: 768px) 50vw, 33vw">
+            <img src="{{ cover.image_url(cover.smallest_width) }}"
+                 srcset="{{ cover.image_srcset('jpg', 600) }}"
+                 sizes="(max-width: 768px) 50vw, 33vw"
+                 width="{{ cover.width }}" height="{{ cover.height }}"
+                 alt="{{ product.title }}" loading="lazy">
+        </picture>
+        {% elif cover and cover.is_video %}
+        <img src="{{ cover.poster_url }}" width="{{ cover.width or 640 }}"
+             height="{{ cover.height or 800 }}" alt="{{ product.title }}" loading="lazy">
+        {% endif %}
+    </div>
+    <div class="product-info">
+        <div class="product-meta">
+            <h3 class="product-name">{{ product.title }}</h3>
+            {% if product.category %}<span class="product-cat">{{ product.category }}</span>{% endif %}
+        </div>
+        <span class="product-price">{{ product.formatted_price or 'Consultar' }}</span>
+    </div>
+</a>
+{% endmacro %}

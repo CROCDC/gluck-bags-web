@@ -1,9 +1,10 @@
 import os
 from datetime import datetime, timedelta
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from dotenv import load_dotenv
-from flask import Flask
+from flask import Flask, redirect, render_template, request
 from flask_compress import Compress
 from flask_sqlalchemy import SQLAlchemy
 from markupsafe import Markup
@@ -86,6 +87,40 @@ def _resolve_secret_key(data_dir: str) -> str:
         return key
 
 
+def _register_canonical_host(app: Flask) -> None:
+    """Enforce one canonical host + HTTPS when FORCE_CANONICAL_HOST is on (prod).
+
+    The site answers on three hosts (apex, www, and the nexttech alias) and over
+    plain http; without this every variant is a crawlable duplicate and the canonical
+    domain leaks. We 301 any non-canonical host/scheme to SITE_URL (preserving path +
+    query) and add HSTS. Gated by a flag so the local/test client (host 'localhost')
+    is never redirected."""
+    if not app.config["FORCE_CANONICAL_HOST"]:
+        return
+
+    canonical = urlsplit(app.config["SITE_URL"])
+    canonical_host = canonical.netloc
+    canonical_scheme = canonical.scheme or "https"
+
+    @app.before_request
+    def _redirect_to_canonical() -> Any:
+        # Behind nginx-proxy/Cloudflare the original scheme arrives in this header.
+        scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
+        if request.host == canonical_host and scheme == canonical_scheme:
+            return None
+        target = urlunsplit(
+            (canonical_scheme, canonical_host, request.path, request.query_string.decode(), "")
+        )
+        return redirect(target, code=301)
+
+    @app.after_request
+    def _hsts(response: Any) -> Any:
+        response.headers.setdefault(
+            "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
+        )
+        return response
+
+
 def create_app() -> Flask:
     app = Flask(__name__)
 
@@ -127,6 +162,21 @@ def create_app() -> Flask:
     )
 
     app.config["UMAMI_WEBSITE_ID"] = os.environ.get("UMAMI_WEBSITE_ID")
+
+    # Public/canonical origin for absolute OG, Twitter, canonical and sitemap URLs
+    # (no trailing slash). Defaults to the real apex domain; overridable per env.
+    app.config["SITE_URL"] = os.environ.get("SITE_URL", "https://gluckbags.com").rstrip("/")
+
+    # When on (production), the app enforces a single canonical host: every request
+    # on another host (www, the nexttech alias) or over http is 301-redirected to
+    # SITE_URL, and responses carry HSTS. Off by default so the local/test client
+    # (host "localhost") is never redirected.
+    app.config["FORCE_CANONICAL_HOST"] = os.environ.get("FORCE_CANONICAL_HOST", "0") in (
+        "1",
+        "true",
+        "True",
+    )
+    _register_canonical_host(app)
 
     db.init_app(app)
 
@@ -173,9 +223,7 @@ def create_app() -> Flask:
             "tagline": "Bolsos minimalistas de cuero vegano",
             "instagram_url": "https://www.instagram.com/gluck_bags/",
             # Public/canonical origin for absolute OG, Twitter and canonical URLs.
-            # Still the nexttech subdomain for now; flip to https://gluck-bags.com
-            # (via SITE_URL or this default) once we cut over to the real domain.
-            "site_url": os.environ.get("SITE_URL", "https://gluck.nexttech.com.ar").rstrip("/"),
+            "site_url": app.config["SITE_URL"],
         }
 
     with app.app_context():
@@ -191,6 +239,11 @@ def create_app() -> Flask:
 
         register_routes(app)
         register_admin(app)
+
+    @app.errorhandler(404)
+    def _not_found(error: object) -> tuple[str, int]:
+        # Branded, indexable-safe (noindex) 404 in Spanish, with nav back to the site.
+        return render_template("404.html"), 404
 
     @app.errorhandler(413)
     def _too_large(error: object) -> tuple[str, int]:

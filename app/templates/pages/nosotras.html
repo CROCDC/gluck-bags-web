@@ -1,0 +1,21 @@
+{% extends "pages/_page_base.html" %}
+
+{% block page_body %}
+    <p>{{ brand }} nació de una idea simple: bolsos de líneas puras, hechos para durar,
+    sin pieles de origen animal y sin excesos. Diseñamos cada pieza en Argentina y la
+    producimos de forma artesanal, en series cortas.</p>
+
+    <h2>Cómo los hacemos</h2>
+    <p>Cada bolso sale de una sola pieza de cuero vegano: la diseñamos, la cortamos con
+    láser desde un molde propio y la plegamos a mano. La forma se sostiene con remaches
+    y broches, no con costuras. Por eso cada modelo es limpio, resistente y atemporal.</p>
+
+    <h2>Cuero vegano, elegido a mano</h2>
+    <p>Seleccionamos cada material por su tacto, su color y su durabilidad. Trabajamos
+    con materiales libres de crueldad animal, buscando el mejor equilibrio entre estética
+    y uso diario.</p>
+
+    <p>¿Querés conocer la colección? Escribinos por
+    <a href="{{ instagram_url }}" target="_blank" rel="noopener">Instagram</a> o pasá por
+    la <a href="{{ url_for('index') }}#shop">tienda</a>.</p>
+{% endblock %}

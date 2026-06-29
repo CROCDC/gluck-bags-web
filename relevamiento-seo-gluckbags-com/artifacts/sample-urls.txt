@@ -1,0 +1,8 @@
+https://gluckbags.com/|home|home
+https://gluckbags.com/producto/1|producto-1|product
+https://gluckbags.com/producto/2|producto-2|product
+https://gluckbags.com/producto/3|producto-3|product
+https://gluckbags.com/?s=seo|home-s-seo|search
+https://gluckbags.com/?utm_source=newsletter|home-utm|home
+https://gluckbags.com/producto/999999|producto-404|notfound
+https://gluckbags.com/zzz-seo-audit-404-test-page/|notfound-path|notfound

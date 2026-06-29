@@ -74,18 +74,6 @@ def _product_id_by_title(app: Flask, title: str) -> int:
         return product.id
 
 
-def _cover_default_image_url(app: Flask, product_id: int) -> str:
-    """The exact og:image path the detail template renders for the cover."""
-    with app.app_context():
-        from app.models import Product
-
-        product = Product.query.filter_by(id=product_id).first()
-        assert product is not None and product.cover is not None
-        url = product.cover.default_image_url
-        assert url, "cover has no default image url"
-        return url
-
-
 # --- 1) HOME Open Graph / Twitter card ----------------------------------------
 
 
@@ -108,7 +96,7 @@ def test_home_open_graph_and_twitter_card(client: FlaskClient) -> None:
         html,
         key="og:image",
         attr="property",
-        content="https://gluck.nexttech.com.ar/static/img/og-image.jpg",
+        content="https://gluckbags.com/static/img/og-image.jpg",
     )
     assert _has_meta(html, key="og:image:width", attr="property", content="1200")
     assert _has_meta(html, key="og:image:height", attr="property", content="630")
@@ -117,6 +105,97 @@ def test_home_open_graph_and_twitter_card(client: FlaskClient) -> None:
     assert _has_meta(
         html, key="twitter:card", attr="name", content="summary_large_image"
     )
+
+
+def _canonical_of(html: str) -> str | None:
+    match = re.search(r'<link rel="canonical" href="([^"]+)"', html)
+    return match.group(1) if match else None
+
+
+def _jsonld_types(html: str) -> list[str]:
+    """All @type values across every JSON-LD <script> on the page."""
+    import json
+
+    types: list[str] = []
+    for block in re.findall(
+        r'<script type="application/ld\+json">(.*?)</script>', html, re.S
+    ):
+        data = json.loads(block)
+        for obj in data if isinstance(data, list) else [data]:
+            if obj.get("@type"):
+                types.append(obj["@type"])
+    return types
+
+
+# --- 1b) Canonical + JSON-LD structured data ----------------------------------
+
+
+def test_home_canonical_and_structured_data(client: FlaskClient) -> None:
+    """The home self-canonicalizes to the apex and ships Organization + WebSite."""
+    html = client.get("/").get_data(as_text=True)
+    assert _canonical_of(html) == "https://gluckbags.com/"
+    assert set(_jsonld_types(html)) >= {"Organization", "WebSite"}
+
+
+def test_query_params_collapse_to_clean_canonical(client: FlaskClient) -> None:
+    """Tracking/search params don't fork the canonical: ?utm=, ?s= -> apex root."""
+    for path in ("/?utm_source=newsletter", "/?s=cualquier-cosa"):
+        html = client.get(path).get_data(as_text=True)
+        assert _canonical_of(html) == "https://gluckbags.com/"
+
+
+def test_detail_canonical_and_product_jsonld_without_price(
+    auth_client: FlaskClient, client: FlaskClient, app: Flask
+) -> None:
+    """A priceless product self-canonicalizes and emits Product + BreadcrumbList,
+    but NO offers (we never fabricate a price for a 'Consultar' item)."""
+    import json
+
+    title = "Sin Precio JSONLD"
+    _create_published_product_with_image(auth_client, title=title)
+    pid = _product_id_by_title(app, title)
+
+    html = client.get(f"/producto/{pid}").get_data(as_text=True)
+    assert _canonical_of(html) == f"https://gluckbags.com/producto/{pid}"
+
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
+    objs = [o for b in blocks for o in json.loads(b)]
+    product = next(o for o in objs if o["@type"] == "Product")
+    assert product["name"] == title
+    assert product["brand"]["name"] == _BRAND
+    assert "offers" not in product  # no price -> no Offer
+    assert any(o["@type"] == "BreadcrumbList" for o in objs)
+
+
+def test_detail_product_jsonld_has_offer_when_priced(
+    auth_client: FlaskClient, client: FlaskClient, app: Flask
+) -> None:
+    """A product WITH a price emits an Offer with that price + currency."""
+    import io
+    import json
+
+    title = "Con Precio JSONLD"
+    auth_client.post(
+        "/admin/products/new",
+        data={
+            "title": title,
+            "price": "45000",
+            "is_published": "on",
+            "media": (io.BytesIO(_SAMPLE_JPEG.read_bytes()), "foto.jpg"),
+            "order": '["new:0"]',
+        },
+        content_type="multipart/form-data",
+    )
+    pid = _product_id_by_title(app, title)
+
+    html = client.get(f"/producto/{pid}").get_data(as_text=True)
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S)
+    product = next(
+        o for b in blocks for o in json.loads(b) if o["@type"] == "Product"
+    )
+    assert product["offers"]["price"] == "45000"
+    assert product["offers"]["priceCurrency"] == "ARS"
+    assert product["offers"]["availability"].endswith("InStock")
 
 
 def test_home_lang_and_description(client: FlaskClient) -> None:
@@ -187,7 +266,6 @@ def test_detail_open_graph_is_product_specific(
     title = "Tote Cognac"
     _create_published_product_with_image(auth_client, title=title)
     pid = _product_id_by_title(app, title)
-    cover_url = _cover_default_image_url(app, pid)
 
     html = client.get(f"/producto/{pid}").get_data(as_text=True)
 
@@ -195,12 +273,12 @@ def test_detail_open_graph_is_product_specific(
     assert _has_meta(html, key="og:type", attr="property", content="product")
     assert not _has_meta(html, key="og:type", attr="property", content="website")
 
-    # og:url is the absolute canonical-ish detail URL.
+    # og:url is the absolute canonical detail URL on the canonical domain.
     assert _has_meta(
         html,
         key="og:url",
         attr="property",
-        content=f"https://gluck.nexttech.com.ar/producto/{pid}",
+        content=f"https://gluckbags.com/producto/{pid}",
     )
 
     # Title (OG + Twitter) carries the product name.
@@ -211,16 +289,16 @@ def test_detail_open_graph_is_product_specific(
         html, key="twitter:title", attr="name", content=f"{title} · {_BRAND}"
     )
 
-    # og:image is the cover's actual generated variant (largest jpg), absolute.
-    assert _has_meta(
-        html,
-        key="og:image",
-        attr="property",
-        content=f"https://gluck.nexttech.com.ar{cover_url}",
-    )
-    # Sanity: it really is a generated media variant, not the static fallback.
-    assert "/media/products/" in cover_url
-    assert cover_url.endswith(".jpg")
+    # og:image is the generated 1200x630 social crop (og.jpg), absolute, on the
+    # canonical domain — not the squished vertical cover nor the static brand image.
+    match = re.search(r'<meta property="og:image"\s+content="([^"]+)"', html)
+    assert match is not None, "no og:image rendered"
+    og_image = match.group(1)
+    assert og_image.startswith("https://gluckbags.com/media/products/")
+    assert og_image.endswith("/og.jpg")
+    assert _has_meta(html, key="og:image:width", attr="property", content="1200")
+    assert _has_meta(html, key="og:image:height", attr="property", content="630")
+    # The product page never falls back to the static brand og-image.
     assert "og-image.jpg" not in html
 
 

@@ -32,6 +32,32 @@ class ProductRepository:
         return db.session.get(Product, product_id)
 
     @staticmethod
+    def get_published_by_category(category: str) -> list[Product]:
+        return (
+            Product.query.options(selectinload(Product.media))
+            .filter_by(is_published=True, category=category)
+            .order_by(Product.position.asc(), Product.id.asc())
+            .all()
+        )
+
+    @staticmethod
+    def published_categories() -> list[str]:
+        """Distinct, non-empty categories among published products, in grid order."""
+        seen: list[str] = []
+        for product in ProductRepository.get_published():
+            if product.category and product.category not in seen:
+                seen.append(product.category)
+        return seen
+
+    @staticmethod
+    def get_related(product: Product, limit: int = 4) -> list[Product]:
+        """Other published products, same category first, excluding `product`."""
+        others = [p for p in ProductRepository.get_published() if p.id != product.id]
+        same = [p for p in others if product.category and p.category == product.category]
+        rest = [p for p in others if p not in same]
+        return (same + rest)[:limit]
+
+    @staticmethod
     def next_position() -> int:
         last = Product.query.order_by(Product.position.desc()).first()
         return (last.position + 1) if last else 0

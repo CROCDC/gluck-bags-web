@@ -1,0 +1,31 @@
+{% extends "base_public.html" %}
+{% from "macros.html" import product_card %}
+
+{% block body_class %}solid-header{% endblock %}
+
+{% block title %}{{ category }} · Carteras de cuero vegano | {{ brand }}{% endblock %}
+{% block description %}{{ category }}: carteras y bolsos de cuero vegano hechos a mano de {{ brand }}. Diseño minimalista y atemporal.{% endblock %}
+
+{# Keep empty (but known) categories out of the index until they have products. #}
+{% block head_extra %}{% if noindex %}<meta name="robots" content="noindex">{% endif %}{% endblock %}
+
+{% block body %}
+    <main class="section shop" id="top">
+        <div class="section-head">
+            <p class="eyebrow">La colección</p>
+            <h1 class="section-title">{{ category }}</h1>
+        </div>
+
+        {% if products %}
+        <div class="shop-grid">
+            {% for product in products %}{{ product_card(product) }}{% endfor %}
+        </div>
+        {% else %}
+        <p class="shop-empty">Muy pronto vas a ver acá nuestros {{ category | lower }}.</p>
+        {% endif %}
+
+        <p style="text-align: center; margin-top: 2.5rem;">
+            <a href="{{ url_for('index') }}#shop" class="pdp-back">← Ver todos los bolsos</a>
+        </p>
+    </main>
+{% endblock %}

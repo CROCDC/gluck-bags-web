@@ -18,9 +18,10 @@
     <meta name="twitter:title"       content="{{ brand }} · {{ tagline }}">
     <meta name="twitter:description" content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
     <meta name="twitter:image"       content="{{ site_url }}/static/img/og-image.jpg">
-    <!-- Same content is served on www and the nexttech alias; pin the canonical
-         to the apex domain so search engines don't see duplicate pages. -->
-    <link rel="canonical" href="{{ site_url }}/">
+{% endblock %}
+
+{% block head_extra %}
+    <script type="application/ld+json">{{ jsonld | safe }}</script>
 {% endblock %}
 
 {% block body %}
@@ -29,6 +30,10 @@
         <!-- ===================== HERO ===================== -->
         <section class="hero">
             <picture class="hero-media">
+                <source type="image/avif"
+                        srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa-768.avif') }} 768w,
+                                {{ url_for('static', filename='img/hero/hero-tote-cognac-playa.avif') }} 1080w"
+                        sizes="100vw">
                 <source type="image/webp"
                         srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa-768.webp') }} 768w,
                                 {{ url_for('static', filename='img/hero/hero-tote-cognac-playa.webp') }} 1080w"
@@ -76,7 +81,7 @@
 
             <div class="cat-grid">
                 {% for cat in categories %}
-                <a href="#shop" class="cat-card reveal" style="--i: {{ loop.index0 }}">
+                <a href="{{ url_for('category_page', slug=cat.name|slugify) }}" class="cat-card reveal" style="--i: {{ loop.index0 }}">
                     <div class="cat-media">
                         <picture>
                             <source type="image/webp"
@@ -109,6 +114,10 @@
         <section class="feature">
             <div class="feature-media reveal">
                 <picture>
+                    <source type="image/avif"
+                            srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero-768.avif') }} 768w,
+                                    {{ url_for('static', filename='img/hero/hero-tote-gris-velero.avif') }} 1080w"
+                            sizes="(max-width: 980px) 100vw, 50vw">
                     <source type="image/webp"
                             srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero-768.webp') }} 768w,
                                     {{ url_for('static', filename='img/hero/hero-tote-gris-velero.webp') }} 1080w"

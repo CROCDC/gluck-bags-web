@@ -39,6 +39,10 @@ except Exception:  # noqa: BLE001 — degrade gracefully if the codec is unavail
 IMAGE_WIDTHS = [400, 600, 1000]
 MAX_IMAGE_DIM = 1600
 
+# Open Graph card size (1.91:1). Portrait product shots get a centered cover-crop
+# to this ratio so social previews aren't squished — see Media.og_image_url.
+OG_SIZE = (1200, 630)
+
 # Videos are scaled so the longest side is at most this, to keep them light.
 VIDEO_MAX_DIM = 1280
 
@@ -118,6 +122,11 @@ def process_image(source: FileStorage | str, product_id: int, media_id: int) -> 
             resized = img.resize((width, height), Image.LANCZOS)
         resized.save(os.path.join(abs_dir, f"{width}.webp"), "WEBP", quality=80, method=6)
         resized.save(os.path.join(abs_dir, f"{width}.jpg"), "JPEG", quality=82, optimize=True)
+
+    # 1200x630 social-share crop (centered cover-fit) for og:image / twitter:image.
+    ImageOps.fit(img, OG_SIZE, Image.LANCZOS).save(
+        os.path.join(abs_dir, "og.jpg"), "JPEG", quality=82, optimize=True
+    )
 
     return {
         "kind": "image",

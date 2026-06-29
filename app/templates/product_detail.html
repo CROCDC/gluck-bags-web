@@ -1,26 +1,45 @@
 {% extends "base_public.html" %}
+{% from "macros.html" import product_card %}
 {% set cover = product.cover %}
 
 {# No dark hero behind the fixed header here, so render it solid from the top. #}
 {% block body_class %}solid-header{% endblock %}
 
-{% block title %}{{ product.title }} · {{ brand }}{% endblock %}
-{% block description %}{{ product.title }}{% if product.category %} · {{ product.category }}{% endif %} — {{ brand }}, cuero vegano hecho a mano.{% endblock %}
+{% block title %}{{ product.title }} · {{ product.category or 'Cartera' }} de cuero vegano | {{ brand }}{% endblock %}
+{% block description %}{{ product.title }}{% if product.category %}, {{ product.category | lower }}{% endif %} de cuero vegano hecho a mano por {{ brand }}. Diseño minimalista, sin crueldad animal.{% if product.formatted_price %} {{ product.formatted_price }}.{% endif %} Consultá disponibilidad por Instagram.{% endblock %}
+
+{# Canonical to the normalized URL so /producto/01 and /producto/001 collapse to /producto/<id>. #}
+{% block canonical %}<link rel="canonical" href="{{ site_url }}{{ url_for('product_detail', product_id=product.id) }}">{% endblock %}
 
 {% block social_meta %}
+    {# Prefer the 1200x630 social crop; fall back to the cover (vertical) or poster. #}
+    {% set og_image = cover.og_image_url if cover else None %}
     <meta property="og:type"        content="product">
-    <meta property="og:url"         content="https://gluck.nexttech.com.ar{{ url_for('product_detail', product_id=product.id) }}">
+    <meta property="og:url"         content="{{ site_url }}{{ url_for('product_detail', product_id=product.id) }}">
     <meta property="og:title"       content="{{ product.title }} · {{ brand }}">
     <meta property="og:description" content="{{ product.title }}{% if product.formatted_price %} — {{ product.formatted_price }}{% endif %}. {{ brand }}, cuero vegano hecho a mano.">
-    {% if cover and cover.is_image %}
-    <meta property="og:image"       content="https://gluck.nexttech.com.ar{{ cover.default_image_url }}">
+    {% if og_image %}
+    <meta property="og:image"        content="{{ site_url }}{{ og_image }}">
+    <meta property="og:image:width"  content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:type"   content="image/jpeg">
+    {% elif cover and cover.is_image %}
+    <meta property="og:image"        content="{{ site_url }}{{ cover.default_image_url }}">
     {% elif cover and cover.is_video %}
-    <meta property="og:image"       content="https://gluck.nexttech.com.ar{{ cover.poster_url }}">
+    <meta property="og:image"        content="{{ site_url }}{{ cover.poster_url }}">
     {% endif %}
+    <meta property="og:image:alt"   content="{{ product.title }} — {{ brand }}">
     <meta property="og:site_name"   content="{{ brand }}">
     <meta property="og:locale"      content="es_AR">
-    <meta name="twitter:card"  content="summary_large_image">
-    <meta name="twitter:title" content="{{ product.title }} · {{ brand }}">
+    <meta name="twitter:card"        content="summary_large_image">
+    <meta name="twitter:title"       content="{{ product.title }} · {{ brand }}">
+    <meta name="twitter:description" content="{{ product.title }}{% if product.category %} · {{ product.category }}{% endif %} — {{ brand }}, cuero vegano hecho a mano.">
+    {% set tw_image = og_image or (cover.default_image_url if cover and cover.is_image else (cover.poster_url if cover and cover.is_video else None)) %}
+    {% if tw_image %}<meta name="twitter:image" content="{{ site_url }}{{ tw_image }}">{% endif %}
+{% endblock %}
+
+{% block head_extra %}
+    <script type="application/ld+json">{{ jsonld | safe }}</script>
 {% endblock %}
 
 {% block body %}
@@ -60,5 +79,17 @@
                 <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark pdp-cta">Consultar por Instagram</a>
             </aside>
         </div>
+
+        {% if related %}
+        <section class="section shop pdp-related">
+            <div class="section-head">
+                <p class="eyebrow">Seguí mirando</p>
+                <h2 class="section-title">Otros bolsos</h2>
+            </div>
+            <div class="shop-grid">
+                {% for item in related %}{{ product_card(item) }}{% endfor %}
+            </div>
+        </section>
+        {% endif %}
     </main>
 {% endblock %}

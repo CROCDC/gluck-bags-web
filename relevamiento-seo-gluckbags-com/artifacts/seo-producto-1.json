@@ -1,0 +1,97 @@
+{
+  "key": "producto-1",
+  "pagetype": "product",
+  "requestedUrl": "https://gluckbags.com/producto/1",
+  "captcha_wall": false,
+  "httpStatus": 200,
+  "xRobotsTag": null,
+  "contentType": "text/html; charset=utf-8",
+  "server": "cloudflare",
+  "redirectChain": [],
+  "finalUrl": "https://gluckbags.com/producto/1",
+  "title": "Tote Cognac · GLÜCK",
+  "titleLen": 19,
+  "metaDescription": "Tote Cognac · Tote — GLÜCK, cuero vegano hecho a mano.",
+  "metaRobots": null,
+  "metaRobotsGoogle": null,
+  "canonical": null,
+  "canonicalSelf": null,
+  "htmlLang": "es",
+  "hreflang": [],
+  "headings": [
+    {
+      "level": 1,
+      "text": "Tote Cognac",
+      "empty": false
+    }
+  ],
+  "h1Count": 1,
+  "h1Texts": [
+    "Tote Cognac"
+  ],
+  "headingSkips": [],
+  "emptyHeadings": 0,
+  "wordCount": 51,
+  "links": {
+    "total": 20,
+    "internal": 15,
+    "external": 5,
+    "nofollow": 0,
+    "emptyAnchor": 0,
+    "genericAnchor": 0,
+    "badAnchors": []
+  },
+  "images": {
+    "total": 1,
+    "missingAlt": 0,
+    "emptyAlt": 0,
+    "lazy": 0,
+    "withDims": 1,
+    "formats": {
+      "png": 0,
+      "jpg": 0,
+      "webp": 1,
+      "avif": 0,
+      "gif": 0,
+      "svg": 0,
+      "other": 0
+    },
+    "missingAltSrc": []
+  },
+  "jsonLdTypes": [],
+  "jsonLdCount": 0,
+  "jsonLdErrors": [],
+  "microdataTypes": [],
+  "og": {
+    "og:type": "product",
+    "og:url": "https://gluck.nexttech.com.ar/producto/1",
+    "og:title": "Tote Cognac · GLÜCK",
+    "og:description": "Tote Cognac. GLÜCK, cuero vegano hecho a mano.",
+    "og:image": "https://gluck.nexttech.com.ar/media/products/1/f884217be34c4337bb7f9c0bf5d0bcdd/787.jpg",
+    "og:site_name": "GLÜCK",
+    "og:locale": "es_AR"
+  },
+  "twitter": {
+    "twitter:card": "summary_large_image",
+    "twitter:title": "Tote Cognac · GLÜCK"
+  },
+  "ogImage": "https://gluck.nexttech.com.ar/media/products/1/f884217be34c4337bb7f9c0bf5d0bcdd/787.jpg",
+  "twitterCard": "summary_large_image",
+  "viewport": "width=device-width, initial-scale=1.0",
+  "charset": "UTF-8",
+  "favicon": true,
+  "appleTouchIcon": true,
+  "manifest": false,
+  "relNext": null,
+  "relPrev": null,
+  "ampHtml": null,
+  "mobile": {
+    "wordCount": 46,
+    "title": "Tote Cognac · GLÜCK",
+    "h1Count": 1,
+    "linkCount": 20,
+    "imgCount": 1
+  },
+  "noindex": false,
+  "indexable": true
+}

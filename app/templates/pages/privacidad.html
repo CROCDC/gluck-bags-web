@@ -1,0 +1,21 @@
+{% extends "pages/_page_base.html" %}
+
+{% block page_body %}
+    <p>En {{ brand }} cuidamos tus datos. Esta política explica qué información tratamos
+    cuando navegás o nos contactás, y para qué.</p>
+
+    {# TODO: revisar / completar con asesoramiento legal antes de publicar. #}
+    <h2>Qué datos tratamos</h2>
+    <p>Sólo los datos que nos compartís voluntariamente al contactarnos (por ejemplo, tu
+    nombre y datos de contacto para coordinar una compra o un envío).</p>
+
+    <h2>Medición del sitio</h2>
+    <p>Usamos herramientas de analítica web respetuosas de la privacidad para entender,
+    de forma agregada y anónima, cómo se usa el sitio y así mejorarlo. No las usamos para
+    identificarte personalmente.</p>
+
+    <h2>Tus derechos</h2>
+    <p>Podés pedirnos acceder, rectificar o eliminar tus datos en cualquier momento
+    escribiéndonos por <a href="{{ instagram_url }}" target="_blank" rel="noopener">Instagram</a>
+    o desde la página de <a href="{{ url_for('page_contacto') }}">contacto</a>.</p>
+{% endblock %}

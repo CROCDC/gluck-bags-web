@@ -1,0 +1,24 @@
+{% extends "base_public.html" %}
+
+{# No dark hero behind the fixed header — render it solid from the top. #}
+{% block body_class %}solid-header{% endblock %}
+
+{% block title %}Página no encontrada · {{ brand }}{% endblock %}
+
+{# A 404 must never be indexed and has no canonical of its own. #}
+{% block canonical %}{% endblock %}
+{% block head_extra %}<meta name="robots" content="noindex">{% endblock %}
+
+{% block body %}
+    <main class="pdp" id="top">
+        <div style="max-width: 640px; margin: 0 auto; text-align: center; padding: 4rem 0;">
+            <p class="eyebrow">Error 404</p>
+            <h1 class="pdp-title">Esta página no existe</h1>
+            <p class="pdp-desc">El enlace que seguiste no lleva a ninguna parte, o la página se movió.</p>
+            <div class="hero-actions" style="justify-content: center; margin-top: 2rem;">
+                <a href="{{ url_for('index') }}" class="btn btn-dark">Volver al inicio</a>
+                <a href="{{ url_for('index') }}#shop" class="btn btn-ghost">Ver los bolsos</a>
+            </div>
+        </div>
+    </main>
+{% endblock %}

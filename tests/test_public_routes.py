@@ -424,3 +424,81 @@ def test_robots_txt_returns_200(client: FlaskClient) -> None:
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "User-agent" in body
+
+
+def test_robots_declares_sitemap_on_canonical_domain(client: FlaskClient) -> None:
+    """robots.txt advertises the sitemap at the canonical origin (not the alias)."""
+    body = client.get("/robots.txt").get_data(as_text=True)
+    assert "Sitemap: https://gluckbags.com/sitemap.xml" in body
+
+
+# --- "/sitemap.xml" -----------------------------------------------------------
+
+
+def test_sitemap_lists_home_and_published_products(
+    auth_client: FlaskClient, client: FlaskClient
+) -> None:
+    """The sitemap is valid XML and lists the home + each published product on the
+    canonical domain; unpublished products are excluded."""
+    _create_product(auth_client, title="En Sitemap", category="Tote")
+    _create_product(auth_client, title="Oculto Sitemap", is_published=False)
+
+    resp = client.get("/sitemap.xml")
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/xml"
+    body = resp.get_data(as_text=True)
+    assert body.startswith("<?xml")
+
+    locs = re.findall(r"<loc>([^<]+)</loc>", body)
+    assert "https://gluckbags.com/" in locs
+    assert "https://gluckbags.com/categoria/tote" in locs  # category with products
+    # The published product URL is present; the unpublished one is not.
+    with_product = [u for u in locs if u.startswith("https://gluckbags.com/producto/")]
+    assert len(with_product) == 1
+    # Trust pages are listed too.
+    assert "https://gluckbags.com/nosotras" in locs
+
+
+# --- "/categoria/<slug>" ------------------------------------------------------
+
+
+def test_category_page_lists_its_products(
+    auth_client: FlaskClient, client: FlaskClient
+) -> None:
+    """A category page returns 200 and lists only products of that category."""
+    _create_product(auth_client, title="Tote Uno", category="Tote")
+    _create_product(auth_client, title="Mini Uno", category="Mini Bag")
+
+    html = client.get("/categoria/tote").get_data(as_text=True)
+    assert "Tote Uno" in html
+    assert "Mini Uno" not in html
+
+
+def test_category_unknown_slug_404s(client: FlaskClient) -> None:
+    resp = client.get("/categoria/no-existe")
+    assert resp.status_code == 404
+
+
+def test_empty_known_category_is_noindex(client: FlaskClient) -> None:
+    """A known category card with no products yet renders (200) but is noindex'd."""
+    resp = client.get("/categoria/bucket-bag")  # in CATEGORIES, no seeded products
+    assert resp.status_code == 200
+    assert 'name="robots" content="noindex"' in resp.get_data(as_text=True)
+
+
+# --- Related products on the PDP ----------------------------------------------
+
+
+def test_detail_shows_related_products(
+    auth_client: FlaskClient, client: FlaskClient, app: Flask
+) -> None:
+    """The product detail page cross-links to other products (related strip)."""
+    _create_product(auth_client, title="Producto A", category="Tote")
+    _create_product(auth_client, title="Producto B", category="Tote")
+    pid = _product_id_by_title(app, "Producto A")
+
+    html = client.get(f"/producto/{pid}").get_data(as_text=True)
+    assert "pdp-related" in html
+    # The sibling product is linked from the related strip.
+    assert "Producto B" in html
+    assert f"/producto/{_product_id_by_title(app, 'Producto B')}" in html

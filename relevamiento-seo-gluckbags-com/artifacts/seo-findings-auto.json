@@ -1,0 +1,215 @@
+{
+  "findings": [
+    {
+      "title": "robots.txt bloquea todo el sitio (Disallow: /)",
+      "severity": "critical",
+      "dimension": "indexability",
+      "category": "robots.txt",
+      "scope": "robots.txt",
+      "evidence": "Hay un 'Disallow: /' para User-agent: * — puede estar bloqueando el rastreo completo.",
+      "recommendation": "Revisar urgente: si el sitio debe indexarse, quitar el Disallow: / global.",
+      "evidenceKind": "code",
+      "source": "auto",
+      "evidenceCode": "# As a condition of accessing this website, you agree to abide by the following\n# content signals:\n\n# (a)  If a Content-Signal = yes, you may collect content for the corresponding\n#      use.\n# (b)  If a Content-Signal = no, you may not collect content for the\n#      corresponding use.\n# (c)  If the website operator does not include a Content-Signal for a\n#      corresponding use, the website oper"
+    },
+    {
+      "title": "Títulos duplicados en 3 páginas",
+      "severity": "high",
+      "dimension": "titles-meta",
+      "category": "Title",
+      "scope": "1 título(s) repetido(s)",
+      "evidence": "1 <title> se repiten en varias URLs indexables (canibalización / SERP confusa).",
+      "recommendation": "Hacer cada <title> único por página, anteponiendo el dato que la distingue.",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "title": "GLÜCK · Bolsos minimalistas de cuero vegano",
+          "url": "https://gluckbags.com/"
+        },
+        {
+          "title": "GLÜCK · Bolsos minimalistas de cuero vegano",
+          "url": "https://gluckbags.com/?s=seo"
+        },
+        {
+          "title": "GLÜCK · Bolsos minimalistas de cuero vegano",
+          "url": "https://gluckbags.com/?utm_source=newsletter"
+        }
+      ]
+    },
+    {
+      "title": "La página de resultados de búsqueda es indexable",
+      "severity": "high",
+      "dimension": "indexability",
+      "category": "Crawl/Index",
+      "scope": "https://gluckbags.com/?s=seo",
+      "evidence": "https://gluckbags.com/?s=seo responde 200 y no tiene noindex → genera páginas delgadas/infinitas indexables.",
+      "recommendation": "Agregar noindex a las páginas de búsqueda interna (?s=).",
+      "evidenceKind": "code",
+      "source": "auto",
+      "evidenceCode": "meta robots: None\nX-Robots-Tag: None\nstatus: 200"
+    },
+    {
+      "title": "Meta descriptions duplicadas en 3 páginas",
+      "severity": "medium",
+      "dimension": "titles-meta",
+      "category": "Description",
+      "scope": "1 description(s) repetida(s)",
+      "evidence": "Misma description en varias URLs → snippets idénticos en la SERP.",
+      "recommendation": "Redactar una description única por página.",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "desc": "GLÜCK — Bolsos minimalistas de cuero vegano. Carteras y bolsos de cuero vegano, hechos a m",
+          "url": "https://gluckbags.com/",
+          "count": 3
+        }
+      ]
+    },
+    {
+      "title": "3 páginas sin rel=canonical",
+      "severity": "medium",
+      "dimension": "indexability",
+      "category": "Canonical",
+      "scope": "3 de 6 indexables",
+      "evidence": "Sin canonical, variantes de URL (parámetros, trailing slash) pueden duplicarse.",
+      "recommendation": "Agregar <link rel=canonical> autorreferente en cada página.",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "url": "https://gluckbags.com/producto/1",
+          "type": "product"
+        },
+        {
+          "url": "https://gluckbags.com/producto/2",
+          "type": "product"
+        },
+        {
+          "url": "https://gluckbags.com/producto/3",
+          "type": "product"
+        }
+      ]
+    },
+    {
+      "title": "3 páginas con canonical apuntando a otra URL",
+      "severity": "medium",
+      "dimension": "indexability",
+      "category": "Canonical",
+      "scope": "3 página(s)",
+      "evidence": "Un canonical cruzado le dice a Google que indexe OTRA URL — verificar que sea intencional.",
+      "recommendation": "Confirmar que el canonical apunta a la versión correcta (no a la home por error).",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "url": "https://gluckbags.com/",
+          "canonical": "https://gluck.nexttech.com.ar/"
+        },
+        {
+          "url": "https://gluckbags.com/?s=seo",
+          "canonical": "https://gluck.nexttech.com.ar/"
+        },
+        {
+          "url": "https://gluckbags.com/?utm_source=newsletter",
+          "canonical": "https://gluck.nexttech.com.ar/"
+        }
+      ]
+    },
+    {
+      "title": "Home sin structured data de Organization/WebSite",
+      "severity": "medium",
+      "dimension": "structured-data",
+      "category": "Datos estructurados",
+      "scope": "home",
+      "evidence": "JSON-LD en home: ninguno. Falta(n): Organization, WebSite.",
+      "recommendation": "Agregar JSON-LD Organization (logo, nombre, sameAs) y WebSite (con SearchAction) en la home.",
+      "evidenceKind": "code",
+      "source": "auto",
+      "evidenceCode": "tipos JSON-LD detectados: (ninguno)"
+    },
+    {
+      "title": "Sin sitemap.xml utilizable",
+      "severity": "medium",
+      "dimension": "indexability",
+      "category": "Sitemap",
+      "scope": "sitemap",
+      "evidence": "No se descubrió ningún sitemap con URLs (ni en robots ni en las rutas habituales).",
+      "recommendation": "Publicar y declarar un sitemap.xml con las URLs indexables.",
+      "evidenceKind": "code",
+      "source": "auto",
+      "evidenceCode": "sitemaps probados: robots + /sitemap.xml + /sitemap_index.xml + /wp-sitemap.xml"
+    },
+    {
+      "title": "3 títulos demasiado cortos (<30 car.)",
+      "severity": "low",
+      "dimension": "titles-meta",
+      "category": "Title",
+      "scope": "3 página(s)",
+      "evidence": "Títulos cortos desaprovechan el espacio de la SERP.",
+      "recommendation": "Enriquecer con el tema + marca manteniéndolo descriptivo.",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "len": 19,
+          "title": "Tote Cognac · GLÜCK",
+          "url": "https://gluckbags.com/producto/1"
+        },
+        {
+          "len": 17,
+          "title": "Tote Gris · GLÜCK",
+          "url": "https://gluckbags.com/producto/2"
+        },
+        {
+          "len": 22,
+          "title": "Crossbody Rosa · GLÜCK",
+          "url": "https://gluckbags.com/producto/3"
+        }
+      ]
+    },
+    {
+      "title": "3 meta descriptions fuera de rango (70–160 car.)",
+      "severity": "low",
+      "dimension": "titles-meta",
+      "category": "Description",
+      "scope": "3 página(s)",
+      "evidence": "Descriptions muy cortas o muy largas (Google las trunca ~155–160 car.).",
+      "recommendation": "Ajustar a 70–160 caracteres.",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "len": 54,
+          "url": "https://gluckbags.com/producto/1"
+        },
+        {
+          "len": 52,
+          "url": "https://gluckbags.com/producto/2"
+        },
+        {
+          "len": 61,
+          "url": "https://gluckbags.com/producto/3"
+        }
+      ]
+    },
+    {
+      "title": "robots.txt no declara el sitemap",
+      "severity": "low",
+      "dimension": "indexability",
+      "category": "robots.txt",
+      "scope": "robots.txt",
+      "evidence": "No hay línea 'Sitemap:' en robots.txt.",
+      "recommendation": "Agregar 'Sitemap: https://dominio/sitemap.xml' al robots.txt.",
+      "evidenceKind": "code",
+      "source": "auto",
+      "evidenceCode": "# As a condition of accessing this website, you agree to abide by the following\n# content signals:\n\n# (a)  If a Content-Signal = yes, you may collect content for the corresponding\n#      use.\n# (b)  If a Content-Signal = no, you may not collect content for the\n#      corresponding use.\n# (c)  If the"
+    }
+  ],
+  "stats": {
+    "pages": 8,
+    "indexable": 6,
+    "sitemapUrls": 0
+  }
+}

@@ -80,6 +80,24 @@ class Media(db.Model):
         w = self.largest_width
         return self._url(f"{w}.jpg") if w else None
 
+    @property
+    def og_image_url(self) -> str | None:
+        """The 1200x630 social-share crop (image/jpeg) when it has been generated,
+        else None. Returns None for media processed before the og variant existed,
+        so callers can fall back to the regular cover without a 404."""
+        import os
+
+        from flask import current_app, has_app_context
+
+        if not self.is_image:
+            return None
+        rel = f"{self.path}/og.jpg"
+        if has_app_context():
+            root = current_app.config.get("MEDIA_ROOT")
+            if root and os.path.exists(os.path.join(root, rel)):
+                return f"{MEDIA_URL_PREFIX}/{rel}"
+        return None
+
     # Videos ---
     @property
     def video_url(self) -> str:
