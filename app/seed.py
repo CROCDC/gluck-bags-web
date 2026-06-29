@@ -1,4 +1,10 @@
-"""One-time seed: import the 6 originally hardcoded products into the DB/media.
+"""One-time seed: import the live catalogue into the DB/media.
+
+Mirrors exactly what production currently shows (gluck.nexttech.com.ar): the same
+6 products, in the same order, each with its category and a single cover image.
+Production has no prices and no descriptions (the cards link straight to
+Instagram), so those fields are seeded as NULL — see the nullable columns on
+Product.
 
 Runs on startup only when the products table is empty, so a fresh volume comes
 up with the existing catalogue (editable from the admin) instead of blank. The
@@ -8,6 +14,7 @@ source images are the full-res originals already shipped under static/.
 from __future__ import annotations
 
 import os
+import uuid
 
 from flask import current_app
 
@@ -48,22 +55,26 @@ def seed_initial_products() -> None:
         product = Product(
             title=title,
             category=category,
-            description="",
-            price=None,
+            description=None,  # not shown in prod
+            price=None,  # not shown in prod ("Consultar")
             is_published=True,
             position=position,
         )
         db.session.add(product)
         db.session.flush()  # assigns product.id
 
-        media = Media(product_id=product.id, kind="image", path="", position=0, is_cover=True)
+        slug = uuid.uuid4().hex
+        info = media_service.process_image(source, product.id, slug)
+        media = Media(
+            product_id=product.id,
+            kind="image",
+            path=info["path"],
+            width=info["width"],
+            height=info["height"],
+            widths=info["widths"],
+            position=0,
+            is_cover=True,
+        )
         db.session.add(media)
-        db.session.flush()  # assigns media.id
-
-        info = media_service.process_image(source, product.id, media.id)
-        media.path = info["path"]
-        media.width = info["width"]
-        media.height = info["height"]
-        media.widths = info["widths"]
 
     db.session.commit()

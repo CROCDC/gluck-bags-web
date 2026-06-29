@@ -20,7 +20,7 @@
         <label for="price">Precio <span class="hint">(opcional)</span></label>
         <div class="adm-price-wrap">
             <span>$</span>
-            <input type="text" id="price" name="price" inputmode="numeric" value="{{ values.price }}" placeholder="45000">
+            <input type="text" id="price" name="price" inputmode="numeric" maxlength="10" value="{{ values.price }}" placeholder="45000">
         </div>
         <span class="hint">Solo el número, sin puntos ni símbolos. Dejalo vacío para mostrar “Consultar”.</span>
     </div>
@@ -67,6 +67,7 @@
                     </div>
                     <span class="tile-name">{{ 'Video' if m.is_video else 'Foto' }}</span>
                     <span class="tile-cover">Portada</span>
+                    <button type="button" class="tile-makecover" aria-label="Hacer portada" title="Hacer portada">★</button>
                     <button type="button" class="tile-remove" aria-label="Quitar">×</button>
                 </li>
                 {% endfor %}{% endif %}

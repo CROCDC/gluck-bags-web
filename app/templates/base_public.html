@@ -50,7 +50,7 @@
     <script async src="https://analytics.nexttech.com.ar/script.js" data-website-id="{{ config.UMAMI_WEBSITE_ID }}"></script>
     {% endif %}
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
 
     <!-- ===================== HEADER ===================== -->
     <header class="site-header" id="header">

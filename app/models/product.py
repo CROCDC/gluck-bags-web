@@ -1,9 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.factory import db
 from app.models.media import Media
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class Product(db.Model):
@@ -13,8 +17,11 @@ class Product(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
-    description = db.Column(db.Text, nullable=False, default="")
-    # Whole ARS pesos. None means "price not set yet" (shown as "Consultar").
+    # Nullable: the live catalogue has no descriptions (products link to Instagram),
+    # so seeded/imported products store NULL. The admin form normalises blanks to "".
+    description = db.Column(db.Text, nullable=True)
+    # Whole ARS pesos. None means "price not set yet" (shown as "Consultar"). The
+    # live catalogue shows no prices, so seeded products are NULL here too.
     price = db.Column(db.Integer, nullable=True)
     currency = db.Column(db.String(8), nullable=False, default="ARS")
     category = db.Column(db.String(80), nullable=True)
@@ -22,10 +29,8 @@ class Product(db.Model):
     is_published = db.Column(db.Boolean, nullable=False, default=True)
     # Manual sort order on the public grid and the admin list (lower = first).
     position = db.Column(db.Integer, nullable=False, default=0)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = db.Column(
-        db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
+    updated_at = db.Column(db.DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 
     media = db.relationship(
         "Media",

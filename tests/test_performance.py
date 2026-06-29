@@ -39,6 +39,10 @@ from urllib.parse import urlparse
 import pytest
 from playwright.sync_api import Browser, Page
 
+# Slow: every test here spins up a real server and measures it. Deselect with
+# `pytest -m "not perf"`.
+pytestmark = pytest.mark.perf
+
 # --- Performance budgets -----------------------------------------------------
 # Calibrate these to your site after the first run (the skill suggests values).
 

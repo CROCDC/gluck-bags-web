@@ -1,6 +1,9 @@
 {% extends "base_public.html" %}
 {% set cover = product.cover %}
 
+{# No dark hero behind the fixed header here, so render it solid from the top. #}
+{% block body_class %}solid-header{% endblock %}
+
 {% block title %}{{ product.title }} · {{ brand }}{% endblock %}
 {% block description %}{{ product.title }}{% if product.category %} · {{ product.category }}{% endif %} — {{ brand }}, cuero vegano hecho a mano.{% endblock %}
 
@@ -26,16 +29,17 @@
 
         <div class="pdp-grid">
             <div class="pdp-gallery">
+                {% set first_image = product.images[0] if product.images else None %}
                 {% for m in product.media %}
-                    {% if m.is_image %}
+                    {% if m.is_image and m.smallest_width %}
                     <picture class="pdp-media">
                         <source type="image/webp" srcset="{{ m.image_srcset('webp') }}" sizes="(max-width: 980px) 100vw, 58vw">
-                        <img src="{{ m.default_image_url }}" srcset="{{ m.image_srcset('jpg') }}"
+                        <img src="{{ m.image_url(m.smallest_width) }}" srcset="{{ m.image_srcset('jpg') }}"
                              sizes="(max-width: 980px) 100vw, 58vw"
                              width="{{ m.width }}" height="{{ m.height }}" alt="{{ product.title }}"
-                             {% if loop.first %}fetchpriority="high"{% else %}loading="lazy"{% endif %}>
+                             {% if first_image and m.id == first_image.id %}fetchpriority="high"{% else %}loading="lazy"{% endif %}>
                     </picture>
-                    {% else %}
+                    {% elif m.is_video %}
                     <video class="pdp-media" controls playsinline preload="none" poster="{{ m.poster_url }}"
                            width="{{ m.width or 720 }}" height="{{ m.height or 1280 }}">
                         <source src="{{ m.video_url }}" type="video/mp4">

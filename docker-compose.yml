@@ -7,12 +7,10 @@ services:
     image: gluck-bags-web
     environment:
       FLASK_DEBUG: "0"
-      # Persistent storage (SQLite DB + uploaded media) on the mounted volume.
       DATA_DIR: /data
-      # Admin credentials + session secret. Injected from Infisical/env at deploy
-      # time — never hardcode them here.
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       SECRET_KEY: ${SECRET_KEY:-}
+      SESSION_COOKIE_SECURE: "1"
       VIRTUAL_HOST: gluck.nexttech.com.ar
       VIRTUAL_PORT: 7014
       UMAMI_WEBSITE_ID: 4badbd28-ea2a-4c67-9520-fe0814abcd1d
@@ -22,7 +20,6 @@ services:
       - "7014"
     restart: unless-stopped
     volumes:
-      # DB + uploaded product media survive rebuilds/redeploys here.
       - gluck-data:/data
     networks:
       - proxy

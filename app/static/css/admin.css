@@ -206,9 +206,15 @@ img { display: block; max-width: 100%; }
 .tile-name { flex: 1 1 auto; min-width: 0; font-size: 0.9rem; color: var(--adm-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tile-cover { flex: none; font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--adm-cognac); border: 1px solid var(--adm-cognac); border-radius: 999px; padding: 0.15rem 0.5rem; display: none; }
 .tile:first-child .tile-cover { display: inline-block; }
+.tile-makecover {
+    flex: none; background: none; border: 1px solid var(--adm-line); border-radius: 8px;
+    cursor: pointer; color: var(--adm-faint); font-size: 1rem; width: 44px; height: 44px;
+}
+.tile-makecover:hover { color: var(--adm-cognac); border-color: var(--adm-cognac); }
+.tile:first-child .tile-makecover { color: var(--adm-cognac); border-color: var(--adm-cognac); }
 .tile-remove {
     flex: none; background: none; border: none; cursor: pointer; color: var(--adm-faint);
-    font-size: 1.4rem; line-height: 1; width: 38px; height: 38px; border-radius: 8px;
+    font-size: 1.4rem; line-height: 1; width: 44px; height: 44px; border-radius: 8px;
 }
 .tile-remove:hover { color: var(--adm-err); background: rgba(192,57,43,0.08); }
 

@@ -147,13 +147,13 @@
                 {% set cover = product.cover %}
                 <a href="{{ url_for('product_detail', product_id=product.id) }}" class="product reveal" style="--i: {{ loop.index0 % 3 }}">
                     <div class="product-media">
-                        {% if cover and cover.is_image %}
+                        {% if cover and cover.is_image and cover.smallest_width %}
                         <picture>
                             <source type="image/webp"
-                                    srcset="{{ cover.image_srcset('webp') }}"
+                                    srcset="{{ cover.image_srcset('webp', 600) }}"
                                     sizes="(max-width: 768px) 50vw, 33vw">
                             <img src="{{ cover.image_url(cover.smallest_width) }}"
-                                 srcset="{{ cover.image_srcset('jpg') }}"
+                                 srcset="{{ cover.image_srcset('jpg', 600) }}"
                                  sizes="(max-width: 768px) 50vw, 33vw"
                                  width="{{ cover.width }}" height="{{ cover.height }}"
                                  alt="{{ product.title }}" loading="lazy">

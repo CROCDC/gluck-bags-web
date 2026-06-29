@@ -253,6 +253,21 @@ h1, h2, h3, h4 { margin: 0; font-weight: 400; }
 .site-header.scrolled .header-cta:hover { background: var(--ink); color: var(--cream); }
 .site-header.scrolled .menu-toggle span { background: var(--ink); }
 
+/* Pages without a dark hero behind the fixed header (e.g. product detail) render
+   it solid from the top — light-on-light header text would otherwise be invisible.
+   main.js's .scrolled toggle still applies on scroll; this just sets the resting
+   look. The menu-toggle rule outscopes the mobile `:not(.scrolled)` rule below. */
+body.solid-header .site-header {
+    background: rgba(250, 247, 243, 0.82);
+    backdrop-filter: saturate(1.4) blur(14px);
+    -webkit-backdrop-filter: saturate(1.4) blur(14px);
+}
+body.solid-header .wordmark { color: var(--ink); }
+body.solid-header .nav a { color: var(--ink-soft); }
+body.solid-header .header-cta { color: var(--ink); border-color: var(--line); }
+body.solid-header .header-inner::after { transform: scaleX(1); }
+body.solid-header .site-header .menu-toggle span { background: var(--ink); }
+
 /* hamburger */
 .menu-toggle {
     display: none;

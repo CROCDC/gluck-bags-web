@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from sqlalchemy.orm import selectinload
+
 from app.factory import db
 from app.models import Product
 
@@ -9,15 +11,21 @@ class ProductRepository:
 
     @staticmethod
     def get_published() -> list[Product]:
+        # selectinload the media so rendering the grid is 2 queries, not 1+N.
         return (
-            Product.query.filter_by(is_published=True)
+            Product.query.options(selectinload(Product.media))
+            .filter_by(is_published=True)
             .order_by(Product.position.asc(), Product.id.asc())
             .all()
         )
 
     @staticmethod
     def get_all() -> list[Product]:
-        return Product.query.order_by(Product.position.asc(), Product.id.asc()).all()
+        return (
+            Product.query.options(selectinload(Product.media))
+            .order_by(Product.position.asc(), Product.id.asc())
+            .all()
+        )
 
     @staticmethod
     def get_by_id(product_id: int) -> Product | None:

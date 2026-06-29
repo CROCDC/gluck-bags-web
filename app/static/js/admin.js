@@ -42,6 +42,10 @@
       const after = getDragAfter(list, itemSelector, e.clientY, dragging);
       if (after == null) list.appendChild(dragging);
       else list.insertBefore(dragging, after);
+      // Auto-scroll near the top/bottom edge so long lists are draggable on a phone.
+      const margin = 70;
+      if (e.clientY < margin) window.scrollBy(0, -14);
+      else if (e.clientY > window.innerHeight - margin) window.scrollBy(0, 14);
     });
     const end = () => {
       if (!dragging) return;
@@ -117,6 +121,14 @@
     cover.textContent = "Portada";
     li.appendChild(cover);
 
+    const makeCover = document.createElement("button");
+    makeCover.type = "button";
+    makeCover.className = "tile-makecover";
+    makeCover.setAttribute("aria-label", "Hacer portada");
+    makeCover.title = "Hacer portada";
+    makeCover.textContent = "★";
+    li.appendChild(makeCover);
+
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "tile-remove";
@@ -135,12 +147,24 @@
     });
   }
 
-  // Remove tiles (existing or new) via delegation.
+  // Tile actions (make-cover / remove) via delegation.
   tiles.addEventListener("click", (e) => {
+    const makeCover = e.target.closest(".tile-makecover");
+    if (makeCover) {
+      const li = makeCover.closest(".tile");
+      if (li && tiles.firstElementChild !== li) tiles.insertBefore(li, tiles.firstElementChild);
+      return;
+    }
     const btn = e.target.closest(".tile-remove");
     if (!btn) return;
     const li = btn.closest(".tile");
     const token = li.dataset.token || "";
+    if (
+      token.indexOf("existing:") === 0 &&
+      !window.confirm("¿Quitar esta foto/video del producto? Se borrará al guardar los cambios.")
+    ) {
+      return;
+    }
     if (token.indexOf("new:") === 0) newFiles.delete(token.slice(4));
     li.remove();
   });
@@ -175,6 +199,8 @@
   /* ---- Submit: align new files to their `new:<index>` tokens, then upload ---- */
   form.addEventListener("submit", (e) => {
     e.preventDefault();
+    // Let the browser flag a missing title etc. WITHOUT losing the queued files.
+    if (!form.reportValidity()) return;
 
     const dt = new DataTransfer();
     const tokens = [];
@@ -198,14 +224,32 @@
     uploadForm();
   });
 
+  // Warn before leaving mid-upload so the owner doesn't lose queued files.
+  let uploading = false;
+  window.addEventListener("beforeunload", (e) => {
+    if (uploading) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  });
+
   function uploadForm() {
     const overlay = document.getElementById("admOverlay");
     const bar = document.getElementById("admBar");
     const text = document.getElementById("admText");
     if (overlay) overlay.classList.add("show");
+    uploading = true;
+
+    const fail = (message) => {
+      uploading = false;
+      if (overlay) overlay.classList.remove("show");
+      window.alert(message);
+    };
 
     const xhr = new XMLHttpRequest();
     xhr.open("POST", form.action);
+    // Long enough for a video transcode, short enough to surface a dead connection.
+    xhr.timeout = 10 * 60 * 1000;
     xhr.upload.addEventListener("progress", (ev) => {
       if (ev.lengthComputable && bar) bar.style.width = Math.round((ev.loaded / ev.total) * 100) + "%";
     });
@@ -215,20 +259,23 @@
     });
     xhr.addEventListener("load", () => {
       if (xhr.status >= 200 && xhr.status < 400) {
+        uploading = false; // about to navigate; don't trigger the beforeunload guard
         window.location.href = xhr.responseURL || form.dataset.listUrl || "/admin/";
       } else if (xhr.status === 400) {
+        uploading = false;
         document.open();
         document.write(xhr.responseText);
         document.close();
+      } else if (xhr.status === 413) {
+        fail("El archivo es demasiado grande (máximo 200 MB). Probá con un video más corto o de menor calidad.");
       } else {
-        if (overlay) overlay.classList.remove("show");
-        window.alert("Hubo un error al guardar. Probá de nuevo.");
+        fail("Hubo un error al guardar. Probá de nuevo.");
       }
     });
-    xhr.addEventListener("error", () => {
-      if (overlay) overlay.classList.remove("show");
-      window.alert("Error de conexión. Probá de nuevo.");
-    });
+    xhr.addEventListener("error", () => fail("Error de conexión. Revisá tu internet y probá de nuevo."));
+    xhr.addEventListener("timeout", () =>
+      fail("La subida tardó demasiado. Probá con un archivo más liviano o mejor conexión.")
+    );
     xhr.send(new FormData(form));
   }
 })();

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.factory import db
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 # Public URL prefix served by the `media_file` route from MEDIA_ROOT. Uploaded
 # files are immutable (a new upload = a new directory), so URLs need no cache
@@ -32,7 +36,7 @@ class Media(db.Model):
     widths = db.Column(db.JSON, nullable=True)
     position = db.Column(db.Integer, nullable=False, default=0)
     is_cover = db.Column(db.Boolean, nullable=False, default=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
 
     product = db.relationship("Product", back_populates="media")
 
@@ -50,11 +54,15 @@ class Media(db.Model):
         return f"{MEDIA_URL_PREFIX}/{self.path}/{name}"
 
     # Images ---
-    def image_url(self, width: int, ext: str = "jpg") -> str:
+    def image_url(self, width: int | None, ext: str = "jpg") -> str | None:
+        if not width:
+            return None
         return self._url(f"{width}.{ext}")
 
-    def image_srcset(self, ext: str = "jpg") -> str:
+    def image_srcset(self, ext: str = "jpg", max_width: int | None = None) -> str:
         ws = self.widths or []
+        if max_width is not None:
+            ws = [w for w in ws if w <= max_width] or ws[:1]
         return ", ".join(f"{self._url(f'{w}.{ext}')} {w}w" for w in ws)
 
     @property

@@ -14,11 +14,25 @@ import os
 import shutil
 import subprocess
 import tempfile
+import warnings
 
 from flask import current_app
 from PIL import Image, ImageOps
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
+
+# Decompression-bomb guard: cap the pixel budget and promote Pillow's warning to
+# an error, so a tiny-on-disk but huge-dimension image can't exhaust worker memory.
+Image.MAX_IMAGE_PIXELS = 50_000_000
+warnings.simplefilter("error", Image.DecompressionBombWarning)
+
+# Decode HEIC/HEIF (the default iPhone photo format) when pillow-heif is installed.
+try:
+    from pillow_heif import register_heif_opener
+
+    register_heif_opener()
+except Exception:  # noqa: BLE001 — degrade gracefully if the codec is unavailable
+    pass
 
 # Responsive widths generated for each image. The grid uses 400/600; the product
 # detail page can use up to 1000. Originals are capped at MAX_IMAGE_DIM.
@@ -28,7 +42,7 @@ MAX_IMAGE_DIM = 1600
 # Videos are scaled so the longest side is at most this, to keep them light.
 VIDEO_MAX_DIM = 1280
 
-IMAGE_EXTS = {"jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff"}
+IMAGE_EXTS = {"jpg", "jpeg", "png", "webp", "gif", "bmp", "tif", "tiff", "heic", "heif"}
 VIDEO_EXTS = {"mp4", "mov", "m4v", "webm", "avi", "mkv", "3gp", "ogv", "mpg", "mpeg"}
 
 
@@ -73,10 +87,20 @@ def process_image(source: FileStorage | str, product_id: int, media_id: int) -> 
 
     try:
         img = Image.open(source.stream if isinstance(source, FileStorage) else source)
-        # Respect EXIF orientation (phone photos) then drop the metadata.
+        # Respect EXIF orientation (phone photos), then flatten to RGB. Images with
+        # transparency are composited onto white (a plain convert('RGB') would put
+        # transparent areas on black).
         img = ImageOps.exif_transpose(img)
-        if img.mode not in ("RGB",):
+        if img.mode in ("RGBA", "LA") or (img.mode == "P" and "transparency" in img.info):
+            background = Image.new("RGB", img.size, (255, 255, 255))
+            rgba = img.convert("RGBA")
+            background.paste(rgba, mask=rgba.split()[-1])
+            img = background
+        elif img.mode != "RGB":
             img = img.convert("RGB")
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
+        shutil.rmtree(abs_dir, ignore_errors=True)
+        raise MediaError("La imagen es demasiado grande. Probá con una más chica.") from exc
     except Exception as exc:  # noqa: BLE001 — surface a friendly error
         shutil.rmtree(abs_dir, ignore_errors=True)
         raise MediaError("No pudimos leer la imagen. Probá con un JPG o PNG.") from exc
@@ -144,14 +168,17 @@ def process_video(source: FileStorage | str, product_id: int, media_id: int) -> 
         "force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2"
     )
     try:
+        # -protocol_whitelist file: the input is always a local temp file, so a
+        # crafted container can't make ffmpeg pull external resources.
         _run_ffmpeg([
+            "-protocol_whitelist", "file",
             "-i", input_path,
             "-vf", scale,
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
             "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an",
             out_mp4,
         ])
-        _run_ffmpeg(["-i", out_mp4, "-frames:v", "1", "-q:v", "3", poster])
+        _run_ffmpeg(["-protocol_whitelist", "file", "-i", out_mp4, "-frames:v", "1", "-q:v", "3", poster])
     except MediaError:
         shutil.rmtree(abs_dir, ignore_errors=True)
         raise
