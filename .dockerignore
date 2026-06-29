@@ -6,3 +6,6 @@ __pycache__
 node_modules
 tests/screenshots/
 ig-gluck_bags/
+instance/
+*.db
+.pytest_cache/

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+{% set home = url_for('index') %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Open Graph / social link preview (must come first in <head>, before scripts/CSS) -->
+    {% block social_meta %}
+    <meta property="og:type"             content="website">
+    <meta property="og:url"              content="https://gluck.nexttech.com.ar/">
+    <meta property="og:title"            content="{{ brand }} · {{ tagline }}">
+    <meta property="og:description"      content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
+    <meta property="og:image"            content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
+    <meta property="og:image:secure_url" content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
+    <meta property="og:image:type"       content="image/jpeg">
+    <meta property="og:image:width"      content="1200">
+    <meta property="og:image:height"     content="630">
+    <meta property="og:image:alt"        content="Tote de cuero vegano cognac de {{ brand }} en la playa">
+    <meta property="og:locale"           content="es_AR">
+    <meta property="og:site_name"        content="{{ brand }}">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card"        content="summary_large_image">
+    <meta name="twitter:title"       content="{{ brand }} · {{ tagline }}">
+    <meta name="twitter:description" content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
+    <meta name="twitter:image"       content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
+    {% endblock %}
+
+    <title>{% block title %}{{ brand }} · {{ tagline }}{% endblock %}</title>
+    <meta name="description" content="{% block description %}{{ brand }} — {{ tagline }}. Carteras y bolsos de cuero vegano, hechos a mano con un diseño minimalista y atemporal.{% endblock %}">
+
+    <!-- The shared Next Tech footer script + its assets load from this origin;
+         preconnecting shaves the TLS/connection setup off the critical path. -->
+    <link rel="preconnect" href="https://nexttech.com.ar" crossorigin>
+
+    <link rel="icon" type="image/webp" href="{{ url_for('static', filename='img/marca/avatar-perfil-gluck.webp') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/marca/avatar-perfil-gluck.jpg') }}">
+
+    <!-- Self-hosted fonts: we preload the two critical above-the-fold ones
+         (Jost = body, Playfair = hero title / LCP) so the swap happens as
+         early as possible and there's no render-blocking third-party request. -->
+    <link rel="preload" href="{{ url_for('static', filename='fonts/jost.woff2') }}" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="{{ url_for('static', filename='fonts/playfairdisplay.woff2') }}" as="font" type="font/woff2" crossorigin>
+    {% block head_preload %}{% endblock %}
+
+    {{ inline_css('css/styles.css') }}
+    {% block head_extra %}{% endblock %}
+
+    {% if config.get('UMAMI_WEBSITE_ID') %}
+    <script async src="https://analytics.nexttech.com.ar/script.js" data-website-id="{{ config.UMAMI_WEBSITE_ID }}"></script>
+    {% endif %}
+</head>
+<body class="{% block body_class %}{% endblock %}">
+
+    <!-- ===================== HEADER ===================== -->
+    <header class="site-header" id="header">
+        <div class="header-inner">
+            <a href="{{ home }}#top" class="wordmark" aria-label="{{ brand }} inicio">{{ brand }}</a>
+
+            <nav class="nav" aria-label="Principal">
+                <a href="{{ home }}#categorias">Colección</a>
+                <a href="{{ home }}#shop">Bolsos</a>
+                <a href="{{ home }}#materia">Materia</a>
+                <a href="{{ home }}#manifiesto">Nosotras</a>
+            </nav>
+
+            <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="header-cta">Comprar</a>
+
+            <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú" aria-expanded="false">
+                <span></span><span></span>
+            </button>
+        </div>
+    </header>
+
+    <!-- mobile menu -->
+    <div class="mobile-menu" id="mobileMenu" hidden>
+        <a href="{{ home }}#categorias">Colección</a>
+        <a href="{{ home }}#shop">Bolsos</a>
+        <a href="{{ home }}#materia">Materia</a>
+        <a href="{{ home }}#manifiesto">Nosotras</a>
+        <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="mobile-cta">Comprar en Instagram</a>
+    </div>
+
+    {% block body %}{% endblock %}
+
+    <!-- ===================== FOOTER ===================== -->
+    <footer class="site-footer">
+        <div class="footer-cta reveal">
+            <p class="footer-cta-eyebrow">¿Te gustó algo?</p>
+            <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="footer-cta-link">
+                Seguinos en Instagram
+                <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.2">
+                    <path d="M7 17 17 7M9 7h8v8"/>
+                </svg>
+            </a>
+        </div>
+
+        <div class="footer-top">
+            <div class="footer-brand">
+                <span class="footer-wordmark">{{ brand }}</span>
+                <p>{{ tagline }}</p>
+            </div>
+            <nav class="footer-nav" aria-label="Pie de página">
+                <a href="{{ home }}#categorias">Colección</a>
+                <a href="{{ home }}#shop">Bolsos</a>
+                <a href="{{ home }}#materia">Materia</a>
+                <a href="{{ home }}#manifiesto">Nosotras</a>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener">Instagram</a>
+            </nav>
+        </div>
+        <div class="footer-bottom">
+            <p>&copy; {{ current_year }} {{ brand }}. Todos los derechos reservados.</p>
+            <a href="{{ home }}#top" class="footer-top-link">Volver arriba ↑</a>
+            <p>Cuero vegano · Hecho a mano</p>
+        </div>
+
+        <!-- Shared Next Tech footer (renders into the site's footer background) -->
+        <script defer src="https://nexttech.com.ar/static/js/nexttechFooter.js"></script>
+        <nexttech-footer source="gluck-bags"></nexttech-footer>
+    </footer>
+
+    <script defer src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts_extra %}{% endblock %}
+</body>
+</html>

@@ -1,9 +1,6 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Open Graph / social link preview (must come first in <head>, before scripts/CSS) -->
+{% extends "base_public.html" %}
+
+{% block social_meta %}
     <meta property="og:type"             content="website">
     <meta property="og:url"              content="{{ site_url }}/">
     <meta property="og:title"            content="{{ brand }} · {{ tagline }}">
@@ -17,68 +14,16 @@
     <meta property="og:locale"           content="es_AR">
     <meta property="og:site_name"        content="{{ brand }}">
 
-    <!-- Twitter Card -->
     <meta name="twitter:card"        content="summary_large_image">
     <meta name="twitter:title"       content="{{ brand }} · {{ tagline }}">
     <meta name="twitter:description" content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
     <meta name="twitter:image"       content="{{ site_url }}/static/img/og-image.jpg">
-
-    <title>{{ brand }} · {{ tagline }}</title>
-    <meta name="description" content="{{ brand }} — {{ tagline }}. Carteras y bolsos de cuero vegano, hechos a mano con un diseño minimalista y atemporal.">
     <!-- Same content is served on www and the nexttech alias; pin the canonical
          to the apex domain so search engines don't see duplicate pages. -->
     <link rel="canonical" href="{{ site_url }}/">
+{% endblock %}
 
-    <!-- The shared Next Tech footer script + its assets load from this origin;
-         preconnecting shaves the TLS/connection setup off the critical path. -->
-    <link rel="preconnect" href="https://nexttech.com.ar" crossorigin>
-
-    <link rel="icon" type="image/webp" href="{{ url_for('static', filename='img/marca/avatar-perfil-gluck.webp') }}">
-    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/marca/avatar-perfil-gluck.jpg') }}">
-
-    <!-- Self-hosted fonts: we preload the two critical above-the-fold ones
-         (Jost = body, Playfair = hero title / LCP) so the swap happens as
-         early as possible and there's no render-blocking third-party request. -->
-    <link rel="preload" href="{{ url_for('static', filename='fonts/jost.woff2') }}" as="font" type="font/woff2" crossorigin>
-    <link rel="preload" href="{{ url_for('static', filename='fonts/playfairdisplay.woff2') }}" as="font" type="font/woff2" crossorigin>
-
-    {{ inline_css('css/styles.css') }}
-
-    {% if config.get('UMAMI_WEBSITE_ID') %}
-    <script async src="https://analytics.nexttech.com.ar/script.js" data-website-id="{{ config.UMAMI_WEBSITE_ID }}"></script>
-    {% endif %}
-</head>
-<body>
-
-    <!-- ===================== HEADER ===================== -->
-    <header class="site-header" id="header">
-        <div class="header-inner">
-            <a href="#top" class="wordmark" aria-label="{{ brand }} inicio">{{ brand }}</a>
-
-            <nav class="nav" aria-label="Principal">
-                <a href="#categorias">Colección</a>
-                <a href="#shop">Bolsos</a>
-                <a href="#materia">Materia</a>
-                <a href="#manifiesto">Nosotras</a>
-            </nav>
-
-            <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="header-cta">Comprar</a>
-
-            <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú" aria-expanded="false">
-                <span></span><span></span>
-            </button>
-        </div>
-    </header>
-
-    <!-- mobile menu -->
-    <div class="mobile-menu" id="mobileMenu" hidden>
-        <a href="#categorias">Colección</a>
-        <a href="#shop">Bolsos</a>
-        <a href="#materia">Materia</a>
-        <a href="#manifiesto">Nosotras</a>
-        <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="mobile-cta">Comprar en Instagram</a>
-    </div>
-
+{% block body %}
     <main id="top">
 
         <!-- ===================== HERO ===================== -->
@@ -199,37 +144,43 @@
                 <h2 class="section-title">Lo último de {{ brand }}</h2>
             </div>
 
+            {% if products %}
             <div class="shop-grid">
                 {% for product in products %}
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="product reveal" style="--i: {{ loop.index0 % 3 }}">
+                {% set cover = product.cover %}
+                <a href="{{ url_for('product_detail', product_id=product.id) }}" class="product reveal" style="--i: {{ loop.index0 % 3 }}">
                     <div class="product-media">
+                        {% if cover and cover.is_image and cover.smallest_width %}
                         <picture>
                             <source type="image/webp"
-                                    srcset="{{ url_for('static', filename=product.image ~ '-400.webp') }} 400w,
-                                            {{ url_for('static', filename=product.image ~ '-600.webp') }} 600w"
+                                    srcset="{{ cover.image_srcset('webp', 600) }}"
                                     sizes="(max-width: 768px) 50vw, 33vw">
-                            <img src="{{ url_for('static', filename=product.image ~ '-600.jpg') }}"
-                                 srcset="{{ url_for('static', filename=product.image ~ '-400.jpg') }} 400w,
-                                         {{ url_for('static', filename=product.image ~ '-600.jpg') }} 600w"
+                            <img src="{{ cover.image_url(cover.smallest_width) }}"
+                                 srcset="{{ cover.image_srcset('jpg', 600) }}"
                                  sizes="(max-width: 768px) 50vw, 33vw"
-                                 width="640" height="800" alt="{{ product.name }}" loading="lazy">
+                                 width="{{ cover.width }}" height="{{ cover.height }}"
+                                 alt="{{ product.title }}" loading="lazy">
                         </picture>
-                        <span class="product-badge">Ver en Instagram</span>
+                        {% elif cover and cover.is_video %}
+                        <img src="{{ cover.poster_url }}"
+                             width="{{ cover.width or 640 }}" height="{{ cover.height or 800 }}"
+                             alt="{{ product.title }}" loading="lazy">
+                        {% endif %}
+                        <span class="product-badge">{% if product.videos %}▶ Ver video{% else %}Ver más{% endif %}</span>
                     </div>
                     <div class="product-info">
                         <div class="product-meta">
-                            <h3 class="product-name">{{ product.name }}</h3>
-                            <span class="product-cat">{{ product.category }}</span>
+                            <h3 class="product-name">{{ product.title }}</h3>
+                            {% if product.category %}<span class="product-cat">{{ product.category }}</span>{% endif %}
                         </div>
-                        <span class="product-arrow" aria-hidden="true">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <path d="M5 12h14M13 6l6 6-6 6"/>
-                            </svg>
-                        </span>
+                        <span class="product-price">{{ product.formatted_price or 'Consultar' }}</span>
                     </div>
                 </a>
                 {% endfor %}
             </div>
+            {% else %}
+            <p class="shop-empty reveal">Muy pronto vas a ver acá nuestros bolsos.</p>
+            {% endif %}
         </section>
 
         <!-- ===================== RAW MATERIAL (VIDEO) ===================== -->
@@ -311,43 +262,4 @@
         </section>
 
     </main>
-
-    <!-- ===================== FOOTER ===================== -->
-    <footer class="site-footer">
-        <div class="footer-cta reveal">
-            <p class="footer-cta-eyebrow">¿Te gustó algo?</p>
-            <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="footer-cta-link">
-                Seguinos en Instagram
-                <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.2">
-                    <path d="M7 17 17 7M9 7h8v8"/>
-                </svg>
-            </a>
-        </div>
-
-        <div class="footer-top">
-            <div class="footer-brand">
-                <span class="footer-wordmark">{{ brand }}</span>
-                <p>{{ tagline }}</p>
-            </div>
-            <nav class="footer-nav" aria-label="Pie de página">
-                <a href="#categorias">Colección</a>
-                <a href="#shop">Bolsos</a>
-                <a href="#materia">Materia</a>
-                <a href="#manifiesto">Nosotras</a>
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener">Instagram</a>
-            </nav>
-        </div>
-        <div class="footer-bottom">
-            <p>&copy; {{ current_year }} {{ brand }}. Todos los derechos reservados.</p>
-            <a href="#top" class="footer-top-link">Volver arriba ↑</a>
-            <p>Cuero vegano · Hecho a mano</p>
-        </div>
-
-        <!-- Shared Next Tech footer (renders into the site's footer background) -->
-        <script defer src="https://nexttech.com.ar/static/js/nexttechFooter.js"></script>
-        <nexttech-footer source="gluck-bags"></nexttech-footer>
-    </footer>
-
-    <script defer src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
+{% endblock %}

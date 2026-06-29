@@ -1,0 +1,57 @@
+{% extends "admin/base.html" %}
+{% block title %}Productos · {{ brand }} Admin{% endblock %}
+
+{% block content %}
+<div class="adm-list-head">
+    <h1>Tus productos</h1>
+    <a href="{{ url_for('admin.product_new') }}" class="btn btn-primary btn-lg">+ Agregar producto</a>
+</div>
+
+{% if products %}
+<ul class="adm-list" id="admList" data-reorder-url="{{ url_for('admin.products_reorder') }}">
+    {% for p in products %}
+    {% set cover = p.cover %}
+    <li class="adm-row" data-id="{{ p.id }}">
+        <span class="adm-handle" aria-hidden="true" title="Arrastrar para ordenar">⋮⋮</span>
+        <div class="adm-row-thumb">
+            {% if cover %}<img src="{{ cover.thumb_url }}" alt="" loading="lazy">{% endif %}
+        </div>
+        <div class="adm-row-main">
+            <h2 class="adm-row-title">{{ p.title }}</h2>
+            <div class="adm-row-meta">
+                <span>{{ p.formatted_price or 'Sin precio' }}</span>
+                {% if p.category %}<span>· {{ p.category }}</span>{% endif %}
+                {% if p.is_published %}
+                <span class="adm-tag adm-tag-on">Visible</span>
+                {% else %}
+                <span class="adm-tag adm-tag-off">Oculto</span>
+                {% endif %}
+            </div>
+        </div>
+        <div class="adm-row-actions">
+            <a href="{{ url_for('admin.product_edit', product_id=p.id) }}" class="btn btn-ghost">Editar</a>
+            <form method="post" action="{{ url_for('admin.product_toggle', product_id=p.id) }}">
+                <button type="submit" class="adm-iconbtn"
+                        aria-label="{{ 'Ocultar de la web' if p.is_published else 'Mostrar en la web' }}"
+                        title="{{ 'Ocultar de la web' if p.is_published else 'Mostrar en la web' }}">{{ '🙈' if p.is_published else '👁' }}</button>
+            </form>
+            <form method="post" action="{{ url_for('admin.product_delete', product_id=p.id) }}"
+                  onsubmit="return confirm('¿Seguro que querés borrar «{{ p.title|e }}»? No se puede deshacer.');">
+                <button type="submit" class="adm-iconbtn" aria-label="Borrar" title="Borrar">🗑</button>
+            </form>
+        </div>
+    </li>
+    {% endfor %}
+</ul>
+<p class="adm-note">Arrastrá ⋮⋮ para cambiar el orden en que aparecen en la web.</p>
+{% else %}
+<div class="adm-empty">
+    <p>Todavía no cargaste ningún producto.</p>
+    <a href="{{ url_for('admin.product_new') }}" class="btn btn-primary btn-lg">+ Agregar el primero</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script defer src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

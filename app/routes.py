@@ -1,8 +1,10 @@
 from typing import Any
 
-from flask import Flask, Response, render_template, send_from_directory
+from flask import Flask, Response, abort, render_template, send_from_directory
 
-# --- Site content (single source of truth for the landing page) ---------------
+from app.repositories import ProductRepository
+
+# --- Static site content (the non-product sections of the landing page) -------
 
 CATEGORIES: list[dict[str, str]] = [
     {
@@ -27,48 +29,29 @@ CATEGORIES: list[dict[str, str]] = [
     },
 ]
 
-PRODUCTS: list[dict[str, str]] = [
-    {
-        "name": "Tote Cognac",
-        "category": "Tote",
-        "image": "img/productos/tote-cognac-01",
-    },
-    {
-        "name": "Tote Gris",
-        "category": "Tote",
-        "image": "img/productos/tote-gris-interior",
-    },
-    {
-        "name": "Crossbody Rosa",
-        "category": "Mini Bag",
-        "image": "img/productos/crossbody-rosa",
-    },
-    {
-        "name": "Bandolera Rosa",
-        "category": "Mini Bag",
-        "image": "img/productos/crossbody-rosa-bandolera",
-    },
-    {
-        "name": "Clutch Sobre",
-        "category": "Clutch",
-        "image": "img/productos/clutch-rosa-sobre",
-    },
-    {
-        "name": "Tote Cognac · Frente",
-        "category": "Tote",
-        "image": "img/productos/tote-cognac-02",
-    },
-]
-
 
 def register_routes(app: Flask) -> None:
     @app.route("/")
     def index() -> str:
         context: dict[str, Any] = {
             "categories": CATEGORIES,
-            "products": PRODUCTS,
+            "products": ProductRepository.get_published(),
         }
         return render_template("index.html", **context)
+
+    @app.route("/producto/<int:product_id>")
+    def product_detail(product_id: int) -> str:
+        product = ProductRepository.get_by_id(product_id)
+        if product is None or not product.is_published:
+            abort(404)
+        return render_template("product_detail.html", product=product)
+
+    @app.route("/media/<path:filename>")
+    def media_file(filename: str) -> Response:
+        # Uploaded media is immutable (new upload = new path), so cache forever.
+        resp = send_from_directory(app.config["MEDIA_ROOT"], filename, conditional=True)
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
 
     @app.route("/robots.txt")
     def robots() -> Response:

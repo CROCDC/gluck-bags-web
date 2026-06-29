@@ -1,0 +1,100 @@
+{% extends "admin/base.html" %}
+{% block title %}{{ 'Editar' if product else 'Nuevo' }} producto · {{ brand }} Admin{% endblock %}
+
+{% block content %}
+<a href="{{ url_for('admin.products_list') }}" class="adm-back">← Volver a productos</a>
+<h1 class="adm-title">{{ 'Editar producto' if product else 'Nuevo producto' }}</h1>
+
+<form id="productForm" class="adm-form" method="post"
+      action="{{ url_for('admin.product_update', product_id=product.id) if product else url_for('admin.product_new') }}"
+      enctype="multipart/form-data"
+      data-list-url="{{ url_for('admin.products_list') }}">
+
+    <div class="adm-field">
+        <label for="title">Título *</label>
+        <input type="text" id="title" name="title" value="{{ values.title }}" required maxlength="200"
+               placeholder="Ej: Tote Cognac">
+    </div>
+
+    <div class="adm-field">
+        <label for="price">Precio <span class="hint">(opcional)</span></label>
+        <div class="adm-price-wrap">
+            <span>$</span>
+            <input type="text" id="price" name="price" inputmode="numeric" maxlength="10" value="{{ values.price }}" placeholder="45000">
+        </div>
+        <span class="hint">Solo el número, sin puntos ni símbolos. Dejalo vacío para mostrar “Consultar”.</span>
+    </div>
+
+    <div class="adm-field">
+        <label for="category">Categoría <span class="hint">(opcional)</span></label>
+        <input type="text" id="category" name="category" value="{{ values.category }}" list="catlist"
+               maxlength="80" placeholder="Ej: Tote">
+        <datalist id="catlist">
+            <option value="Tote"></option>
+            <option value="Mini Bag"></option>
+            <option value="Bucket Bag"></option>
+            <option value="Clutch"></option>
+        </datalist>
+    </div>
+
+    <div class="adm-field">
+        <label for="description">Descripción <span class="hint">(opcional)</span></label>
+        <textarea id="description" name="description"
+                  placeholder="Contá los detalles: material, medidas, colores, cómo se usa...">{{ values.description }}</textarea>
+    </div>
+
+    <div class="adm-field">
+        <label>Fotos y videos</label>
+        <span class="hint">La primera es la portada. Arrastrá ⋮⋮ para cambiar el orden.</span>
+        <div class="uploader">
+            <label class="dropzone" for="fileInput" id="dropzone">
+                <strong>Arrastrá acá tus fotos y videos</strong>
+                <span>o tocá para elegir del celular</span>
+            </label>
+            <input type="file" id="fileInput" name="media" multiple accept="image/*,video/*" class="visually-hidden">
+
+            <ul class="tiles" id="tiles">
+                {% if product %}{% for m in product.media %}
+                <li class="tile" data-token="existing:{{ m.id }}">
+                    <span class="tile-handle" aria-hidden="true">⋮⋮</span>
+                    <div class="tile-thumb">
+                        {% if m.is_image %}
+                        <img src="{{ m.thumb_url }}" alt="" loading="lazy">
+                        {% else %}
+                        <img src="{{ m.poster_url }}" alt="" loading="lazy">
+                        <span class="tile-badge">▶</span>
+                        {% endif %}
+                    </div>
+                    <span class="tile-name">{{ 'Video' if m.is_video else 'Foto' }}</span>
+                    <span class="tile-cover">Portada</span>
+                    <button type="button" class="tile-makecover" aria-label="Hacer portada" title="Hacer portada">★</button>
+                    <button type="button" class="tile-remove" aria-label="Quitar">×</button>
+                </li>
+                {% endfor %}{% endif %}
+            </ul>
+
+            <input type="hidden" name="order" id="orderField" value="">
+        </div>
+    </div>
+
+    <div class="adm-field adm-check">
+        <input type="checkbox" id="is_published" name="is_published" {% if values.is_published %}checked{% endif %}>
+        <label for="is_published">Mostrar en la web</label>
+    </div>
+
+    <div class="adm-form-actions">
+        <a href="{{ url_for('admin.products_list') }}" class="btn btn-ghost">Cancelar</a>
+        <button type="submit" class="btn btn-primary btn-lg">Guardar</button>
+    </div>
+</form>
+
+<div class="adm-overlay" id="admOverlay" role="status" aria-live="polite">
+    <div class="adm-spinner"></div>
+    <div class="adm-overlay-text" id="admText">Subiendo…</div>
+    <div class="adm-progress"><div class="adm-progress-bar" id="admBar"></div></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script defer src="{{ url_for('static', filename='js/admin.js') }}"></script>
+{% endblock %}

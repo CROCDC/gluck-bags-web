@@ -1,0 +1,64 @@
+{% extends "base_public.html" %}
+{% set cover = product.cover %}
+
+{# No dark hero behind the fixed header here, so render it solid from the top. #}
+{% block body_class %}solid-header{% endblock %}
+
+{% block title %}{{ product.title }} · {{ brand }}{% endblock %}
+{% block description %}{{ product.title }}{% if product.category %} · {{ product.category }}{% endif %} — {{ brand }}, cuero vegano hecho a mano.{% endblock %}
+
+{% block social_meta %}
+    <meta property="og:type"        content="product">
+    <meta property="og:url"         content="https://gluck.nexttech.com.ar{{ url_for('product_detail', product_id=product.id) }}">
+    <meta property="og:title"       content="{{ product.title }} · {{ brand }}">
+    <meta property="og:description" content="{{ product.title }}{% if product.formatted_price %} — {{ product.formatted_price }}{% endif %}. {{ brand }}, cuero vegano hecho a mano.">
+    {% if cover and cover.is_image %}
+    <meta property="og:image"       content="https://gluck.nexttech.com.ar{{ cover.default_image_url }}">
+    {% elif cover and cover.is_video %}
+    <meta property="og:image"       content="https://gluck.nexttech.com.ar{{ cover.poster_url }}">
+    {% endif %}
+    <meta property="og:site_name"   content="{{ brand }}">
+    <meta property="og:locale"      content="es_AR">
+    <meta name="twitter:card"  content="summary_large_image">
+    <meta name="twitter:title" content="{{ product.title }} · {{ brand }}">
+{% endblock %}
+
+{% block body %}
+    <main class="pdp" id="top">
+        <a href="{{ url_for('index') }}#shop" class="pdp-back">← Volver a los bolsos</a>
+
+        <div class="pdp-grid">
+            <div class="pdp-gallery">
+                {% set first_image = product.images[0] if product.images else None %}
+                {% for m in product.media %}
+                    {% if m.is_image and m.smallest_width %}
+                    <picture class="pdp-media">
+                        <source type="image/webp" srcset="{{ m.image_srcset('webp') }}" sizes="(max-width: 980px) 100vw, 58vw">
+                        <img src="{{ m.image_url(m.smallest_width) }}" srcset="{{ m.image_srcset('jpg') }}"
+                             sizes="(max-width: 980px) 100vw, 58vw"
+                             width="{{ m.width }}" height="{{ m.height }}" alt="{{ product.title }}"
+                             {% if first_image and m.id == first_image.id %}fetchpriority="high"{% else %}loading="lazy"{% endif %}>
+                    </picture>
+                    {% elif m.is_video %}
+                    <video class="pdp-media" controls playsinline preload="none" poster="{{ m.poster_url }}"
+                           width="{{ m.width or 720 }}" height="{{ m.height or 1280 }}">
+                        <source src="{{ m.video_url }}" type="video/mp4">
+                    </video>
+                    {% endif %}
+                {% else %}
+                    <div class="pdp-noimg" aria-hidden="true"></div>
+                {% endfor %}
+            </div>
+
+            <aside class="pdp-info">
+                <p class="eyebrow">{{ product.category or brand }}</p>
+                <h1 class="pdp-title">{{ product.title }}</h1>
+                <p class="pdp-price">{{ product.formatted_price or 'Consultar' }}</p>
+                {% if product.description %}
+                <div class="pdp-desc">{{ product.description }}</div>
+                {% endif %}
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark pdp-cta">Consultar por Instagram</a>
+            </aside>
+        </div>
+    </main>
+{% endblock %}

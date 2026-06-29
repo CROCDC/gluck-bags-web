@@ -34,6 +34,9 @@ import tempfile
 
 import pytest
 
+# Slow + needs the Lighthouse CLI (npx/Chrome). Deselect with `pytest -m "not lighthouse"`.
+pytestmark = pytest.mark.lighthouse
+
 LIGHTHOUSE_VERSION = "lighthouse@12"
 
 # Opportunity audits → max wasted KiB tolerated. Calibrate to your site: set to

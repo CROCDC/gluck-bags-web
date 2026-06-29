@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{% block title %}Admin · {{ brand }}{% endblock %}</title>
+    <link rel="icon" type="image/webp" href="{{ url_for('static', filename='img/marca/avatar-perfil-gluck.webp') }}">
+    {{ inline_css('css/admin.css') }}
+    {% block head %}{% endblock %}
+</head>
+<body class="admin">
+    <header class="adm-header">
+        <a class="adm-brand" href="{{ url_for('admin.products_list') if session.admin else url_for('admin.login') }}">{{ brand }} · Admin</a>
+        {% if session.admin %}
+        <form method="post" action="{{ url_for('admin.logout') }}">
+            <button type="submit" class="adm-link">Salir</button>
+        </form>
+        {% endif %}
+    </header>
+
+    <main class="adm-main">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="adm-flashes">
+            {% for category, message in messages %}
+            <div class="adm-flash adm-flash-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>
