@@ -12,7 +12,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:-}
       SESSION_COOKIE_SECURE: "1"
       # Multi-domain: the real apex + www, plus the nexttech alias.
-      VIRTUAL_HOST: gluck-bags.com,www.gluck-bags.com,gluck.nexttech.com.ar
+      VIRTUAL_HOST: gluckbags.com,www.gluckbags.com,gluck.nexttech.com.ar
       VIRTUAL_PORT: 7014
       UMAMI_WEBSITE_ID: 4badbd28-ea2a-4c67-9520-fe0814abcd1d
     ports:
