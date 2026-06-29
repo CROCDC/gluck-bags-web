@@ -1,3 +1,8 @@
+# Pin the project name so it never depends on the Jenkins workspace dir.
+# Otherwise a workspace renamed to gluck-bags-web2 makes Compose create a new
+# project, colliding with the existing container_name and the data volume.
+name: gluck-bags-web
+
 services:
   web:
     build:
