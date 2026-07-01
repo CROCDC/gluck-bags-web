@@ -1,24 +1,33 @@
 {% extends "base_public.html" %}
-{% from "macros.html" import product_card %}
+{% from "macros.html" import product_card, breadcrumb, category_nav %}
 
 {% block body_class %}solid-header{% endblock %}
 
 {% block title %}{{ category }} · Carteras de cuero vegano | {{ brand }}{% endblock %}
 {% block description %}{{ category }}: carteras y bolsos de cuero vegano hechos a mano de {{ brand }}. Diseño minimalista y atemporal.{% endblock %}
 
-{# Keep empty (but known) categories out of the index until they have products. #}
-{% block head_extra %}{% if noindex %}<meta name="robots" content="noindex">{% endif %}{% endblock %}
+{% block head_extra %}
+    {# Keep empty (but known) categories out of the index until they have products. #}
+    {% if noindex %}<meta name="robots" content="noindex">{% endif %}
+    {% if jsonld %}<script type="application/ld+json">{{ jsonld | safe }}</script>{% endif %}
+{% endblock %}
 
 {% block body %}
     <main class="section shop" id="top">
+        {{ breadcrumb([("Inicio", url_for('index')), (category, None)]) }}
+
         <div class="section-head">
             <p class="eyebrow">La colección</p>
             <h1 class="section-title">{{ category }}</h1>
+            {% if intro %}<p class="section-intro">{{ intro }}</p>{% endif %}
         </div>
 
+        {{ category_nav(nav_categories, current=category) }}
+
         {% if products %}
+        <h2 class="sr-only">Modelos de {{ category }}</h2>
         <div class="shop-grid">
-            {% for product in products %}{{ product_card(product) }}{% endfor %}
+            {% for product in products %}{{ product_card(product, priority=loop.first) }}{% endfor %}
         </div>
         {% else %}
         <p class="shop-empty">Muy pronto vas a ver acá nuestros {{ category | lower }}.</p>

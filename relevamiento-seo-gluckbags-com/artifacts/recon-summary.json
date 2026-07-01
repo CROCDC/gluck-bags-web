@@ -2,13 +2,58 @@
   "base": "https://gluckbags.com",
   "host": "gluckbags.com",
   "platform": "generic",
-  "url_count": 0,
-  "sitemap_count": 0,
+  "url_count": 15,
+  "sitemap_count": 1,
   "sample": [
     {
       "url": "https://gluckbags.com/",
       "key": "gluckbags-com",
       "pagetype": "home"
+    },
+    {
+      "url": "https://gluckbags.com/categoria/tote",
+      "key": "gluckbags-com-categoria-tote",
+      "pagetype": "section"
+    },
+    {
+      "url": "https://gluckbags.com/categoria/mini-bag",
+      "key": "gluckbags-com-categoria-mini-bag",
+      "pagetype": "section"
+    },
+    {
+      "url": "https://gluckbags.com/categoria/clutch",
+      "key": "gluckbags-com-categoria-clutch",
+      "pagetype": "section"
+    },
+    {
+      "url": "https://gluckbags.com/nosotras",
+      "key": "gluckbags-com-nosotras",
+      "pagetype": "article"
+    },
+    {
+      "url": "https://gluckbags.com/envios",
+      "key": "gluckbags-com-envios",
+      "pagetype": "article"
+    },
+    {
+      "url": "https://gluckbags.com/contacto",
+      "key": "gluckbags-com-contacto",
+      "pagetype": "static"
+    },
+    {
+      "url": "https://gluckbags.com/terminos",
+      "key": "gluckbags-com-terminos",
+      "pagetype": "static"
+    },
+    {
+      "url": "https://gluckbags.com/privacidad",
+      "key": "gluckbags-com-privacidad",
+      "pagetype": "static"
+    },
+    {
+      "url": "https://gluckbags.com/cambios-y-devoluciones",
+      "key": "gluckbags-com-cambios-y-devoluciones",
+      "pagetype": "article"
     },
     {
       "url": "https://gluckbags.com/?s=seo",

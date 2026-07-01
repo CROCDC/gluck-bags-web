@@ -26,6 +26,19 @@ from PIL import Image
 from app.services import media_service as ms
 
 
+def _avif_supported() -> bool:
+    """True when this Pillow build can write AVIF (native or via plugin). AVIF
+    generation is best-effort, so tests that assert it skip when it's unavailable."""
+    try:
+        Image.new("RGB", (4, 4)).save(io.BytesIO(), "AVIF")
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+
+
+_AVIF = _avif_supported()
+
+
 # --- helpers -----------------------------------------------------------------
 
 
@@ -196,18 +209,57 @@ class TestProcessImage:
                 assert ji.width == w
             with Image.open(webp) as wi:
                 assert wi.width == w
-        # Exactly the variants we expect: a jpg+webp per width, plus the 1200x630
-        # social-share crop (og.jpg) used for og:image / twitter:image.
+        # Exactly the variants we expect: a jpg+webp per width, the 1200x630
+        # social-share crop (og.jpg), and — where the encoder is available — an
+        # AVIF per width (best-effort).
         files = sorted(os.listdir(abs_dir))
         expected = sorted(
             [f"{w}.jpg" for w in result["widths"]]
             + [f"{w}.webp" for w in result["widths"]]
+            + ([f"{w}.avif" for w in result["widths"]] if _AVIF else [])
             + ["og.jpg"]
         )
         assert files == expected
         # The og crop is exactly 1200x630.
         with Image.open(os.path.join(abs_dir, "og.jpg")) as og:
             assert og.size == (1200, 630)
+
+    @pytest.mark.skipif(not _AVIF, reason="Pillow build has no AVIF encoder")
+    def test_has_avif_is_all_or_nothing(self, app, tmp_path) -> None:
+        """Media.has_avif is True only when EVERY width has an .avif. A partial set
+        (one width's .avif missing) returns False so the template won't emit an AVIF
+        <source> with a candidate that 404s (a <picture> doesn't fall back on a 404)."""
+        from app.models import Media
+
+        src = _img_path(tmp_path, 1200, 800)
+        with app.app_context():
+            result = ms.process_image(src, product_id=12, media_id=6)
+            abs_dir = _abs_dir(app, 12, 6)
+            media = Media(
+                kind="image",
+                path=result["path"],
+                width=result["width"],
+                height=result["height"],
+                widths=result["widths"],
+            )
+            assert media.has_avif is True  # full set just generated
+            # Drop the largest width's AVIF -> partial set -> must report False.
+            os.remove(os.path.join(abs_dir, f"{max(result['widths'])}.avif"))
+            assert media.has_avif is False
+
+    @pytest.mark.skipif(not _AVIF, reason="Pillow build has no AVIF encoder")
+    def test_writes_avif_variant_for_each_width(self, app, tmp_path) -> None:
+        """When an AVIF encoder is available, an AVIF variant is written per width
+        (smaller than WebP). Best-effort: skipped entirely when unavailable."""
+        src = _img_path(tmp_path, 1200, 800)
+        with app.app_context():
+            result = ms.process_image(src, product_id=9, media_id=3)
+        abs_dir = _abs_dir(app, 9, 3)
+        for w in result["widths"]:
+            avif = os.path.join(abs_dir, f"{w}.avif")
+            assert os.path.isfile(avif), f"missing {avif}"
+            with Image.open(avif) as ai:
+                assert ai.width == w
 
     def test_small_image_only_source_width_plus_smaller_widths(self, app, tmp_path) -> None:
         """A 500-wide source: only 400 is < 500, so widths are [400, 500]."""

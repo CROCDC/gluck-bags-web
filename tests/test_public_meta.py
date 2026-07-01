@@ -199,10 +199,11 @@ def test_detail_product_jsonld_has_offer_when_priced(
 
 
 def test_home_lang_and_description(client: FlaskClient) -> None:
-    """The document declares Spanish and ships a non-empty meta description."""
+    """The document declares Argentine Spanish and ships a non-empty meta description."""
     html = client.get("/").get_data(as_text=True)
 
-    assert '<html lang="es">' in html
+    # es-AR matches og:locale=es_AR (the store self-targets Argentina).
+    assert '<html lang="es-AR">' in html
 
     # Extract the description content and assert it is non-trivial (a blank
     # description silently breaks search snippets / link previews).
@@ -212,6 +213,62 @@ def test_home_lang_and_description(client: FlaskClient) -> None:
 
 
 # --- 2) Favicon + critical font preloads --------------------------------------
+
+
+def test_home_og_url_is_self(client: FlaskClient) -> None:
+    """og:url on the home points at the apex root (matches its canonical)."""
+    html = client.get("/").get_data(as_text=True)
+    assert _has_meta(
+        html, key="og:url", attr="property", content="https://gluckbags.com/"
+    )
+
+
+def test_internal_pages_have_self_referential_og_url(client: FlaskClient) -> None:
+    """Internal pages (categories, trust pages) emit og:url == their own canonical,
+    NOT the home — so sharing them consolidates social signals to the right URL."""
+    for path in ("/categoria/tote", "/nosotras", "/envios"):
+        html = client.get(path).get_data(as_text=True)
+        og_url = re.search(r'<meta property="og:url"\s+content="([^"]+)"', html)
+        assert og_url is not None, f"no og:url on {path}"
+        assert og_url.group(1) == f"https://gluckbags.com{path}", path
+        assert og_url.group(1) == _canonical_of(html), f"og:url != canonical on {path}"
+
+
+def test_internal_pages_have_unique_social_title(client: FlaskClient) -> None:
+    """Category/trust pages don't reuse the home's generic social card: their
+    og:title reflects the page's own <title>, not the brand tagline."""
+    html = client.get("/categoria/tote").get_data(as_text=True)
+    assert _has_meta(
+        html,
+        key="og:title",
+        attr="property",
+        content="Tote · Carteras de cuero vegano | GLÜCK",
+    )
+
+
+def test_instagram_cta_is_tracked_as_conversion(
+    auth_client: FlaskClient, client: FlaskClient, app: Flask
+) -> None:
+    """The buy CTA (the site's only conversion: a click out to Instagram) carries a
+    Umami custom-event attribute so the conversion is measurable, not just pageviews."""
+    # Home buy CTAs.
+    home = client.get("/").get_data(as_text=True)
+    assert 'data-umami-event="comprar-instagram"' in home
+    # The product detail CTA tags the event with the product name.
+    title = "Tote Trackeado"
+    _create_published_product_with_image(auth_client, title=title)
+    pid = _product_id_by_title(app, title)
+    pdp = client.get(f"/producto/{pid}").get_data(as_text=True)
+    assert 'data-umami-event="comprar-instagram"' in pdp
+    assert f'data-umami-event-producto="{title}"' in pdp
+
+
+def test_404_emits_no_social_card(client: FlaskClient) -> None:
+    """A 404 ships no Open Graph card (no soft-404 social preview of the home)."""
+    html = client.get("/esta-pagina-no-existe-zzz").get_data(as_text=True)
+    assert "og:image" not in html
+    assert 'property="og:title"' not in html
+    assert '<meta name="robots" content="noindex">' in html
 
 
 def test_home_favicon_and_apple_touch_icon(client: FlaskClient) -> None:
@@ -337,3 +394,5 @@ def test_umami_injected_when_website_id_configured(tmp_path, monkeypatch) -> Non
     html = application.test_client().get("/").get_data(as_text=True)
     assert f"https://{_UMAMI_HOST}/script.js" in html
     assert f'data-website-id="{website_id}"' in html
+    # Scoped to the production host so dev/alias traffic doesn't pollute the stats.
+    assert 'data-domains="gluckbags.com"' in html

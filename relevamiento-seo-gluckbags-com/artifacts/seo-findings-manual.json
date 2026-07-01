@@ -1,0 +1,49 @@
+{
+  "findings": [
+    {
+      "id": "m-http-https",
+      "title": "HTTP no redirige a HTTPS (sirve 200 en http://)",
+      "severity": "medium",
+      "category": "Canonical",
+      "dimension": "url-canonicalization",
+      "scope": "todo el sitio",
+      "symptom": "http://gluckbags.com/ responde 200 con el contenido completo en vez de hacer un 301 a https://. Eso deja una copia del sitio accesible por HTTP (duplicado de protocolo) y expone una primera request en claro antes de que actúe el HSTS.",
+      "evidence": "curl -sI http://gluckbags.com/ -> HTTP/1.1 200 OK (Server: cloudflare; Strict-Transport-Security presente). curl -L no genera ningún redirect (num_redirects=0). En cambio https://www.gluckbags.com/ sí hace 301 -> https://gluckbags.com/.",
+      "evidenceCode": "$ curl -sI http://gluckbags.com/\nHTTP/1.1 200 OK\nContent-Type: text/html; charset=utf-8\nServer: cloudflare\nStrict-Transport-Security: max-age=31536000; includeSubDomains\nCf-Cache-Status: DYNAMIC\n\n# Esperado: HTTP/1.1 301 Moved Permanently  Location: https://gluckbags.com/",
+      "recommendation": "Activar en Cloudflare 'SSL/TLS > Edge Certificates > Always Use HTTPS' (o una Redirect Rule http->https 301). El HSTS ya está, pero el 301 es necesario para el primer visitante/crawler y para no servir el sitio en claro. El canonical absoluto en https mitiga el duplicado para Google, pero igual conviene el 301 duro.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "manual"
+    },
+    {
+      "id": "m-product-offers",
+      "title": "El JSON-LD Product no incluye offers (sin precio ni disponibilidad)",
+      "severity": "medium",
+      "category": "Datos estructurados",
+      "dimension": "structured-data",
+      "scope": "todas las páginas /producto/N",
+      "symptom": "El schema Product está presente y bien formado (name, brand, image, category, BreadcrumbList) pero le falta el bloque offers. Sin offers (con price/priceCurrency y availability), Google no muestra el rich result de producto (precio, disponibilidad, estrella de reseñas) y Search Console reporta 'Falta el campo offers'.",
+      "evidence": "JSON-LD renderizado de https://gluckbags.com/producto/1: Product sin la propiedad 'offers'.",
+      "evidenceCode": "{\n  \"@context\": \"https://schema.org\",\n  \"@type\": \"Product\",\n  \"name\": \"Tote Cognac\",\n  \"url\": \"https://gluckbags.com/producto/1\",\n  \"brand\": {\"@type\": \"Brand\", \"name\": \"GLÜCK\"},\n  \"description\": \"Tote Cognac — GLÜCK, cartera de cuero vegano hecha a mano.\",\n  \"image\": [\"https://gluckbags.com/media/products/1/.../787.jpg\"],\n  \"category\": \"Tote\"\n  // <-- falta:  \"offers\": { \"@type\": \"Offer\", \"availability\": \"https://schema.org/InStock\", \"priceCurrency\": \"ARS\", \"price\": \"...\", \"url\": \"...\" }\n}",
+      "recommendation": "Agregar offers al Product. Como no hay checkout (la compra se coordina por Instagram), usar al menos availability (InStock / PreOrder) + priceCurrency + price (o priceSpecification), y url al producto. Si no se quiere publicar precio, considerar Offer con availability + priceCurrency y sin price, o no marcar como Product comercial — pero la forma que más rich result habilita es offers con price.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "manual"
+    },
+    {
+      "id": "m-robots-aibots-info",
+      "title": "robots.txt: Googlebot NO está bloqueado (el 'Disallow: /' es solo para bots de IA) — aclaración",
+      "severity": "info",
+      "category": "robots.txt",
+      "dimension": "indexability",
+      "scope": "robots.txt",
+      "symptom": "El análisis determinístico marcó un 'Disallow: / global' como crítico, pero es un FALSO POSITIVO: el grupo User-agent:* tiene 'Allow: /'. Los 'Disallow: /' aplican únicamente a crawlers de IA gestionados por Cloudflare (ClaudeBot, GPTBot, Google-Extended, Amazonbot, Bytespider, CCBot, meta-externalagent, Applebot-Extended, CloudflareBrowserRenderingCrawler). La indexación de Google para búsqueda está intacta.",
+      "evidence": "robots.txt en vivo: el grupo 'User-agent: *' termina en 'Allow: /'. Los bloqueos son por user-agent de IA. Google-Extended (entrenamiento de Gemini/Vertex) está bloqueado pero Googlebot (indexación de búsqueda) NO.",
+      "evidenceCode": "User-agent: *\nContent-Signal: search=yes,ai-train=no\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\nUser-agent: Google-Extended\nDisallow: /\nUser-agent: ClaudeBot\nDisallow: /\n# ... (resto de bots de IA)\n\nUser-agent: *\nAllow: /",
+      "recommendation": "No hay acción requerida para SEO de búsqueda. Es una decisión deliberada (Cloudflare AI Audit / Content Signals): permite indexación de buscadores y bloquea scraping para entrenamiento de IA. Dejar como está salvo que se quiera permitir IA. Único ajuste menor real: declarar el Sitemap en robots.txt (ver hallazgo aparte).",
+      "evidenceKind": "code",
+      "status": "OK / SIN ACCIÓN",
+      "source": "manual"
+    }
+  ]
+}

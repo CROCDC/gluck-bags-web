@@ -5,4 +5,4 @@ themes: (none)
 plugins:
 server:
   server: cloudflare
-  cf-ray: a13780c4ce5ad7c1-EZE
+  cf-ray: a13898a398aad7c1-EZE

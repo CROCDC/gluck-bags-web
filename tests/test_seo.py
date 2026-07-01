@@ -12,6 +12,7 @@ from __future__ import annotations
 from app.seo import (
     BRAND,
     breadcrumb_jsonld,
+    category_breadcrumb_jsonld,
     organization_jsonld,
     product_jsonld,
     website_jsonld,
@@ -44,6 +45,39 @@ def test_organization_and_website_absolute_on_canonical() -> None:
     site = website_jsonld(SITE)
     assert site["@type"] == "WebSite"
     assert site["url"] == f"{SITE}/"
+
+
+def test_organization_has_id_contactpoint_and_country() -> None:
+    """The Organization carries a stable @id (for cross-page entity consolidation),
+    a Google-recognized contactType, and an AR address — the verifiable trust signals
+    we add without inventing personal data."""
+    org = organization_jsonld(SITE)
+    assert org["@id"] == f"{SITE}/#organization"
+    assert org["address"]["@type"] == "PostalAddress"
+    assert org["address"]["addressCountry"] == "AR"
+    cp = org["contactPoint"]
+    assert cp["@type"] == "ContactPoint"
+    # Must be a value from Google's documented enum (not "customer support").
+    assert cp["contactType"] == "customer service"
+    assert "instagram.com" in cp["url"]
+
+
+def test_product_has_stable_sku() -> None:
+    """Every product gets a stable synthetic SKU derived from its id (no DB column)."""
+    data = product_jsonld(_FakeProduct(7, "Tote Cognac"), SITE)
+    assert data["sku"] == "GLUCK-0007"
+
+
+def test_category_breadcrumb_matches_visible_trail() -> None:
+    """category_breadcrumb_jsonld is Inicio › <categoría> with absolute canonical URLs
+    (the category node points at the real /categoria/<slug> page)."""
+    crumbs = category_breadcrumb_jsonld("Mini Bag", SITE)
+    assert crumbs["@type"] == "BreadcrumbList"
+    items = crumbs["itemListElement"]
+    assert [it["name"] for it in items] == ["Inicio", "Mini Bag"]
+    assert [it["position"] for it in items] == [1, 2]
+    assert items[0]["item"] == f"{SITE}/"
+    assert items[1]["item"] == f"{SITE}/categoria/mini-bag"
 
 
 def test_product_without_price_has_no_offer() -> None:

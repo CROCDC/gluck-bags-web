@@ -119,3 +119,73 @@ def test_missing_source_skips_only_that_product(tmp_path, monkeypatch) -> None:
         # The others are present, so only one was dropped (not a broad failure).
         assert seed_module._SEED[0][0] in titles
         assert seed_module._SEED[-1][0] in titles
+
+
+# --- 4) Startup self-heals media variants (og.jpg + AVIF) ---------------------
+
+
+def test_startup_backfills_missing_media_variants(tmp_path, monkeypatch) -> None:
+    """A redeploy heals media in place: if og.jpg / AVIF are missing on the volume
+    (products seeded by an older build), constructing the app regenerates them — so
+    no manual reprocess is ever run on the server."""
+    from app.maintenance import _avif_supported
+
+    app = _build_seeded_app(tmp_path, monkeypatch)
+    with app.app_context():
+        media = Media.query.filter_by(kind="image").first()
+        assert media is not None
+        d = os.path.join(app.config["MEDIA_ROOT"], media.path)
+        assert os.path.exists(os.path.join(d, "og.jpg"))  # seed generated it
+        # Simulate an old volume: drop og.jpg + every AVIF variant.
+        os.remove(os.path.join(d, "og.jpg"))
+        removed_avif = [f for f in os.listdir(d) if f.endswith(".avif")]
+        for f in removed_avif:
+            os.remove(os.path.join(d, f))
+        media_path = media.path
+
+    # Re-construct against the SAME DATA_DIR (a "redeploy"): the startup backfill runs.
+    app2 = _build_seeded_app(tmp_path, monkeypatch)
+    with app2.app_context():
+        d = os.path.join(app2.config["MEDIA_ROOT"], media_path)
+        assert os.path.exists(os.path.join(d, "og.jpg")), "og.jpg not healed on boot"
+        if _avif_supported() and removed_avif:
+            for f in removed_avif:
+                assert os.path.exists(os.path.join(d, f)), f"AVIF {f} not healed on boot"
+
+
+def test_backfill_skips_corrupt_file_and_heals_the_rest(tmp_path, monkeypatch) -> None:
+    """One unreadable JPEG must not abort the whole self-heal: that file is counted
+    as failed and skipped while every other variant is still regenerated, and og.jpg
+    is rebuilt from a larger (intact) source."""
+    import pytest
+
+    from app.maintenance import _avif_supported, backfill_media_variants
+
+    if not _avif_supported():
+        pytest.skip("Pillow build has no AVIF encoder")
+
+    app = _build_seeded_app(tmp_path, monkeypatch)
+    with app.app_context():
+        root = app.config["MEDIA_ROOT"]
+        media = Media.query.filter_by(kind="image").first()
+        d = os.path.join(root, media.path)
+        widths = sorted(media.widths)
+        assert len(widths) >= 2, "need a multi-width image for this test"
+
+        # Simulate an old volume + one corrupt input.
+        os.remove(os.path.join(d, "og.jpg"))
+        for f in [f for f in os.listdir(d) if f.endswith(".avif")]:
+            os.remove(os.path.join(d, f))
+        smallest = widths[0]
+        with open(os.path.join(d, f"{smallest}.jpg"), "wb") as fh:
+            fh.write(b"not a real jpeg")
+
+        counts = backfill_media_variants(root)
+
+        # The corrupt width's AVIF failed; the rest healed; og.jpg rebuilt from a
+        # larger intact jpg — the backfill did NOT abort on the bad file.
+        assert counts["failed"] >= 1
+        assert os.path.exists(os.path.join(d, "og.jpg"))
+        for w in widths[1:]:
+            assert os.path.exists(os.path.join(d, f"{w}.avif")), f"{w}.avif not healed"
+        assert not os.path.exists(os.path.join(d, f"{smallest}.avif"))

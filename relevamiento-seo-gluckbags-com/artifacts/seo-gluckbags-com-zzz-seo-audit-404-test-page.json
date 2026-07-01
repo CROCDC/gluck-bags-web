@@ -1,0 +1,117 @@
+{
+  "key": "gluckbags-com-zzz-seo-audit-404-test-page",
+  "pagetype": "notfound",
+  "requestedUrl": "https://gluckbags.com/zzz-seo-audit-404-test-page/",
+  "captcha_wall": false,
+  "httpStatus": 404,
+  "xRobotsTag": null,
+  "contentType": "text/html; charset=utf-8",
+  "server": "cloudflare",
+  "redirectChain": [],
+  "finalUrl": "https://gluckbags.com/zzz-seo-audit-404-test-page/",
+  "title": "Página no encontrada · GLÜCK",
+  "titleLen": 28,
+  "metaDescription": "GLÜCK — Bolsos minimalistas de cuero vegano. Carteras y bolsos de cuero vegano, hechos a mano con un diseño minimalista y atemporal.",
+  "metaRobots": "noindex",
+  "metaRobotsGoogle": null,
+  "canonical": null,
+  "canonicalSelf": null,
+  "htmlLang": "es",
+  "hreflang": [],
+  "headings": [
+    {
+      "level": 1,
+      "text": "Esta página no existe",
+      "empty": false
+    }
+  ],
+  "h1Count": 1,
+  "h1Texts": [
+    "Esta página no existe"
+  ],
+  "headingSkips": [],
+  "emptyHeadings": 0,
+  "wordCount": 69,
+  "links": {
+    "total": 24,
+    "internal": 20,
+    "external": 4,
+    "nofollow": 0,
+    "emptyAnchor": 0,
+    "genericAnchor": 0,
+    "badAnchors": []
+  },
+  "images": {
+    "total": 0,
+    "missingAlt": 0,
+    "emptyAlt": 0,
+    "lazy": 0,
+    "withDims": 0,
+    "formats": {
+      "png": 0,
+      "jpg": 0,
+      "webp": 0,
+      "avif": 0,
+      "gif": 0,
+      "svg": 0,
+      "other": 0
+    },
+    "missingAltSrc": []
+  },
+  "jsonLdTypes": [],
+  "jsonLdCount": 0,
+  "jsonLdErrors": [],
+  "microdataTypes": [],
+  "og": {
+    "og:type": "website",
+    "og:url": "https://gluckbags.com/",
+    "og:title": "GLÜCK · Bolsos minimalistas de cuero vegano",
+    "og:description": "Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.",
+    "og:image": "https://gluckbags.com/static/img/og-image.jpg",
+    "og:image:secure_url": "https://gluckbags.com/static/img/og-image.jpg",
+    "og:image:type": "image/jpeg",
+    "og:image:width": "1200",
+    "og:image:height": "630",
+    "og:image:alt": "Tote de cuero vegano cognac de GLÜCK en la playa",
+    "og:locale": "es_AR",
+    "og:site_name": "GLÜCK"
+  },
+  "twitter": {
+    "twitter:card": "summary_large_image",
+    "twitter:title": "GLÜCK · Bolsos minimalistas de cuero vegano",
+    "twitter:description": "Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.",
+    "twitter:image": "https://gluckbags.com/static/img/og-image.jpg"
+  },
+  "ogImage": "https://gluckbags.com/static/img/og-image.jpg",
+  "twitterCard": "summary_large_image",
+  "viewport": "width=device-width, initial-scale=1.0",
+  "charset": "UTF-8",
+  "favicon": true,
+  "appleTouchIcon": true,
+  "manifest": false,
+  "relNext": null,
+  "relPrev": null,
+  "ampHtml": null,
+  "mobile": {
+    "wordCount": 64,
+    "title": "Página no encontrada · GLÜCK",
+    "h1Count": 1,
+    "linkCount": 24,
+    "imgCount": 0
+  },
+  "rawVsRendered": {
+    "rawWordCount": 176,
+    "renderedWordCount": 69,
+    "wordDeltaPct": -155,
+    "rawLinks": 0,
+    "renderedLinks": 24,
+    "rawH1": 0,
+    "renderedH1": 1,
+    "titleInRaw": false,
+    "descriptionInRaw": false,
+    "jsonLdInRaw": 0,
+    "jsonLdRendered": 0
+  },
+  "noindex": true,
+  "indexable": false
+}

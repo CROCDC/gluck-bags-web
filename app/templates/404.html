@@ -5,8 +5,10 @@
 
 {% block title %}Página no encontrada · {{ brand }}{% endblock %}
 
-{# A 404 must never be indexed and has no canonical of its own. #}
+{# A 404 must never be indexed and has no canonical of its own. It also emits NO
+   social card: a broken link shouldn't preview as a legit page (soft-404 social). #}
 {% block canonical %}{% endblock %}
+{% block social_meta %}{% endblock %}
 {% block head_extra %}<meta name="robots" content="noindex">{% endblock %}
 
 {% block body %}

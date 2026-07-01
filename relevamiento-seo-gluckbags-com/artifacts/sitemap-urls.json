@@ -1,6 +1,89 @@
 {
-  "sitemaps": [],
-  "urls": [],
+  "sitemaps": [
+    {
+      "sitemap": "https://gluckbags.com/sitemap.xml",
+      "kind": "urlset",
+      "count": 15,
+      "declared_in_robots": false
+    }
+  ],
+  "urls": [
+    {
+      "loc": "https://gluckbags.com/",
+      "lastmod": "",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/nosotras",
+      "lastmod": "",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/contacto",
+      "lastmod": "",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/envios",
+      "lastmod": "",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/cambios-y-devoluciones",
+      "lastmod": "",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/terminos",
+      "lastmod": "",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/privacidad",
+      "lastmod": "",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/categoria/tote",
+      "lastmod": "",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/categoria/mini-bag",
+      "lastmod": "",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/categoria/clutch",
+      "lastmod": "",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/producto/1",
+      "lastmod": "2026-06-29",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/producto/2",
+      "lastmod": "2026-06-29",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/producto/3",
+      "lastmod": "2026-06-29",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/producto/4",
+      "lastmod": "2026-06-29",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    },
+    {
+      "loc": "https://gluckbags.com/producto/5",
+      "lastmod": "2026-06-29",
+      "sitemap": "https://gluckbags.com/sitemap.xml"
+    }
+  ],
   "declared": [],
   "walled": 0
 }

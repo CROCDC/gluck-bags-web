@@ -6,6 +6,12 @@
 {%- if u.lastmod %}
     <lastmod>{{ u.lastmod }}</lastmod>
 {%- endif %}
+{%- if u.changefreq %}
+    <changefreq>{{ u.changefreq }}</changefreq>
+{%- endif %}
+{%- if u.priority %}
+    <priority>{{ u.priority }}</priority>
+{%- endif %}
   </url>
 {%- endfor %}
 </urlset>

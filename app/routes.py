@@ -5,6 +5,7 @@ from flask import Flask, Response, abort, render_template, url_for
 from app.repositories import ProductRepository
 from app.seo import (
     breadcrumb_jsonld,
+    category_breadcrumb_jsonld,
     dump_jsonld,
     organization_jsonld,
     product_jsonld,
@@ -63,13 +64,37 @@ STATIC_PAGES: dict[str, dict[str, str]] = {
     "terminos": {
         "template": "terminos.html",
         "title": "Términos y condiciones",
-        "description": "Términos y condiciones de uso y de compra del sitio de GLÜCK.",
+        "description": "Términos y condiciones de uso y de compra del sitio de GLÜCK: cómo comprar, coordinar pagos y envíos por Instagram, y las condiciones generales del servicio.",
     },
     "privacidad": {
         "template": "privacidad.html",
         "title": "Política de privacidad",
         "description": "Cómo GLÜCK trata tus datos personales y qué herramientas de medición usa el sitio.",
     },
+}
+
+
+# Short intro copy per category — gives each (otherwise thin) category page unique,
+# indexable text above the product grid. Keyed by category name.
+CATEGORY_INTRO: dict[str, str] = {
+    "Tote": (
+        "El bolso de todos los días: amplio, de líneas rectas y hecho de una sola "
+        "pieza de cuero vegano. Pensado para que entre todo sin perder la silueta "
+        "minimalista y atemporal que define a GLÜCK."
+    ),
+    "Mini Bag": (
+        "Lo esencial, en formato pequeño. Bandoleras y crossbody de cuero vegano "
+        "para llevar lo justo con las manos libres, sin resignar diseño ni "
+        "carácter."
+    ),
+    "Bucket Bag": (
+        "Volumen y carácter en una silueta tipo balde. Cuero vegano plegado a mano, "
+        "espacioso y con una caída suave que la vuelve inconfundible."
+    ),
+    "Clutch": (
+        "Lo justo y necesario para una salida. Sobres y clutches de cuero vegano, "
+        "mínimos y elegantes, hechos a mano y sin crueldad animal."
+    ),
 }
 
 
@@ -91,8 +116,14 @@ def register_routes(app: Flask) -> None:
     def index() -> str:
         site_url = app.config["SITE_URL"]
         jsonld = dump_jsonld([organization_jsonld(site_url), website_jsonld(site_url)])
+        # Categories that actually have published products, so the home grid can
+        # avoid linking an empty (noindex) category as if it were shoppable. Keyed by
+        # slug (not raw name) so an off-casing product category (admin input is
+        # free-text, e.g. "tote") still matches the curated card ("Tote").
+        published_cats = {slugify(c) for c in ProductRepository.published_categories()}
         context: dict[str, Any] = {
             "categories": CATEGORIES,
+            "published_cats": published_cats,
             "products": ProductRepository.get_published(),
             "jsonld": jsonld,
         }
@@ -111,6 +142,7 @@ def register_routes(app: Flask) -> None:
             "product_detail.html",
             product=product,
             related=ProductRepository.get_related(product),
+            nav_categories=ProductRepository.published_categories(),
             jsonld=jsonld,
         )
 
@@ -119,9 +151,19 @@ def register_routes(app: Flask) -> None:
         name = _category_name_for_slug(slug)
         if name is None:
             abort(404)
+        site_url = app.config["SITE_URL"]
         products = ProductRepository.get_published_by_category(name)
-        # An empty (but known) category is a thin page — keep it out of the index.
-        return render_template("category.html", category=name, products=products, noindex=not products)
+        return render_template(
+            "category.html",
+            category=name,
+            products=products,
+            intro=CATEGORY_INTRO.get(name),
+            # Sibling categories (non-empty) for the inter-category nav chips.
+            nav_categories=ProductRepository.published_categories(),
+            jsonld=dump_jsonld(category_breadcrumb_jsonld(name, site_url)),
+            # An empty (but known) category is a thin page — keep it out of the index.
+            noindex=not products,
+        )
 
     # Register the editorial trust pages from STATIC_PAGES (one thin view each).
     def _make_static_view(slug: str, meta: dict[str, str]) -> Any:
@@ -155,13 +197,33 @@ def register_routes(app: Flask) -> None:
     @app.route("/sitemap.xml")
     def sitemap() -> Response:
         site_url = app.config["SITE_URL"]
-        urls: list[dict[str, str | None]] = [{"loc": f"{site_url}/", "lastmod": None}]
+        # changefreq/priority are hints (Google largely ignores them, but they're
+        # cheap and valid); lastmod is the signal it does use — set where we have it.
+        urls: list[dict[str, str | None]] = [
+            {"loc": f"{site_url}/", "lastmod": None, "changefreq": "weekly", "priority": "1.0"}
+        ]
         for slug in STATIC_PAGES:
-            urls.append({"loc": f"{site_url}/{slug}", "lastmod": None})
+            urls.append(
+                {"loc": f"{site_url}/{slug}", "lastmod": None, "changefreq": "yearly", "priority": "0.3"}
+            )
         for name in ProductRepository.published_categories():
-            urls.append({"loc": f"{site_url}/categoria/{slugify(name)}", "lastmod": None})
+            urls.append(
+                {
+                    "loc": f"{site_url}/categoria/{slugify(name)}",
+                    "lastmod": None,
+                    "changefreq": "weekly",
+                    "priority": "0.8",
+                }
+            )
         for product in ProductRepository.get_published():
             lastmod = product.updated_at.date().isoformat() if product.updated_at else None
-            urls.append({"loc": f"{site_url}/producto/{product.id}", "lastmod": lastmod})
+            urls.append(
+                {
+                    "loc": f"{site_url}/producto/{product.id}",
+                    "lastmod": lastmod,
+                    "changefreq": "weekly",
+                    "priority": "0.7",
+                }
+            )
         body = render_template("sitemap.xml", urls=urls)
         return Response(body, mimetype="application/xml")

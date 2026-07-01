@@ -36,12 +36,27 @@ def dump_jsonld(obj: Any) -> str:
 
 
 def organization_jsonld(site_url: str) -> dict[str, Any]:
+    # Stable @id so the brand entity consolidates across pages (products can point
+    # their breadcrumb/brand back at this node). addressCountry + contactPoint are
+    # the verifiable trust signals we can assert without inventing data.
     return {
         "@context": "https://schema.org",
         "@type": "Organization",
+        "@id": f"{site_url}/#organization",
         "name": BRAND,
         "url": f"{site_url}/",
         "logo": f"{site_url}{_LOGO}",
+        "description": (
+            "Bolsos y carteras de cuero vegano hechos a mano en Argentina, "
+            "con diseño minimalista y atemporal."
+        ),
+        "address": {"@type": "PostalAddress", "addressCountry": "AR"},
+        "contactPoint": {
+            "@type": "ContactPoint",
+            "contactType": "customer service",
+            "url": INSTAGRAM,
+            "availableLanguage": ["es"],
+        },
         "sameAs": [INSTAGRAM],
     }
 
@@ -72,6 +87,8 @@ def product_jsonld(product: Product, site_url: str) -> dict[str, Any]:
         "@context": "https://schema.org",
         "@type": "Product",
         "name": product.title,
+        # Stable per-product identifier (no DB column needed; derived from the id).
+        "sku": f"GLUCK-{product.id:04d}",
         "url": url,
         "brand": {"@type": "Brand", "name": BRAND},
         "description": product.description
@@ -103,6 +120,23 @@ def breadcrumb_jsonld(product: Product, site_url: str) -> dict[str, Any]:
             {"name": product.category, "url": f"{site_url}/categoria/{slugify(product.category)}"}
         )
     items.append({"name": product.title, "url": f"{site_url}/producto/{product.id}"})
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": i + 1, "name": it["name"], "item": it["url"]}
+            for i, it in enumerate(items)
+        ],
+    }
+
+
+def category_breadcrumb_jsonld(category: str, site_url: str) -> dict[str, Any]:
+    """Inicio › <categoría>. Mirrors the visible breadcrumb on the category page so
+    the markup matches the on-page navigation (no markup-vs-content mismatch)."""
+    items = [
+        {"name": "Inicio", "url": f"{site_url}/"},
+        {"name": category, "url": f"{site_url}/categoria/{slugify(category)}"},
+    ]
     return {
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",

@@ -1,376 +1,596 @@
 {
   "site": "https://gluckbags.com",
   "date": "2026-06-29",
-  "summary": "Relevamiento SEO exhaustivo de gluckbags.com (storefront Flask server-rendered, detrás de Cloudflare). Motor determinístico + fan-out multiagente con verificación adversarial de cada hallazgo contra el sitio vivo. Lo positivo: Lighthouse SEO 100 y Performance 94, CLS 0, TBT 10 ms, sin interstitials intrusivos, HTML rastreable sin brecha JS, un solo idioma (es-AR, sin hreflang necesario). Pero el sitio tiene un problema CRÍTICO que Lighthouse no detecta: el canonical y los datos sociales de TODO el dominio apuntan a un dominio gemelo vivo (gluck.nexttech.com.ar), así que la marca le cede su indexación al alias. Resuelto eso (un cambio de config SITE_URL), siguen: duplicación de host sin redirección, falta de sitemap, ausencia total de datos estructurados, sin páginas de confianza (E-E-A-T) y fichas de producto delgadas. Alcance: muestra representativa de tipos de página (home, 3 PDP, variantes con parámetros, 404), no el catálogo completo; los hallazgos por-URL valen como patrón. Backlinks/autoridad off-page y volumen real de indexación quedan fuera (requieren Ahrefs/GSC).",
+  "summary": "Auditoría SEO exhaustiva de gluckbags.com (e-commerce/catálogo Flask SSR, marca GLÜCK, es-AR monolingüe, sin checkout: la compra se coordina por Instagram). Base técnica muy sólida (Lighthouse SEO 100, Performance 96, CLS 0; titles únicos, canonical autorreferente, OG e imágenes bien resueltas; el viejo bug de canonical hacia el alias gluck.nexttech.com.ar ya está corregido). Los hallazgos son de refinamiento: completitud de structured data (Product sin offers), OG por-página (og:url y tarjeta social heredan la home), arquitectura de enlazado interno (categorías y productos débilmente enlazados, breadcrumbs solo en JSON-LD), señales E-E-A-T y de confianza (placeholder '(a completar)' en páginas de contacto/envíos), indexación de la búsqueda interna y medición de la conversión a Instagram. Sin hallazgos críticos ni altos. Sin datos de Google Search Console (no había credenciales): la indexación/posición real no se midió contra la API oficial.",
   "findings": [
     {
-      "id": "01",
-      "title": "Canonical cross-dominio: gluckbags.com cede toda su autoridad a un dominio gemelo vivo (gluck.nexttech.com.ar)",
-      "severity": "critical",
-      "category": "Canonical / Indexación",
-      "dimension": "url-canonicalization",
-      "scope": "Todo el sitio (home + todas las PDP + variantes de URL)",
-      "symptom": "Cada página de gluckbags.com declara como canónica una URL de OTRO dominio: gluck.nexttech.com.ar. Ese segundo dominio está VIVO, sirve contenido idéntico y se auto-canonicaliza. Resultado: gluckbags.com le dice a Google «la versión buena de esta página vive en gluck.nexttech.com.ar», así que Google indexa y rankea el alias y trata al dominio de marca como un duplicado que apunta hacia afuera. El dominio de marca puede quedar directamente fuera del índice bajo su propio nombre.",
-      "evidence": "Verificado en vivo (curl UA Chrome, HTTP 200, sin captcha):\n\n# gluckbags.com/  (dominio de marca)\n<link rel=\"canonical\" href=\"https://gluck.nexttech.com.ar/\">\n<meta property=\"og:url\"   content=\"https://gluck.nexttech.com.ar/\">\n<meta property=\"og:image\" content=\"https://gluck.nexttech.com.ar/static/img/og-image.jpg\">\n\n# gluck.nexttech.com.ar/  (el gemelo) -> HTTP 200, mismo <title> 'GLÜCK · Bolsos minimalistas...'\n<link rel=\"canonical\" href=\"https://gluck.nexttech.com.ar/\">   # se auto-canonicaliza\n\nCausa raíz: el config de producción SITE_URL/site_url está apuntado al alias de staging. La home emite el canonical desde site_url (app/templates/index.html:23) y og:url/og:image están hardcodeados al alias en base_public.html y product_detail.html.",
-      "recommendation": "1) Setear en producción SITE_URL=https://gluckbags.com y corregir los og:url/og:image hardcodeados en base_public.html y product_detail.html. 2) Redirigir 301 todo gluck.nexttech.com.ar -> https://gluckbags.com (o, si debe seguir vivo, ponerlo noindex y canonical hacia gluckbags.com). 3) Verificar el dominio en Google Search Console y pedir reindexación. Es el arreglo de mayor impacto y debe ir primero.",
-      "evidenceKind": "serp",
-      "serp": {
-        "title": "GLÜCK · Bolsos minimalistas de cuero vegano",
-        "url": "https://gluck.nexttech.com.ar/",
-        "description": "GLÜCK — Bolsos minimalistas de cuero vegano. Carteras y bolsos de cuero vegano, hechos a mano con un diseño minimalista y atemporal."
-      },
-      "evidenceFile": "/Users/cromero/projects/gluck-bags-web/relevamiento-seo-gluckbags-com/evidence/01-serp-wrongdomain.png",
-      "status": "PENDIENTE"
-    },
-    {
-      "id": "02",
-      "title": "Duplicación de host: www, no-www y http:// devuelven 200 sin redirigir al canónico",
-      "severity": "high",
-      "category": "Canonical / Indexación",
-      "dimension": "url-canonicalization",
-      "scope": "Hosts: gluckbags.com, www.gluckbags.com, http://(www.)gluckbags.com",
-      "symptom": "Las cuatro variantes de host devuelven 200 con el mismo contenido y ninguna redirige a una versión única. No hay canonicalización de host: Google puede rastrear e indexar el mismo contenido en varios hosts (más el gemelo nexttech del hallazgo 01), repartiendo señales y generando duplicados.",
-      "evidence": "Verificado en vivo (curl, sin -L):",
-      "recommendation": "Elegir un host canónico (https://gluckbags.com) y redirigir 301 todas las variantes (www->apex, http->https). En Cloudflare: activar «Always Use HTTPS» y una Bulk Redirect / Rule para www. Confirmar que la única versión 200 sea https://gluckbags.com/.",
-      "evidenceKind": "table",
-      "evidenceTable": [
-        {
-          "URL": "http://gluckbags.com/",
-          "Status": "200",
-          "Redirige a": "— (no redirige)"
-        },
-        {
-          "URL": "https://www.gluckbags.com/",
-          "Status": "200",
-          "Redirige a": "— (no redirige)"
-        },
-        {
-          "URL": "http://www.gluckbags.com/",
-          "Status": "200",
-          "Redirige a": "— (no redirige)"
-        },
-        {
-          "URL": "https://gluckbags.com/ (esperado: único 200)",
-          "Status": "200",
-          "Redirige a": "—"
-        }
-      ],
-      "status": "PENDIENTE"
-    },
-    {
-      "id": "03",
-      "title": "No hay páginas de identidad/confianza (Nosotras, Contacto, envíos, cambios, términos) en una tienda que cobra",
-      "severity": "high",
-      "category": "Contenido / E-E-A-T",
-      "dimension": "content-quality-eeat",
-      "scope": "Todo el sitio (no existe ninguna ruta de estas páginas)",
-      "symptom": "Para un e-commerce, Google y los usuarios esperan señales de confianza: quiénes son, cómo contactar, política de envíos, cambios/devoluciones y términos. Ninguna existe (todas 404) y no hay un canal de contacto en el sitio (sólo CTAs a Instagram). Es un hueco de E-E-A-T y de conversión.",
-      "evidence": "Verificado en vivo (curl) — todas 404:",
-      "recommendation": "Agregar páginas reales e indexables: Nosotras (historia de marca), Contacto (con canal real: email/WhatsApp + Instagram), Envíos, Cambios y devoluciones, y Términos/Privacidad. Enlazarlas desde el footer. Suma confianza, contenido indexable y palabras clave de marca.",
-      "evidenceKind": "table",
-      "evidenceTable": [
-        {
-          "URL probada": "/nosotras",
-          "Status": "404"
-        },
-        {
-          "URL probada": "/contacto",
-          "Status": "404"
-        },
-        {
-          "URL probada": "/envios",
-          "Status": "404"
-        },
-        {
-          "URL probada": "/cambios-y-devoluciones",
-          "Status": "404"
-        },
-        {
-          "URL probada": "/terminos",
-          "Status": "404"
-        },
-        {
-          "URL probada": "/privacidad",
-          "Status": "404"
-        },
-        {
-          "URL probada": "/faq",
-          "Status": "404"
-        }
-      ],
-      "status": "PENDIENTE"
-    },
-    {
-      "id": "04",
-      "title": "Sin sitemap.xml y robots.txt no lo declara: el descubrimiento depende sólo de los links de la home",
+      "title": "9 páginas con contenido delgado (<300 palabras)",
       "severity": "medium",
-      "category": "Sitemap / Descubrimiento",
-      "dimension": "indexability-crawl",
-      "scope": "sitemap.xml / robots.txt",
-      "symptom": "No existe ningún sitemap (404 en todas las ubicaciones habituales) y robots.txt no tiene línea Sitemap:. Para un sitio nuevo sin backlinks, un sitemap acelera el descubrimiento y, sobre todo, permite enviarlo en Search Console y monitorear cobertura por URL.",
-      "evidence": "Verificado en vivo (curl) — sin sitemap en ninguna ruta habitual; robots.txt sin línea 'Sitemap:':\n\n404  https://gluckbags.com/sitemap.xml\n404  https://gluckbags.com/sitemap_index.xml\n404  https://gluckbags.com/sitemap-index.xml\n404  https://gluckbags.com/wp-sitemap.xml\n\n# robots.txt -> no contiene ninguna línea 'Sitemap: ...'",
-      "recommendation": "Agregar una ruta /sitemap.xml que liste la home y los productos publicados (con <lastmod>), declarar 'Sitemap: https://gluckbags.com/sitemap.xml' en robots.txt y enviarlo en Search Console. Generarlo con las URLs canónicas correctas (gluckbags.com) una vez resuelto el hallazgo 01.",
-      "evidenceKind": "code",
-      "status": "PENDIENTE"
+      "dimension": "content-quality",
+      "category": "Contenido",
+      "scope": "9 página(s)",
+      "evidence": "Páginas con poco texto rinden mal y pueden verse como thin content.",
+      "recommendation": "Ampliar el contenido útil o consolidar/noindexar las páginas pobres.",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "words": 55,
+          "type": "section",
+          "url": "https://gluckbags.com/categoria/clutch"
+        },
+        {
+          "words": 59,
+          "type": "section",
+          "url": "https://gluckbags.com/categoria/tote"
+        },
+        {
+          "words": 62,
+          "type": "section",
+          "url": "https://gluckbags.com/categoria/mini-bag"
+        },
+        {
+          "words": 101,
+          "type": "static",
+          "url": "https://gluckbags.com/contacto"
+        },
+        {
+          "words": 119,
+          "type": "article",
+          "url": "https://gluckbags.com/envios"
+        },
+        {
+          "words": 134,
+          "type": "article",
+          "url": "https://gluckbags.com/cambios-y-devoluciones"
+        },
+        {
+          "words": 148,
+          "type": "static",
+          "url": "https://gluckbags.com/privacidad"
+        },
+        {
+          "words": 168,
+          "type": "static",
+          "url": "https://gluckbags.com/terminos"
+        },
+        {
+          "words": 172,
+          "type": "article",
+          "url": "https://gluckbags.com/nosotras"
+        }
+      ],
+      "symptom": "Nueve páginas tienen menos de 300 palabras: las 3 categorías (55–62 palabras, sin texto introductorio) y las páginas legales/informativas. Las categorías thin rinden poco y compiten débilmente; conviene sumar copy introductorio único por categoría.",
+      "status": "PENDIENTE",
+      "id": "01"
     },
     {
-      "id": "05",
-      "title": "Cero datos estructurados (JSON-LD) en todo el sitio: sin Organization/WebSite, sin Product, sin BreadcrumbList",
+      "title": "Contenido placeholder \"(a completar)\" en vivo e indexable en 3 páginas de confianza/políticas (contacto, envíos, cambios y devoluciones)",
+      "severity": "medium",
+      "category": "Contenido / E-E-A-T (confianza)",
+      "dimension": "content-quality-eeat",
+      "scope": "https://gluckbags.com/contacto, https://gluckbags.com/envios, https://gluckbags.com/cambios-y-devoluciones",
+      "symptom": "Tres páginas de confianza (contacto, envíos, cambios y devoluciones) están publicadas e indexables con texto de plantilla '(a completar)' en lugar de los datos reales (WhatsApp, email, plazos). Es una señal E-E-A-T negativa visible para usuarios y Google.",
+      "evidence": "Verificado en vivo con UA de navegador (HTTP 200, sin sg-captcha):\n\ncontacto → '<li><strong>WhatsApp:</strong> <span>(a completar)</span></li>' y '<li><strong>Email:</strong> <span>(a completar)</span></li>'. Instagram (@gluck_bags) es el ÚNICO canal real; no hay mailto:, tel: ni wa.me en la página.\n\ncambios-y-devoluciones → '<p>Aceptamos cambios dentro de los <strong>(a completar)</strong> días de recibido el producto...' (el plazo de devolución, dato transaccional clave, quedó sin completar).\n\nenvios → '<li><strong>Tiempo estimado:</strong> a completar (depende del destino y el correo).</li>' y '<li><strong>Costo:</strong> a completar (se informa al coordinar la compra).</li>'.\n\nReproducible: curl -s -A \"Mozilla/5.0 ... Chrome/124.0 Safari/537.36\" https://gluckbags.com/cambios-y-devoluciones | grep 'a completar'",
+      "recommendation": "Completar los datos reales (WhatsApp, email, plazo de cambios en días, tiempos y costos de envío) ANTES de que estas páginas sean indexables. En e-commerce, las páginas de contacto/envío/devoluciones son señales E-E-A-T y de confianza directas: textos de plantilla sin terminar (\"(a completar)\") indican contenido incompleto/no mantenido, dañan la confianza del comprador y son justamente el tipo de página de baja calidad que las directrices de Google penalizan. Si los datos aún no existen, ocultar esas filas en lugar de mostrar el placeholder.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "02"
+    },
+    {
+      "title": "Búsqueda interna indexable y sin límite: duplica la home y abre un espacio infinito de URLs",
+      "severity": "medium",
+      "category": "Crawl / Indexación",
+      "dimension": "indexability",
+      "scope": "/?s=<cualquier-término>",
+      "symptom": "La página de resultados de búsqueda interna responde 200 sin noindex. Comparte <title> y meta description con la home, su canonical apunta a la home (no autorreferente) y, como /?s= acepta cualquier término, genera infinitas URLs rastreables que reparten crawl budget y se ven como contenido duplicado/thin. Además hereda la tarjeta social de la home.",
+      "evidence": "GET https://gluckbags.com/?s=seo → HTTP 200; meta robots: None; X-Robots-Tag: None. <title> y <meta name=\"description\"> idénticos a la home. <link rel=\"canonical\"> → https://gluckbags.com/ (no autorreferente). Cualquier otro término (/?s=loquesea) también responde 200, por lo que el espacio de URLs es ilimitado.",
+      "evidenceCode": "GET /?s=seo\nHTTP/2 200\nmeta robots: None\nX-Robots-Tag: None\n<title>GLÜCK · Bolsos minimalistas de cuero vegano</title>   <!-- = home -->\n<link rel=\"canonical\" href=\"https://gluckbags.com/\">          <!-- apunta a home, no a sí misma -->",
+      "recommendation": "Agregar <meta name=\"robots\" content=\"noindex,follow\"> a las páginas de búsqueda (?s=). Opcional reforzar con Disallow: /?s= en robots.txt. Quitar (o minimizar) el bloque OG de esas páginas para que no se compartan como la home. Esto elimina el duplicado y cierra el espacio infinito de URLs.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "consolidated",
+      "id": "03"
+    },
+    {
+      "title": "Product schema sin offers: los 3 productos no son elegibles para rich results de producto",
       "severity": "medium",
       "category": "Datos estructurados",
       "dimension": "structured-data",
-      "scope": "Home + todas las PDP",
-      "symptom": "Ninguna página emite JSON-LD ni microdata. La home no declara Organization/WebSite (pierde knowledge panel y sitelinks searchbox); las PDP no declaran Product (pierden el rich result de producto) pese a que ya se auto-identifican como producto para social (og:type=product) y tienen nombre, imagen, marca y categoría en el DOM. Tampoco hay BreadcrumbList.",
-      "evidence": "Verificado en vivo y en artefactos (DOM renderizado post-JS):\n\ngrep -ci 'application/ld+json'  -> 0  (home, producto-1, producto-2, producto-3)\ngrep -ci 'itemtype|itemscope'  -> 0  (sin microdata/RDFa)\nseo-producto-1.json -> jsonLdCount: 0, jsonLdTypes: [], microdataTypes: []\n\n# pero la PDP YA se declara producto para social:\n<meta property=\"og:type\" content=\"product\">",
-      "recommendation": "Agregar JSON-LD: en la home Organization (logo, sameAs a Instagram) + WebSite; en cada PDP Product (name, image absoluta, brand 'GLÜCK', category, description). IMPORTANTE: el precio es 'Consultar' (venta por Instagram), así que NO inventar offers.price — sería markup que no coincide con lo visible (riesgo de acción manual). Declarar Product sin offers, o con Offer availability InStock + url al canal, y recién agregar price/priceCurrency (ARS) cuando haya un precio numérico real. Sumar BreadcrumbList cuando exista una URL de categoría real (ver hallazgo 12).",
+      "scope": "https://gluckbags.com/producto/1, /producto/2, /producto/3 (y por extensión /producto/4, /producto/5 del sitemap)",
+      "symptom": "Los productos exponen JSON-LD Product pero sin el bloque offers (ni review/aggregateRating), que Google exige para cualquier rich result de producto. Search Console lo marca como inválido y la ficha no gana snippet enriquecido. Matiz: la PDP no publica precio (dice 'Consultar', compra por Instagram), así que un offers con precio real no es posible hoy.",
+      "evidence": "Verificado en vivo (curl, HTTP 200, sin captcha) y en rendered-gluckbags-com-producto-1.html. El bloque JSON-LD de Product tiene solo estas claves: ['@context','@type','name','url','brand','description','image','category']. NO existe la propiedad `offers`. JSON real:\n[{\"@type\":\"Product\",\"name\":\"Tote Cognac\",\"url\":\"https://gluckbags.com/producto/1\",\"brand\":{\"@type\":\"Brand\",\"name\":\"GLÜCK\"},\"description\":\"Tote Cognac — GLÜCK...\",\"image\":[\"https://gluckbags.com/media/products/1/.../787.jpg\"],\"category\":\"Tote\"}]\nGoogle exige `offers` (o `review`/`aggregateRating`) para que un Product genere cualquier rich result; sin ninguno de los tres, Search Console lo marca como inválido para resultados enriquecidos. Matiz importante: la PDP no muestra precio — el precio visible es el texto 'Consultar' (<p class=\"pdp-price\">Consultar</p>) y el CTA es 'Consultar por Instagram'. Es un catálogo/lookbook sin checkout.",
+      "recommendation": "Decidir el modelado según el negocio: (a) si se quiere elegibilidad de producto, agregar `offers` con `priceCurrency: ARS`, un `price` (o `priceSpecification`) y `availability` (https://schema.org/InStock); como no hay precio público, lo correcto es publicar el precio o usar `offers.availability` + `offers.url` apuntando al canal de venta (Instagram) — Google no acepta precios placeholder ni 0 ficticio. (b) Si la decisión es no exponer precio, retirar el @type Product (que promete commerce) y modelarlo como `ItemPage`/`CreativeWork` o solo `BreadcrumbList`, para no declarar un Product incompleto que Search Console reportará como error. Mantener consistencia con el contenido visible ('Consultar').",
       "evidenceKind": "code",
-      "status": "PENDIENTE"
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "04"
     },
     {
-      "id": "06",
-      "title": "Sin canonical propio: parámetros arbitrarios e IDs con ceros a la izquierda sirven 200 duplicado",
+      "title": "Product schema sin identificadores ni señales de confianza recomendadas (sku/gtin/mpn, aggregateRating, review)",
       "severity": "medium",
-      "category": "Canonical / Indexación",
-      "dimension": "indexability-crawl",
-      "scope": "Home con query params + /producto/<id> (PDP sin canonical)",
-      "symptom": "Las PDP no tienen rel=canonical en absoluto, y la home/PDP aceptan basura en la URL devolviendo 200 con contenido idéntico: ?s=cualquier-cosa, ?utm_source=..., y hasta IDs con ceros a la izquierda (/producto/01, /producto/001) que Flask resuelve al mismo producto. Sin un canonical propio que normalice, cada variante es una URL duplicada e indexable (trampa de rastreo). Hoy lo único que las 'salva' es el canonical del hallazgo 01… que apunta al dominio equivocado.",
-      "evidence": "Verificado en vivo (curl) — todas 200 con el mismo contenido:",
-      "recommendation": "Emitir en TODA página un canonical auto-referencial con los parámetros removidos (home -> https://gluckbags.com/; PDP -> https://gluckbags.com/producto/<id>). Ignorar parámetros desconocidos y, opcionalmente, normalizar IDs no canónicos (01 -> 404 o 301 a 1). Esto colapsa todas las variantes a una sola URL canónica del dominio correcto.",
-      "evidenceKind": "table",
-      "evidenceTable": [
-        {
-          "URL": "https://gluckbags.com/?s=seo",
-          "Status": "200",
-          "Contenido": "= home",
-          "Canonical propio": "no (apunta al alias)"
-        },
-        {
-          "URL": "https://gluckbags.com/?utm_source=newsletter",
-          "Status": "200",
-          "Contenido": "= home",
-          "Canonical propio": "no (apunta al alias)"
-        },
-        {
-          "URL": "https://gluckbags.com/producto/1",
-          "Status": "200",
-          "Contenido": "Tote Cognac",
-          "Canonical propio": "— (sin canonical)"
-        },
-        {
-          "URL": "https://gluckbags.com/producto/01",
-          "Status": "200",
-          "Contenido": "= producto 1",
-          "Canonical propio": "— (sin canonical)"
-        },
-        {
-          "URL": "https://gluckbags.com/producto/001",
-          "Status": "200",
-          "Contenido": "= producto 1",
-          "Canonical propio": "— (sin canonical)"
-        }
-      ],
-      "status": "PENDIENTE"
+      "category": "Datos estructurados",
+      "dimension": "structured-data",
+      "scope": "https://gluckbags.com/producto/1, /producto/2, /producto/3",
+      "symptom": "El Product no trae sku/gtin/mpn ni aggregateRating/review, y su brand es un Brand suelto sin @id que lo una a la Organization de la home. Se pierde consolidación de entidad de marca y señales recomendadas.",
+      "evidence": "El mismo bloque Product (verificado en vivo) no incluye ninguna de las propiedades recomendadas por Google para Product: falta `sku`, `gtin`/`gtin13`/`mpn`, `aggregateRating` y `review`. Además `brand` es un `Brand` suelto ({\"@type\":\"Brand\",\"name\":\"GLÜCK\"}) que NO está vinculado por @id a la Organization declarada en la home (que sí existe: {\"@type\":\"Organization\",\"name\":\"GLÜCK\",\"url\":\"https://gluckbags.com/\",\"logo\":...,\"sameAs\":[instagram]}). Sin @id no se consolida la entidad de marca entre páginas.",
+      "recommendation": "Agregar `sku` (o `mpn`) por producto como identificador estable. Vincular el `brand` del Product a la Organization de la home con un @id compartido (p.ej. Organization con \"@id\":\"https://gluckbags.com/#org\" y en el Product \"brand\":{\"@id\":\"https://gluckbags.com/#org\"}). Si en algún momento hay reseñas reales (no inventadas), sumar `aggregateRating`/`review` — nunca markup que no corresponda a contenido visible (riesgo de spam/penalización).",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "05"
     },
     {
-      "id": "07",
-      "title": "Contenido de producto delgado y 100% plantillado",
+      "title": "Ausencia total de señales E-E-A-T: sin autor/fundadora, sin NAP, sin contactPoint en Organization y sin fechas de publicación/actualización",
       "severity": "medium",
-      "category": "Contenido",
+      "category": "E-E-A-T",
       "dimension": "content-quality-eeat",
-      "scope": "Todas las PDP (/producto/1..N)",
-      "symptom": "Las fichas tienen ~51 palabras y el copy es una fórmula con sólo el nombre/categoría cambiados: title '<Nombre> · GLÜCK', description '<Nombre> · <Categoría> — GLÜCK, cuero vegano hecho a mano.' y cuerpo mínimo. Poco contenido único para rankear por términos de producto y baja diferenciación entre fichas.",
-      "evidence": "De los artefactos (wordCount) y el patrón de títulos/descriptions:",
-      "recommendation": "Escribir descripciones únicas por producto: materiales, medidas, capacidad, detalles de confección, cuidados y ocasión de uso. Subir el contenido por ficha bastante por encima de las ~50 palabras actuales y evitar la fórmula repetida.",
-      "evidenceKind": "table",
-      "evidenceTable": [
-        {
-          "URL": "/producto/1 (Tote Cognac)",
-          "Palabras": "51",
-          "title": "Tote Cognac · GLÜCK",
-          "description": "Tote Cognac · Tote — GLÜCK, cuero vegano hecho a mano."
-        },
-        {
-          "URL": "/producto/2 (Tote Gris)",
-          "Palabras": "51",
-          "title": "Tote Gris · GLÜCK",
-          "description": "Tote Gris · Tote — GLÜCK, cuero vegano hecho a mano."
-        },
-        {
-          "URL": "/producto/3 (Crossbody Rosa)",
-          "Palabras": "52",
-          "title": "Crossbody Rosa · GLÜCK",
-          "description": "Crossbody Rosa · Mini Bag — GLÜCK, cuero vegano hecho a mano."
-        },
-        {
-          "URL": "/ (home, referencia)",
-          "Palabras": "369",
-          "title": "GLÜCK · Bolsos minimalistas de cuero vegano",
-          "description": "—"
-        }
-      ],
-      "status": "PENDIENTE"
-    },
-    {
-      "id": "08",
-      "title": "http:// se sirve con 200 en texto plano: sin redirección 301 a https ni HSTS",
-      "severity": "medium",
-      "category": "Infra / Seguridad",
-      "dimension": "url-canonicalization",
-      "scope": "http://gluckbags.com/",
-      "symptom": "La home responde 200 sobre HTTP sin redirigir a HTTPS, y no hay cabecera HSTS. Además de duplicar contenido en http/https (hallazgo 02), sirve la página en texto plano y pierde el refuerzo de seguridad que Google valora.",
-      "evidence": "curl -I http://gluckbags.com/ :\n\nHTTP/1.1 200 OK\nCf-Cache-Status: DYNAMIC\nCF-RAY: ...\n# (sin 'Location:' a https, sin 'Strict-Transport-Security')",
-      "recommendation": "Activar «Always Use HTTPS» en Cloudflare (301 http->https) y agregar HSTS (Strict-Transport-Security: max-age=31536000; includeSubDomains; preload) una vez confirmado que todo va por https.",
+      "scope": "Todo el sitio (home, /nosotras, todas las páginas)",
+      "symptom": "No hay autor/fundadora nombrada, ni NAP (dirección/teléfono), ni contactPoint en el schema, ni fechas de publicación/actualización en ninguna página. Para una marca artesanal, faltan las señales de experiencia y confianza que Google valora.",
+      "evidence": "grep sobre todas las páginas renderizadas: 'datePublished|dateModified|\"author\"|rel=\"author\"|byline' → NINGUNA coincidencia (sin señales de autoría ni frescura). 'PostalAddress|telephone|contactPoint|streetAddress|\"address\"' → NINGUNA coincidencia (sin NAP).\n\nLa página 'Nosotras' (about) describe el proceso pero no nombra a ninguna persona/fundadora, taller, ciudad ni año de fundación: '...Diseñamos cada pieza en Argentina y la producimos de forma artesanal...'. El Organization JSON-LD del home es mínimo y sin datos de contacto/ubicación:\n  { \"@type\":\"Organization\", \"name\":\"GLÜCK\", \"url\":\"https://gluckbags.com/\", \"logo\":\"...avatar-perfil-gluck.jpg\", \"sameAs\":[\"https://www.instagram.com/gluck_bags/\"] }\nNo hay contactPoint, address ni founder.",
+      "recommendation": "Para una marca artesanal, sumar señales de experiencia/autoría reales: en 'Nosotras' incluir nombre y foto de la fundadora/equipo, ciudad/taller en Argentina y año de fundación; enriquecer el Organization schema con address (PostalAddress), contactPoint (teléfono/email) y founder. Esto fortalece la 'Experience' y 'Trust' de E-E-A-T y aporta NAP consistente, especialmente útil para una marca con poca huella de contenido fuera de Instagram.",
       "evidenceKind": "code",
-      "status": "PENDIENTE"
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "06"
     },
     {
-      "id": "09",
-      "title": "Las previews sociales se atribuyen al dominio equivocado (og:url y og:image en gluck.nexttech.com.ar)",
+      "title": "La home enlaza /categoria/bucket-bag como categoría principal, pero esa página es noindex, está fuera del sitemap y no tiene productos",
       "severity": "medium",
-      "category": "Social / Open Graph",
-      "dimension": "social-og-quality",
-      "scope": "Home + todas las PDP",
-      "symptom": "Al compartir cualquier URL de gluckbags.com en WhatsApp/Facebook/Twitter, la tarjeta muestra y enlaza a gluck.nexttech.com.ar, y la imagen se sirve desde ese dominio. La marca pierde la atribución de todo lo que se comparte (mismo origen que el hallazgo 01).",
-      "evidence": "Verificado en vivo (curl) en la home y en /producto/1:\n\n<meta property=\"og:url\"   content=\"https://gluck.nexttech.com.ar/\">\n<meta property=\"og:image\" content=\"https://gluck.nexttech.com.ar/static/img/og-image.jpg\">\n# en PDP: og:url y og:image -> https://gluck.nexttech.com.ar/...",
-      "recommendation": "Mismo arreglo que el hallazgo 01: SITE_URL=https://gluckbags.com y corregir los og:url/og:image hardcodeados. Revalidar con el Sharing Debugger de Facebook y la Card Validator de Twitter/X.",
-      "evidenceKind": "photo",
-      "evidenceFile": "/Users/cromero/projects/gluck-bags-web/relevamiento-seo-gluckbags-com/evidence/13-social-wrongdomain.png",
-      "status": "PENDIENTE"
-    },
-    {
-      "id": "10",
-      "title": "Las páginas de producto no enlazan a otros productos (sin módulo de relacionados)",
-      "severity": "medium",
-      "category": "Enlazado interno",
+      "category": "Enlazado interno / Arquitectura",
       "dimension": "internal-linking",
-      "scope": "Todas las PDP",
-      "symptom": "Desde una ficha sólo se puede volver a la grilla (#shop) o ir a Instagram. No hay enlaces a otros productos, así que el link equity no fluye entre fichas y Google tiene un único camino (la home) para llegar a cada producto. Peor descubrimiento y peor distribución de autoridad interna.",
-      "evidence": "Los únicos enlaces internos de una PDP son el «← Volver a los bolsos» (a /#shop) y los del header/footer (todos anclas a la home /#...) más el CTA a Instagram (externo). No hay ningún <a href> a otro /producto/<id>.",
-      "recommendation": "Agregar un módulo «También te puede gustar» / «Otros bolsos» con 3-4 productos enlazados al pie de cada PDP. Mejora el enlazado interno, el descubrimiento y el tiempo en sitio.",
+      "scope": "https://gluckbags.com/ (nav de colección) -> https://gluckbags.com/categoria/bucket-bag",
+      "symptom": "La home promociona 'Bucket Bag' como una de sus 4 categorías principales, pero esa página es noindex, no tiene productos y está fuera del sitemap. Es un dead-end de crawl y una mala experiencia (el usuario llega a una categoría vacía).",
+      "evidence": "La home lista 4 categorías y enlaza la cuarta con anchor '03 Bucket Bag Volumen y carácter': raw-gluckbags-com.html contiene href=\"/categoria/bucket-bag\" (junto a tote/mini-bag/clutch). Pero el sitemap solo declara 3 categorías (all-urls.txt: /categoria/tote, /categoria/mini-bag, /categoria/clutch; bucket-bag NO aparece). Verificado en vivo con UA de navegador: `curl https://gluckbags.com/categoria/bucket-bag` -> HTTP/2 200, title '<title>Bucket Bag · Carteras de cuero vegano | GLÜCK</title>', y CONTIENE '<meta name=\"robots\" content=\"noindex\">'. Además no enlaza ningún producto (0 coincidencias de href=\"/producto/N\" en el body). Las otras 3 categorías sí son indexables (seo-pages.json: indexable=true, noindex=false) y sí tienen productos. Resultado: la home reparte equity interna hacia una categoría vacía y bloqueada para indexación.",
+      "recommendation": "Decidir el estado de bucket-bag y unificarlo: (a) si la categoría debe existir, quitar el noindex, agregar productos y añadir /categoria/bucket-bag al sitemap para que quede en pie de igualdad con tote/mini-bag/clutch; (b) si todavía no hay stock, NO enlazarla desde la nav de la home (o marcarla como 'próximamente' sin <a>), para no gastar crawl/equity en una página vacía y noindexada. La inconsistencia actual (enlazada como peer + noindex + sin sitemap + sin productos) envía señales contradictorias a Google.",
       "evidenceKind": "code",
-      "status": "PENDIENTE"
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "07"
     },
     {
-      "id": "11",
-      "title": "Las tarjetas de «categoría» apuntan todas al mismo ancla #shop: no hay arquitectura de categorías",
-      "severity": "low",
-      "category": "Enlazado interno",
+      "title": "Las categorías están débilmente enlazadas: solo reciben inbound de la home y la búsqueda, no se enlazan entre sí, y su 'volver' apunta a un fragmento de la home (#shop)",
+      "severity": "medium",
+      "category": "Enlazado interno / Arquitectura",
       "dimension": "internal-linking",
-      "scope": "Home (bloque de categorías) ",
-      "symptom": "Las cuatro categorías (Tote / Mini Bag / Bucket Bag / Clutch) se muestran como tarjetas pero todas llevan al mismo ancla #shop de la home. No existen URLs de categoría reales (ni en el sitio ni en sitemap), así que no hay páginas indexables que puedan rankear por «cartera tote», «mini bag», etc.",
-      "evidence": "Las 4 tarjetas de categoría resuelven al mismo destino (#shop). No hay rutas /categoria/<nombre> (devolverían 404). La categoría existe sólo como etiqueta/CSS-class, no como página.",
-      "recommendation": "Crear páginas de categoría reales e indexables (/categoria/tote, etc.) que listen los productos de cada tipo, enlazadas desde estas tarjetas y desde el sitemap. Habilita rankear por términos de categoría y construir BreadcrumbList (hallazgo 05).",
-      "evidenceKind": "code",
-      "status": "PENDIENTE"
-    },
-    {
-      "id": "12",
-      "title": "La página 404 es el default crudo de Werkzeug: lang=en, sin navegación ni marca",
-      "severity": "low",
-      "category": "Errores / UX",
-      "dimension": "indexability-crawl",
-      "scope": "Cualquier URL inexistente",
-      "symptom": "El 404 devuelve el estado correcto (bien, no es soft-404) pero es la página default del servidor: «Not Found / The requested URL was not found...» en inglés sobre un sitio en español, sin header, sin navegación de vuelta al sitio y sin la analítica de Umami. Es un callejón sin salida para el usuario y el crawler.",
-      "evidence": "Captura en vivo de https://gluckbags.com/<url-inexistente> (estado 404, html lang=\"en\").",
-      "recommendation": "Registrar un handler 404 con una plantilla propia: html lang=\"es\", header/footer del sitio, un mensaje de marca y enlaces de vuelta (home, bolsos). Incluir el tag de Umami para medir el tráfico de error.",
-      "evidenceKind": "photo",
-      "evidenceFile": "/Users/cromero/projects/gluck-bags-web/relevamiento-seo-gluckbags-com/evidence/12-404.png",
-      "status": "PENDIENTE"
-    },
-    {
-      "id": "13",
-      "title": "Calidad de tarjeta social en productos: og:image vertical recortada, sin dimensiones y Twitter Card incompleta",
-      "severity": "low",
-      "category": "Social / Open Graph",
-      "dimension": "social-og-quality",
-      "scope": "Todas las PDP",
-      "symptom": "En las fichas, og:image usa la foto vertical del producto (787x1400, relación ~0.56:1): en una tarjeta summary_large_image (1.91:1) se recorta fuerte. Además falta og:image:width/height/type, y la Twitter Card sólo trae title (sin twitter:image ni twitter:description), por lo que el preview en X queda pobre.",
-      "evidence": "De los artefactos y el template product_detail.html:\n\nog:image = https://gluck.nexttech.com.ar/media/products/1/.../787.jpg   (787x1400, vertical)\n# sin og:image:width / og:image:height / og:image:type\n# twitter:card=summary_large_image pero sin twitter:image ni twitter:description",
-      "recommendation": "Para productos, generar/usar una og:image horizontal 1200x630 (1.91:1) — o un compuesto con la foto sobre fondo de marca — y declarar og:image:width/height/type. Completar twitter:image y twitter:description en la PDP.",
-      "evidenceKind": "code",
-      "status": "PENDIENTE"
-    },
-    {
-      "id": "14",
-      "title": "Títulos y meta descriptions de producto por debajo del largo ideal para la SERP",
-      "severity": "low",
-      "category": "Títulos / Descriptions",
-      "dimension": "titles-meta",
-      "scope": "Todas las PDP",
-      "symptom": "Los títulos de producto miden 17-22 caracteres y las descriptions 52-61, ambos cortos para el espacio que da Google (title útil ~50-60, description ~120-160). Se desaprovecha espacio de SERP y palabras clave.",
-      "evidence": "De los artefactos (titleLen / largo de metaDescription):",
-      "recommendation": "Enriquecer con categoría, material y atributo (ej. «Tote Cognac · Cartera tote de cuero vegano hecha a mano | GLÜCK») y descriptions de 120-160 car. con beneficio + CTA. Mantenerlas únicas por producto.",
+      "scope": "https://gluckbags.com/categoria/tote, /categoria/mini-bag, /categoria/clutch (y bucket-bag)",
+      "symptom": "Cada categoría recibe enlaces solo de la home y la búsqueda, no se enlazan entre sí, y el botón 'volver' apunta a un fragmento (#shop) en vez de a una URL de catálogo indexable. La arquitectura interna es plana y débil.",
+      "evidence": "Grafo de inbound construido sobre los HTML renderizados del crawl muestreado: cada /categoria/* recibe enlaces solo de ['home','search-s-seo'] (inbound=2). Ninguna categoría enlaza a sus hermanas: en rendered-gluckbags-com-categoria-{tote,mini-bag,clutch}.html, 'links to categories: NONE'. El único enlace de 'retorno' en la página de categoría es '← Ver todos los bolsos' apuntando a /#shop (un ancla de la home), no a una URL real de catálogo. Las fichas de producto tampoco les dan inbound (ver hallazgo anterior). Las categorías quedan como nodos casi-hoja alimentados únicamente por la home.",
+      "recommendation": "Añadir un bloque de navegación entre categorías (chips/menu 'Tote · Mini Bag · Bucket Bag · Clutch') presente en cada página de categoría y de producto, con <a> a las URLs reales /categoria/*. Reemplazar el '← Ver todos los bolsos' que va a /#shop por un enlace a una URL de catálogo indexable (o a la home raíz si esa es la página de listado). Esto multiplica el inbound interno de cada categoría y distribuye equity en horizontal.",
       "evidenceKind": "table",
-      "evidenceTable": [
-        {
-          "URL": "/producto/1",
-          "title (largo)": "Tote Cognac · GLÜCK (19)",
-          "description (largo)": "54"
-        },
-        {
-          "URL": "/producto/2",
-          "title (largo)": "Tote Gris · GLÜCK (17)",
-          "description (largo)": "52"
-        },
-        {
-          "URL": "/producto/3",
-          "title (largo)": "Crossbody Rosa · GLÜCK (22)",
-          "description (largo)": "61"
-        }
-      ],
-      "status": "PENDIENTE"
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "08"
     },
     {
-      "id": "15",
-      "title": "LCP en 2,9 s (zona «a mejorar») por una imagen hero algo sobre-pesada",
-      "severity": "low",
-      "category": "Performance / CWV",
+      "title": "Las fichas de producto no tienen ningún enlace crawleable a su categoría padre (el breadcrumb existe solo como JSON-LD)",
+      "severity": "medium",
+      "category": "Enlazado interno / Breadcrumbs",
+      "dimension": "internal-linking",
+      "scope": "https://gluckbags.com/producto/1, /producto/2, /producto/3 (todas las fichas de producto)",
+      "symptom": "El breadcrumb producto→categoría existe solo como JSON-LD; en el HTML no hay ningún <a> a la categoría padre. No se transmite link equity producto→categoría ni hay navegación real hacia la colección.",
+      "evidence": "producto/1 declara un BreadcrumbList en JSON-LD con la ruta correcta Inicio -> Tote (https://gluckbags.com/categoria/tote) -> Tote Cognac. Pero en el DOM renderizado (rendered-gluckbags-com-producto-1.html) NO existe ningún <a href=\"/categoria/...\"> (0 coincidencias de href=\"/categoria\"). Los únicos enlaces internos de la ficha son a otros /producto/N y al footer (nosotras, contacto, envios, cambios, terminos, privacidad). Es decir: el camino producto->categoría existe como dato estructurado de display, pero NO como enlace navegable que pase equity ni cree ruta de rastreo. Esto deja a las categorías sin inbound desde sus propios productos.",
+      "recommendation": "Renderizar el breadcrumb como HTML real con <a> (Inicio › Tote › Tote Cognac), enlazando /categoria/tote desde cada ficha de su categoría. Así el breadcrumb JSON-LD y el enlace navegable coinciden, se crea inbound real producto->categoría y se refuerza la jerarquía colección > categoría > producto.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "09"
+    },
+    {
+      "title": "La conversión principal (clic a \"Comprar\" → Instagram) no se mide en ninguna herramienta de analítica",
+      "severity": "medium",
+      "category": "Medición / Conversiones",
+      "dimension": "measurement-trust",
+      "scope": "Todo el sitio — CTAs \"Comprar\" / \"Comprar en Instagram\" (home + las 3 fichas de producto y categorías). En cada ficha hay 5 enlaces salientes a instagram.com/gluck_bags; 8 en la home.",
+      "symptom": "La única conversión del negocio —el clic saliente del CTA 'Comprar' hacia la tienda de Instagram— no se mide en ninguna herramienta (Umami y Cloudflare solo registran pageviews). No se sabe cuántas visitas terminan en intención de compra.",
+      "evidence": "El sitio carga Umami (analytics.nexttech.com.ar, data-website-id=4badbd28-ea2a-4c67-9520-fe0814abcd1d) + Cloudflare Web Analytics, ambos solo auto-trackean PAGEVIEWS. El objetivo de negocio es el clic saliente a la tienda de Instagram: el CTA es `<a href=\"https://www.instagram.com/gluck_bags/\" target=\"_blank\" rel=\"noopener\" class=\"header-cta\">Comprar</a>` (y `class=\"mobile-cta\">Comprar en Instagram`). grep sobre los 16 rendered-*.html: `data-umami-event` = 0 coincidencias; `umami.track(` / `gtag('event'` / `fbq('track'` / `dataLayer` = 0 coincidencias. No hay ningún event-tracking instrumentado, por lo que esos clics (la única ruta de venta) quedan invisibles: imposible saber cuántas visitas terminan en Instagram, ni atribuir tráfico/campañas a ventas.",
+      "recommendation": "Instrumentar el clic saliente como evento. Con Umami basta agregar el atributo a cada CTA: `<a ... data-umami-event=\"comprar-instagram\" data-umami-event-producto=\"{slug}\">Comprar</a>` (o `umami.track('comprar', {producto})` en el onclick). Idealmente, para un comercio, sumar también un pixel/medición de conversión (GA4 con evento `select_promotion`/`outbound_click`, o Meta Pixel `Lead`) para poder optimizar campañas hacia ese clic. Verificar luego en el dashboard de Umami que el evento aparece.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "10"
+    },
+    {
+      "title": "og:url apunta a la home en todas las páginas internas (no coincide con el canonical)",
+      "severity": "medium",
+      "category": "Open Graph / Social",
+      "dimension": "social-og-quality",
+      "scope": "9 URLs internas: /categoria/tote, /categoria/mini-bag, /categoria/clutch, /nosotras, /envios, /contacto, /terminos, /privacidad, /cambios-y-devoluciones (y también /?s=seo y la 404)",
+      "symptom": "Todas las páginas internas (categorías, artículos, estáticas, búsqueda, 404) declaran og:url=home, que no coincide con su canonical autorreferente. Al compartirlas, las redes consolidan la interacción social hacia la home y no hacia la URL real. (Las PDP sí tienen og:url correcto.)",
+      "evidence": "Live (curl, browser UA) sobre https://gluckbags.com/categoria/tote devuelve en el <head>:\n<meta property=\"og:url\" content=\"https://gluckbags.com/\">\n<link rel=\"canonical\" href=\"https://gluckbags.com/categoria/tote\">\nIdéntico en /nosotras (og:url=https://gluckbags.com/ vs canonical=https://gluckbags.com/nosotras). El og:url está hardcodeado a la home en el HTML de servidor (raw-*.html) en TODAS las páginas salvo /producto/*. Tabla og:url vs canonical (de seo-pages.json):\n/categoria/tote        og:url=/  canonical=/categoria/tote\n/categoria/mini-bag    og:url=/  canonical=/categoria/mini-bag\n/categoria/clutch      og:url=/  canonical=/categoria/clutch\n/nosotras              og:url=/  canonical=/nosotras\n/envios                og:url=/  canonical=/envios\n/contacto              og:url=/  canonical=/contacto\n/terminos              og:url=/  canonical=/terminos\n/privacidad            og:url=/  canonical=/privacidad\n/cambios-y-devoluciones og:url=/ canonical=/cambios-y-devoluciones",
+      "recommendation": "Emitir og:url dinámico igual a la URL canónica de cada página (og:url == canonical). Hoy todas las páginas internas declaran og:url=home: al compartir cualquier sección/artículo, Facebook/WhatsApp atribuyen la interacción y consolidan el objeto social a la home, no a la URL real.",
+      "evidenceKind": "table",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "11"
+    },
+    {
+      "title": "Categorías, artículos y páginas estáticas comparten la MISMA tarjeta social genérica de la home",
+      "severity": "medium",
+      "category": "Open Graph / Social",
+      "dimension": "social-og-quality",
+      "scope": "11 URLs no-producto: /categoria/* (3), /nosotras, /envios, /contacto, /terminos, /privacidad, /cambios-y-devoluciones, /?s=seo, /zzz-...404",
+      "symptom": "Categorías, artículos y estáticas emiten la misma tarjeta OG genérica de la home (mismo og:title/description/image). Compartir cualquiera de esas páginas muestra el preview de la home, perdiendo CTR social y contexto.",
+      "evidence": "Todas estas páginas emiten el mismo bloque OG de la home (live-confirmado en /categoria/tote y /nosotras):\nog:type=website\nog:title=\"GLÜCK · Bolsos minimalistas de cuero vegano\"\nog:description=\"Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.\"\nog:image=https://gluckbags.com/static/img/og-image.jpg\nog:image:alt=\"Tote de cuero vegano cognac de GLÜCK en la playa\"\nNinguna categoría ni artículo personaliza og:title/og:description/og:image: la categoría Tote, la página Nosotras y la de Cambios y devoluciones se ven idénticas al compartirse. Para las categorías además og:type=website es correcto, pero el título/imagen no reflejan el contenido.",
+      "recommendation": "Generar og:title/og:description por página (reutilizar el <title> y meta description ya únicos de cada categoría/artículo) y, en categorías, usar como og:image una foto representativa del segmento (tote/mini-bag/clutch). Hoy una campaña que comparta el link de una categoría o de 'Nosotras' muestra la tarjeta de la home, perdiendo contexto y CTR.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "12"
+    },
+    {
+      "title": "og:image de producto es vertical/cuadrada (no 1200×630) y sin og:image:width/height declarados",
+      "severity": "medium",
+      "category": "Open Graph / Social",
+      "dimension": "social-og-quality",
+      "scope": "/producto/1, /producto/2, /producto/3 (todas las fichas de producto, og:type=product, twitter:card=summary_large_image)",
+      "symptom": "Las PDP usan la foto del producto como og:image en formato retrato/cuadrado (787×1400, 1080×1080) en vez de 1200×630, y sin declarar og:image:width/height. El preview social se recorta y puede renderizar sin dimensiones reservadas.",
+      "evidence": "curl -sI a las og:image live → 200 image/jpeg (alcanzables), pero las dimensiones reales (descargadas y medidas con sips) NO son 1200×630:\n/producto/1 .../787.jpg  → 787×1400 (retrato 9:16)\n/producto/2 .../1080.jpg → 1080×1080 (cuadrada)\n/producto/3 .../1080.jpg → 1080×1080 (cuadrada)\nAdemás, ninguna ficha declara og:image:width / og:image:height / og:image:secure_url (grep sobre rendered-gluckbags-com-producto-{1,2,3}.html → ninguno). La home, en cambio, sí declara 1200×630 + secure_url + type. Con twitter:card=summary_large_image y el preview grande de Facebook (que espera ~1.91:1 y ≥1200px de ancho), la 787×1400 queda recortada/encajada y, por debajo de 1200px de ancho, puede degradar a thumbnail chico.",
+      "recommendation": "Servir una og:image de producto en 1200×630 (composición landscape del producto, p. ej. el render sobre fondo de marca) y declarar og:image:width=1200, og:image:height=630, og:image:secure_url y og:image:type, como ya se hace en la home. Esto fija el tamaño del preview (evita el primer-render sin dimensiones) y garantiza la tarjeta grande en lugar del recorte vertical.",
+      "evidenceKind": "table",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "13"
+    },
+    {
+      "title": "Category listing: la primera imagen de producto (candidata a LCP, above-the-fold en mobile) usa loading=\"lazy\" sin prioridad",
+      "severity": "medium",
+      "category": "Performance / Core Web Vitals (LCP)",
       "dimension": "performance-cwv",
-      "scope": "Home (imagen hero = elemento LCP)",
-      "symptom": "Lighthouse da Performance 94 y el resto de Core Web Vitals es excelente (CLS 0, TBT 10 ms, FCP 1,0 s), pero el LCP queda en 2,9 s — por encima del umbral «bueno» de 2,5 s. La imagen hero ya está precargada con fetchpriority=high (bien), así que el margen está en comprimirla mejor (~21 KB y ~150 ms recuperables).",
-      "evidence": "Lighthouse (categorías seo+performance, headless):\n\nSEO:          100\nPerformance:  94\nLCP:          2.9 s   (a mejorar: > 2.5 s)\nFCP:          1.0 s\nCLS:          0\nTBT:          10 ms\n\n# La hero YA se precarga (fetchpriority=high) -> el arreglo es compresión, no preload.",
-      "recommendation": "Recomprimir la imagen hero (AVIF/WebP a calidad adecuada, srcset por breakpoint) para bajar su peso sin perder nitidez y meter el LCP por debajo de 2,5 s. El resto de CWV ya está en verde.",
+      "scope": "Páginas de categoría (/categoria/tote, /categoria/mini-bag, /categoria/clutch). Verificado en rendered-gluckbags-com-categoria-tote.html y contra la live.",
+      "symptom": "En los listados de categoría, la primera imagen de producto —candidata a LCP, above-the-fold en mobile— sale con loading=lazy y sin fetchpriority. El sitio ya aplica bien el patrón eager/priority en home y PDP; falta replicarlo en los listados.",
+      "evidence": "En /categoria/tote las 2 (únicas) tarjetas de producto, ambas en el primer viewport mobile, salen con loading=\"lazy\" y SIN fetchpriority. Snippet (rendered-gluckbags-com-categoria-tote.html):\n<img src=\"/media/products/1/.../400.jpg\" srcset=\".../400.jpg 400w, .../600.jpg 600w\" sizes=\"(max-width: 768px) 50vw, 33vw\" width=\"787\" height=\"1400\" alt=\"Tote Cognac\" loading=\"lazy\">\n<img ... alt=\"Tote Gris\" loading=\"lazy\">\nContraste: el home (hero) y el PDP (imagen principal) SÍ promueven su imagen LCP — rendered-gluckbags-com-producto-1.html: <img ... 787w ... fetchpriority=\"high\"> y home: <img class=\"hero-img\" ... fetchpriority=\"high\">. Las páginas de listado no marcan eager/priority la primera tarjeta, así que su imagen LCP se descubre/descarga tarde (lazy difiere el fetch hasta el layout).",
+      "recommendation": "En las tarjetas de producto del listado, renderizar la PRIMERA fila (o al menos la primera tarjeta) con loading=\"eager\" y fetchpriority=\"high\", y dejar lazy del resto. Es el patrón que el sitio ya aplica bien en home/PDP; solo falta replicarlo en los listados, donde la primera tarjeta es el elemento LCP en mobile.",
       "evidenceKind": "code",
-      "status": "PENDIENTE"
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "14"
     },
     {
-      "id": "16",
-      "title": "robots.txt: bloqueo de crawlers de IA (intencional, Cloudflare) — el rastreo de buscadores está permitido",
-      "severity": "info",
-      "category": "Crawl / robots.txt",
+      "title": "URLs con barra final hacen 404 duro en vez de 301 a la versión canónica (trampa de duplicado/enlaces rotos)",
+      "severity": "low",
+      "category": "Crawl / Trailing slash",
       "dimension": "indexability-crawl",
-      "scope": "robots.txt",
-      "symptom": "Nota de transparencia + corrección. El pase determinístico marcó «robots.txt bloquea todo el sitio (Disallow: /)» como CRÍTICO: es un FALSO POSITIVO. El Disallow: / está acotado a bots de IA nombrados (Amazonbot, GPTBot, ClaudeBot, Google-Extended, etc.), cada uno bajo su propio User-agent. Para User-agent: * la directiva es Allow: /. Googlebot y el rastreo de búsqueda están permitidos.",
-      "evidence": "robots.txt (gestionado por Cloudflare):\n\nUser-agent: *\nContent-Signal: search=yes,ai-train=no\nAllow: /\n\nUser-agent: GPTBot\nDisallow: /\nUser-agent: ClaudeBot\nDisallow: /\nUser-agent: Google-Extended\nDisallow: /\n... (resto de bots de IA)\n\nUser-agent: *\nAllow: /",
-      "recommendation": "No requiere acción salvo que se desee permitir el entrenamiento de IA. Es un ajuste deliberado de Cloudflare; el SEO de búsqueda no se ve afectado. Se incluye sólo para descartar el falso positivo.",
+      "scope": "Todo el sitio: p.ej. /nosotras/, /producto/1/",
+      "symptom": "Agregar una barra final (p. ej. /categoria/tote/) devuelve un 404 duro en vez de redirigir 301 a la versión canónica. Un enlace interno o externo con slash extra rompe en vez de resolver.",
+      "evidence": "Las URLs canónicas no llevan barra final (canonical y enlaces internos usan /nosotras, /producto/1). Pero la variante con barra NO redirige: curl 'https://gluckbags.com/nosotras/' → HTTP/2 404; 'https://gluckbags.com/producto/1/' → HTTP/2 404 (FINAL 404). Cualquier enlace externo, compartido o tipeado con barra final cae en un 404 en lugar de un 301 a la URL buena. (Mayúsculas también 404: /Nosotras → 404, lo cual es correcto.)",
+      "recommendation": "Agregar una normalización server-side: 301 de /ruta/ → /ruta (strip de la barra final para rutas no-static). Evita 404 evitables sobre URLs que apuntan a contenido real y consolida la señal en la versión sin barra.",
       "evidenceKind": "code",
-      "status": "INFO"
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "15"
     },
     {
-      "id": "17",
-      "title": "Sin verificación de Google Search Console en el sitio",
-      "severity": "info",
-      "category": "Medición / Confianza",
-      "dimension": "measurement-trust",
-      "scope": "Todo el sitio",
-      "symptom": "No hay meta google-site-verification ni señal de propiedad verificada. Dado el problema de canonical cross-dominio (hallazgo 01), GSC es justamente la herramienta para monitorear qué dominio indexa Google y la cobertura por URL.",
-      "evidence": "Home (curl): no aparece <meta name=\"google-site-verification\" ...>.",
-      "recommendation": "Verificar gluckbags.com en Search Console (idealmente por DNS, que cubre todos los hosts), enviar el sitemap (hallazgo 04) y vigilar el informe de Páginas para confirmar que el canonical pase a apuntar a gluckbags.com.",
+      "title": "Páginas de categoría sin ningún structured data: falta BreadcrumbList (hay breadcrumb visible) y oportunidad de ItemList/CollectionPage",
+      "severity": "low",
+      "category": "Datos estructurados",
+      "dimension": "structured-data",
+      "scope": "https://gluckbags.com/categoria/tote, /categoria/mini-bag, /categoria/clutch",
+      "symptom": "Las categorías no emiten ningún JSON-LD: no hay BreadcrumbList (aunque la jerarquía existe) ni ItemList/CollectionPage, desaprovechando structured data en páginas de colección.",
+      "evidence": "Verificado en vivo: curl a https://gluckbags.com/categoria/tote devuelve HTTP 200 y `grep -c application/ld` = 0 (cero bloques JSON-LD). Sin embargo la página SÍ tiene un breadcrumb visible ('La colección › Tote') y lista productos enlazados (href=\"/producto/1\", href=\"/producto/2\"). Las PDP de producto sí llevan BreadcrumbList, pero las categorías —que son el nivel intermedio del mismo árbol— no tienen ninguno. Esto es una incoherencia: el breadcrumb 'Inicio › Tote › Producto' que declaran las PDP no se refuerza en la propia página /categoria/tote.",
+      "recommendation": "Agregar en cada página de categoría un `BreadcrumbList` que refleje el breadcrumb visible (Inicio › <Categoría>). Opcionalmente agregar un `ItemList` (o `CollectionPage` con `mainEntity` ItemList) enumerando los productos de la categoría con `position` + `url`, para reforzar la estructura del catálogo. El ItemList debe coincidir 1:1 con los productos visibles en la página.",
       "evidenceKind": "code",
-      "status": "INFO"
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "16"
     },
     {
-      "id": "18",
-      "title": "Dos sistemas de analítica de page views en paralelo: Umami + Cloudflare Web Analytics",
-      "severity": "info",
-      "category": "Medición / Confianza",
-      "dimension": "measurement-trust",
-      "scope": "Todo el sitio",
-      "symptom": "El HTML incluye el script de Umami (analytics.nexttech.com.ar/script.js) y, además, Cloudflare inyecta en el edge su beacon de Web Analytics (cloudflareinsights.com/beacon.min.js). Dos sistemas midiendo lo mismo: duplica datos y suma un request extra.",
-      "evidence": "Umami en el HTML servido:\n  <script ... src=\"https://analytics.nexttech.com.ar/script.js\" data-website-id=\"...\">\n\nBeacon de Cloudflare en el DOM renderizado (inyectado en el edge):\n  https://static.cloudflareinsights.com/beacon.min.js/v...",
-      "recommendation": "Decidir una sola fuente de verdad. Si se usa Umami, desactivar Cloudflare Web Analytics (o viceversa) para no duplicar métricas ni cargar dos beacons.",
+      "title": "BreadcrumbList de las PDP no coincide con el breadcrumb visible de la página",
+      "severity": "low",
+      "category": "Datos estructurados",
+      "dimension": "structured-data",
+      "scope": "https://gluckbags.com/producto/1, /producto/2, /producto/3",
+      "symptom": "El BreadcrumbList JSON-LD del producto no refleja exactamente el rastro de navegación visible, lo que puede generar inconsistencia markup-vs-contenido.",
+      "evidence": "En rendered-gluckbags-com-producto-1.html el JSON-LD declara 3 niveles: ListItem 1 'Inicio' (https://gluckbags.com/), ListItem 2 'Tote' (/categoria/tote), ListItem 3 'Tote Cognac'. Pero el breadcrumb VISIBLE en el <main> es: '← Volver a los bolsos  Tote  Tote Cognac' — es decir, el primer crumb mostrado al usuario es 'Volver a los bolsos', no 'Inicio', y no se renderiza un nivel 'Inicio' navegable como en el JSON-LD. Google pide que el BreadcrumbList represente el breadcrumb que ve el usuario; la divergencia de nombres/niveles puede hacer que se ignore el rich result o se marque como discrepancia.",
+      "recommendation": "Alinear el JSON-LD con lo visible: o bien renderizar un breadcrumb visible con los mismos labels y niveles que el JSON-LD (Inicio › Tote › Tote Cognac), o ajustar el JSON-LD para que el primer ListItem use el label real visible. La estructura de URLs del itemListElement está bien; el problema es solo la correspondencia label/nivel con la UI.",
       "evidenceKind": "code",
-      "status": "INFO"
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "17"
+    },
+    {
+      "title": "Organization de la home demasiado genérica para un e-commerce: sin tipo específico ni contactPoint, y desaprovecha sameAs",
+      "severity": "low",
+      "category": "Datos estructurados",
+      "dimension": "structured-data",
+      "scope": "https://gluckbags.com/ (Organization + WebSite)",
+      "symptom": "El Organization de la home es mínimo: sin tipo más específico, sin contactPoint/address y con sameAs pobre, desaprovechando el panel de conocimiento de marca.",
+      "evidence": "Verificado en vivo. La home declara Organization con claves ['@context','@type','name','url','logo','sameAs'] y sameAs=[\"https://www.instagram.com/gluck_bags/\"], y un WebSite con solo ['@context','@type','name','url'] (sin potentialAction — correcto, porque el ?s= no es una búsqueda real: /?s=seo devuelve la home con canonical a / ). El logo https://gluckbags.com/static/img/marca/avatar-perfil-gluck.jpg responde 200 (image/jpeg, 10.5 KB). Como es una tienda de carteras, `Organization` a secas pierde matices: no hay `OnlineStore`/`Brand` consolidado, ni `contactPoint`. La página /contacto aún tiene los datos en placeholder ('WhatsApp: (a completar)', 'Email: (a completar)'), por eso un ContactPoint todavía no es markup justificable.",
+      "recommendation": "Considerar especializar el @type a `OnlineStore` (subtipo de Organization, soportado por Google) y darle un @id estable para vincularlo desde el `brand` de los productos. Mantener WebSite SIN SearchAction mientras no exista una búsqueda interna real (agregarla ahora sería markup que no matchea una feature → riesgo). Cuando /contacto tenga email/WhatsApp reales (hoy son placeholders), recién ahí sumar `contactPoint` con esos canales.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "18"
+    },
+    {
+      "title": "1 meta descriptions fuera de rango (70–160 car.)",
+      "severity": "low",
+      "dimension": "titles-meta",
+      "category": "Description",
+      "scope": "1 página(s)",
+      "evidence": "Descriptions muy cortas o muy largas (Google las trunca ~155–160 car.).",
+      "recommendation": "Ajustar a 70–160 caracteres.",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "len": 61,
+          "url": "https://gluckbags.com/terminos"
+        }
+      ],
+      "symptom": "La meta description de /terminos es muy corta (61 caracteres); por debajo del rango útil de 120–160. Menor.",
+      "status": "PENDIENTE",
+      "id": "19"
+    },
+    {
+      "title": "HTTP no redirige a HTTPS: http://gluckbags.com/ devuelve 200 (versión duplicada rastreable)",
+      "severity": "low",
+      "category": "Duplicados / Protocolo",
+      "dimension": "indexability-crawl",
+      "scope": "http://gluckbags.com/ (y todo el sitio sobre http://)",
+      "symptom": "http://gluckbags.com/ responde 200 con la página completa en lugar de un 301 a https://. Queda una copia rastreable por HTTP (duplicado de protocolo) y la primera request viaja en texto plano antes de que actúe el HSTS. El canonical en https mitiga el SEO, pero el 301 duro es trivial y conviene.",
+      "evidence": "curl 'http://gluckbags.com/' (sin seguir redirects) → 'HTTP/1.1 200 OK', num_redirects=0, scheme=HTTP, sirve el HTML completo (title 'GLÜCK · Bolsos minimalistas de cuero vegano'). No hay 301 a https. La respuesta incluye 'Strict-Transport-Security: max-age=31536000; includeSubDomains' y el <link rel=canonical> apunta a https://, lo que mitiga la indexación del duplicado, pero el HTTP sigue accesible y rastreable (la opción 'Always Use HTTPS' de Cloudflare está apagada). En contraste, www SÍ redirige bien: https://www.gluckbags.com/ → 301 → https://gluckbags.com/.",
+      "recommendation": "Activar 'Always Use HTTPS' en Cloudflare (o una Redirect Rule) para forzar 301 de http:// → https://. Aunque HSTS y el canonical ayudan, un 301 explícito evita que la primera visita / crawler sobre HTTP vea un 200 y consolida señales en la versión segura.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "20"
+    },
+    {
+      "title": "3 páginas con saltos en la jerarquía de encabezados",
+      "severity": "low",
+      "dimension": "titles-meta",
+      "category": "Encabezados",
+      "scope": "3 página(s)",
+      "evidence": "Saltos como H2→H4 rompen el outline semántico.",
+      "recommendation": "No saltar niveles; bajar de a uno.",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "skips": "1->3",
+          "url": "https://gluckbags.com/categoria/tote"
+        },
+        {
+          "skips": "1->3",
+          "url": "https://gluckbags.com/categoria/mini-bag"
+        },
+        {
+          "skips": "1->3",
+          "url": "https://gluckbags.com/categoria/clutch"
+        }
+      ],
+      "symptom": "Las 3 categorías saltan de H1 (nombre de la categoría) a H3 (nombres de producto) sin H2 intermedio. Jerarquía de encabezados inconsistente.",
+      "status": "PENDIENTE",
+      "id": "21"
+    },
+    {
+      "title": "El anchor text de las fichas de producto es un bloque concatenado ('Ver más … Consultar') que diluye la keyword",
+      "severity": "low",
+      "category": "Enlazado interno / Anchor text",
+      "dimension": "internal-linking",
+      "scope": "Tarjetas de producto en home y en páginas de categoría (todas las fichas)",
+      "symptom": "El enlace de cada tarjeta de producto usa como texto de ancla todo el bloque ('Ver más … Consultar'), mezclando CTA y repeticiones en vez de un ancla limpia con el nombre del producto. Diluye la keyword del enlace interno.",
+      "evidence": "El <a href=\"/producto/1\"> de la home (rendered-gluckbags-com.html) tiene como texto de ancla la cadena completa de la tarjeta: 'Ver más Tote Cognac Tote Consultar'. Mismo patrón en categoría tote: anchors 'Tote Cognac Tote Consultar' / 'Tote Gris Tote Consultar'. El anchor mezcla el CTA ('Ver más', 'Consultar') y repite la categoría ('Tote ... Tote'), en vez de un ancla limpia con el nombre del producto. (Nota distinta del hallazgo determinístico de genericAnchor, que dio 0 porque no son anchors vacíos/'click aquí', pero igualmente son anchors ruidosos.)",
+      "recommendation": "Hacer que el enlace de la tarjeta use como texto accesible solo el nombre del producto (p. ej. envolver únicamente el título 'Tote Cognac' en el <a>, o usar aria-label='Tote Cognac' en el enlace de imagen) y dejar 'Consultar'/'Ver más' como botón aparte. Así el anchor interno transmite la keyword del producto sin ruido.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "22"
+    },
+    {
+      "title": "No hay breadcrumbs HTML visibles en ninguna página (solo JSON-LD en productos); categorías y páginas internas carecen de rastro de navegación",
+      "severity": "low",
+      "category": "Enlazado interno / Breadcrumbs",
+      "dimension": "internal-linking",
+      "scope": "Todo el sitio (home, /categoria/*, /producto/*, /nosotras, /envios, etc.)",
+      "symptom": "Ninguna página tiene breadcrumbs HTML reales (ni markup aria-label=breadcrumb); solo las PDP tienen BreadcrumbList en JSON-LD sin contraparte visible. Falta rastro de navegación para usuario y crawler.",
+      "evidence": "Escaneo de los 15 HTML renderizados (rendered-gluckbags-com*.html): ninguna página tiene aria-label=\"breadcrumb\" ni class*=\"breadcrumb\". Solo las fichas /producto/{1,2,3} incluyen BreadcrumbList en JSON-LD (BreadcrumbList-JSONLD=True), pero sin contraparte visible en el DOM. Las páginas de categoría no tienen ni JSON-LD ni breadcrumb HTML. Sin breadcrumbs reales, el usuario y el crawler no tienen una ruta jerárquica navegable (Inicio › Categoría › Producto) más allá del menú global.",
+      "recommendation": "Implementar breadcrumbs HTML reales en categorías y productos (Inicio › Tote para categoría; Inicio › Tote › Tote Cognac para producto), con <a> a cada nivel, y agregar el BreadcrumbList JSON-LD también en las páginas de categoría. Esto crea enlaces internos jerárquicos consistentes, mejora la navegación y habilita los breadcrumbs en la SERP.",
+      "evidenceKind": "table",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "23"
+    },
+    {
+      "title": "<html lang=\"es\"> is generic Spanish while the store self-targets Argentina (og:locale=es_AR) — minor locale-signal inconsistency",
+      "severity": "low",
+      "category": "Internacional / señal de idioma",
+      "dimension": "international",
+      "scope": "Sitewide (<html> element on all pages); cross-checked against og:locale on the home",
+      "symptom": "El <html lang=\"es\"> es español genérico mientras el sitio se autodirige a Argentina (og:locale=es_AR). Inconsistencia menor de señal de idioma/región.",
+      "evidence": "The page-level language declaration is region-agnostic, but the social/locale metadata pins the country:\n  LIVE:  curl -s https://gluckbags.com/ | grep '<html'  ->  <html lang=\"es\">\n  Artifact (raw-gluckbags-com.html):  <meta property=\"og:locale\" content=\"es_AR\">\n  seo-pages.json .og.\"og:locale\"  ->  \"es_AR\"\nContent reinforces an Argentina-only audience (AR shipping/returns pages /envios, /cambios-y-devoluciones; Spanish copy). So the site clearly targets es-AR, yet <html lang> only says \"es\". This is not an hreflang problem (no alternates exist), only a consistency nuance: the strongest, most-read language signal (<html lang>) is less specific than the locale the brand actually claims.",
+      "recommendation": "For maximal consistency with the declared og:locale=es_AR and the Argentina-only operation, set the document language to the region-qualified BCP-47 tag: <html lang=\"es-AR\">. This is optional and low-impact (Google treats \"es\" and \"es-AR\" almost identically for a monolingual site), so it can be deferred — but if touched, align <html lang>, og:locale and any future content-language signal on es-AR. Do NOT introduce hreflang as part of this change; a single-version site still needs none.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "24"
+    },
+    {
+      "title": "El tag de Umami no está acotado por dominio (sin data-domains): riesgo de contaminar las estadísticas con tráfico de alias/dev",
+      "severity": "low",
+      "category": "Medición / Calidad del dato",
+      "dimension": "measurement-trust",
+      "scope": "Tag de analítica presente en las 16 páginas renderizadas (home, categorías, productos, estáticas, búsqueda y la 404 de prueba).",
+      "symptom": "El tag de Umami no tiene data-domains, así que cuenta pageviews desde cualquier host donde cargue el script (alias gluck.nexttech.com.ar, entornos de dev), contaminando las estadísticas del dominio productivo.",
+      "evidence": "El snippet es `<script async src=\"https://analytics.nexttech.com.ar/script.js\" data-website-id=\"4badbd28-ea2a-4c67-9520-fe0814abcd1d\"></script>` — sin atributo `data-domains` (grep `data-domains` = 0 coincidencias en todos los rendered-*.html). Sin esa restricción, Umami contabiliza pageviews desde CUALQUIER host donde se cargue el script: mirrors de dev, el alias gluck.nexttech.com.ar (que hoy 301-redirige a gluckbags.com, pero sigue sirviendo el mismo data-website-id tras seguir el redirect) o cualquier entorno de staging que comparta el HTML. Eso infla/ensucia las métricas del sitio productivo. Nota: la página de prueba de 404 (zzz-seo-audit-404-test-page) también lleva el tag y se contabiliza.",
+      "recommendation": "Agregar `data-domains=\"gluckbags.com\"` al tag de Umami para que solo registre el dominio productivo, y/o no inyectar el tag fuera de producción (condicionarlo por entorno como se hace con otros tags). Así las visitas de dev/alias dejan de mezclarse con las reales.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "25"
+    },
+    {
+      "title": "La página 404 emite una tarjeta social completa que apunta a la home (soft-404 social)",
+      "severity": "low",
+      "category": "Open Graph / Social",
+      "dimension": "social-og-quality",
+      "scope": "URLs inexistentes — verificado con https://gluckbags.com/zzz-seo-audit-404-test-page/ (httpStatus 404, noindex correcto)",
+      "symptom": "La página 404 (correctamente noindex) igual renderiza la tarjeta OG completa de la home. Compartir un enlace roto del sitio muestra un preview legítimo de la home (soft-404 social).",
+      "evidence": "El registro de la 404 (httpStatus=404, noindex=true — bien para buscadores) igual renderiza en el DOM el bloque OG completo de la home:\nog:type=website\nog:url=https://gluckbags.com/\nog:title=\"GLÜCK · Bolsos minimalistas de cuero vegano\"\nog:image=https://gluckbags.com/static/img/og-image.jpg\ntwitter:card=summary_large_image\nAl compartir un enlace roto/expirado del sitio, el scraper social arma un preview válido de la home en vez de no mostrar nada o indicar error: el usuario cree que el link funciona.",
+      "recommendation": "En respuestas 404, omitir el bloque OG/Twitter o emitir og:url con la propia URL solicitada (no la home). Mantener el noindex actual; el objetivo es que un link roto no se vea como un preview legítimo de la home.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "26"
+    },
+    {
+      "title": "LCP del home = 2.7 s en Lighthouse mobile (score 0.85): es la única métrica CWV fuera de \"good\"",
+      "severity": "low",
+      "category": "Performance / Core Web Vitals (LCP)",
+      "dimension": "performance-cwv",
+      "scope": "Home (https://gluckbags.com/). Lighthouse mobile (Slow-4G simulada), artifacts/lighthouse.json, fetchTime 2026-06-29T23:14:24Z.",
+      "symptom": "El LCP del home en Lighthouse mobile es 2.7s (score 0.85), la única métrica CWV fuera de 'good' (FCP, CLS, TBT, SI están todas bien). El LCP es texto (H1 del hero).",
+      "evidence": "Lighthouse mobile: Performance 0.96, SEO 1.0. Métricas: FCP 1.1s, CLS 0, TBT 0ms, SI 2.5s — todas \"good\". Único punto flojo: largest-contentful-paint = 2.7 s (score 0.85), por encima del umbral \"good\" de 2.5 s. El LCP es TEXTO (el H1 del hero): metrics.observedLargestContentfulPaint=1226ms (== FCP, gracias al @font-face \"Playfair Fallback\" metric-matched que evita reflow), pero el LCP lab simulado/throttled = 2696ms. lcp-breakdown-insight: TTFB 126ms + elementRenderDelay 1099ms; el render delay lo domina el critical chain antes del primer paint (HTML → CSS inline → primer render). No es un bug — el sitio está bien optimizado — pero es el delta entre 2.7s (0.85) y <2.5s (good).",
+      "recommendation": "Para empujar el LCP del home bajo 2.5s en condiciones throttled: (a) reducir el costo del primer render — el bloque <style> inline pesa ~6.9 KiB y se puede minificar (ver hallazgo aparte); (b) considerar inline-critical + diferir lo no crítico del CSS si crece; (c) como el LCP es texto que ya pinta en FCP, el mayor margen está en acortar TTFB/critical-path, no en la imagen. Bajo impacto: la métrica de campo (observed) ya es ~1.2s; priorizar solo si se busca el \"good\" verde en lab.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "27"
+    },
+    {
+      "title": "Imágenes de producto (/media/) se sirven en WebP/JPG sin variante AVIF, a diferencia del hero del home",
+      "severity": "low",
+      "category": "Performance / Core Web Vitals (entrega de imágenes)",
+      "dimension": "performance-cwv",
+      "scope": "Imágenes de catálogo en categorías y PDP (las que definen el LCP de esas páginas). Verificado contra la live.",
+      "symptom": "Las imágenes de producto se sirven en WebP/JPG pero sin AVIF, a diferencia del hero del home que sí tiene AVIF. AVIF ahorraría 30–50% extra en la imagen principal del PDP (que es su LCP).",
+      "evidence": "El home sirve el hero con <picture> AVIF+WebP+JPG (hero-tote-cognac-playa-768.avif = 45.267 b live). Las imágenes de producto /media/ usan <picture> con WebP+JPG pero NO AVIF: live → .../787.webp = 89.778 b (200), .../787.avif = 404. La imagen principal del PDP es fetchpriority=\"high\" (es el LCP del PDP) y su mejor variante es WebP 787w (90 KB) vs JPG 148 KB. AVIF típicamente ahorraría 30–50% adicional sobre WebP en estas imágenes que son justo el painter de LCP en PDP/listado. Lighthouse image-delivery-insight además marca una cat-card del home (clutch-rosa-sobre-400.webp, 48 KB) con 12 KiB de ahorro por compresión (esa es below-the-fold y lazy, impacto menor).",
+      "recommendation": "Generar variantes AVIF también para /media/products/* (el pipeline ya produce WebP+JPG; agregar AVIF) y añadir el <source type=\"image/avif\"> en el <picture> de tarjetas y de la galería del PDP, como ya se hace en el hero del home. Beneficia directamente el LCP de categorías y PDP (la imagen de mayor prioridad). De paso, recomprimir ligeramente la cat-card del home flaggeada por Lighthouse.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "28"
+    },
+    {
+      "title": "El bloque <style> inline (crítico, en cada página) no está minificado: ~2.2 KiB de whitespace/comentarios en la ruta de render",
+      "severity": "low",
+      "category": "Performance / Core Web Vitals (render path)",
+      "dimension": "performance-cwv",
+      "scope": "Todas las páginas (el CSS va inline en el <head> de cada una). Lighthouse audit unminified-css, artifacts/lighthouse.json.",
+      "symptom": "El CSS crítico inline (presente en cada documento) no está minificado: ~2.2 KiB de whitespace/comentarios viajan en cada respuesta HTML y se parsean antes del primer paint.",
+      "evidence": "Lighthouse unminified-css: score 0.5, \"Est savings of 2 KiB\". Detalle: el bloque inline mide totalBytes=6942 b con wastedBytes=2249 b (≈32% es whitespace/comentarios). Como el CSS está inlineado en el <head> de cada documento, ese peso viaja en CADA respuesta HTML y se parsea antes del primer paint (parte del elementRenderDelay de 1099ms del LCP). Snippet (rendered-gluckbags-com.html, línea 45+): <style>/* =====... GLÜCK — Minimalist vegan leather bags ... */ ... con comentarios extensos y saltos de línea.",
+      "recommendation": "Minificar el CSS crítico que se inyecta inline en build (quitar comentarios y whitespace), manteniendo una copia legible en el repo. Reduce ~2.2 KiB por documento en cada respuesta HTML y acorta el parse previo al primer paint — pequeño empujón al FCP/LCP en mobile throttled. Mantener el comentario de diseño solo en el fuente, no en el output.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "29"
+    },
+    {
+      "title": "El sitemap.xml no está declarado en robots.txt (falta la directiva Sitemap:)",
+      "severity": "low",
+      "category": "Sitemap",
+      "dimension": "indexability-crawl",
+      "scope": "https://gluckbags.com/robots.txt y https://gluckbags.com/sitemap.xml",
+      "symptom": "El robots.txt no incluye la directiva 'Sitemap:', así que los crawlers no descubren el sitemap por esa vía (sí existe en /sitemap.xml).",
+      "evidence": "robots.txt en vivo (HTTP 200) NO contiene ninguna línea 'Sitemap:' (grep -i sitemap → 0 resultados). El sitemap existe y responde 200 (application/xml, 15 URLs) en /sitemap.xml, pero no hay forma de que un crawler lo descubra desde robots.txt. Confirmado también en sitemap-urls.json: \"declared_in_robots\": false.",
+      "recommendation": "Agregar al final de robots.txt: 'Sitemap: https://gluckbags.com/sitemap.xml'. Es la forma estándar (independiente de buscador) de anunciar el sitemap; sin ella se depende solo del envío manual en Search Console / Bing y del path por defecto.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "30"
+    },
+    {
+      "title": "Sitemap pobre: sin lastmod en 10 de 15 URLs y sin changefreq/priority",
+      "severity": "low",
+      "category": "Sitemap",
+      "dimension": "indexability-crawl",
+      "scope": "https://gluckbags.com/sitemap.xml",
+      "symptom": "El sitemap declara 15 URLs pero 10 no tienen <lastmod>, y ninguna tiene changefreq/priority. Le da a Google menos señales de frescura/prioridad.",
+      "evidence": "El sitemap (15 <loc>, HTTP 200) tiene <lastmod>2026-06-29</lastmod> SOLO en los 5 /producto/N; las otras 10 URLs (home, /nosotras, /contacto, /envios, /cambios-y-devoluciones, /terminos, /privacidad y las 3 /categoria/*) no llevan ningún <lastmod>. Tampoco hay <changefreq> ni <priority> en ninguna. La calidad por lo demás es correcta: todas las URLs del sitemap responden 200, son canónicas-a-sí-mismas e indexables, y la categoría noindex (bucket-bag) está bien excluida; producto/4 y producto/5 (no muestreados) también responden 200.",
+      "recommendation": "Poblar <lastmod> en todas las URLs con una fecha real de última modificación del contenido (no la fecha de generación), también en categorías y páginas estáticas, para ayudar a Google a priorizar el recrawl. <changefreq>/<priority> son opcionales (Google los ignora), no es necesario agregarlos.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "31"
+    },
+    {
+      "title": "3 títulos demasiado cortos (<30 car.)",
+      "severity": "low",
+      "dimension": "titles-meta",
+      "category": "Title",
+      "scope": "3 página(s)",
+      "evidence": "Títulos cortos desaprovechan el espacio de la SERP.",
+      "recommendation": "Enriquecer con el tema + marca manteniéndolo descriptivo.",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "len": 16,
+          "title": "Nosotras · GLÜCK",
+          "url": "https://gluckbags.com/nosotras"
+        },
+        {
+          "len": 14,
+          "title": "Envíos · GLÜCK",
+          "url": "https://gluckbags.com/envios"
+        },
+        {
+          "len": 16,
+          "title": "Contacto · GLÜCK",
+          "url": "https://gluckbags.com/contacto"
+        }
+      ],
+      "symptom": "Tres títulos quedan por debajo de 30 caracteres (Nosotras·GLÜCK, Envíos·GLÜCK, Contacto·GLÜCK): son correctos pero desaprovechan espacio para sumar contexto/keyword.",
+      "status": "PENDIENTE",
+      "id": "32"
+    },
+    {
+      "title": "Doble barra en la raíz (https://gluckbags.com//) devuelve 200 con la home completa en vez de 301/404",
+      "severity": "info",
+      "category": "Canonicalización de URL",
+      "dimension": "url-canonicalization",
+      "scope": "URL raíz con doble slash: https://gluckbags.com//",
+      "symptom": "https://gluckbags.com// (doble barra) devuelve 200 con la home completa en vez de 301/404, abriendo una variante de URL duplicada menor.",
+      "evidence": "UA=\"Mozilla/5.0 ... Chrome/124.0 Safari/537.36\"\n\n$ curl -sI -A \"$UA\" \"https://gluckbags.com//\" | awk 'NR==1{print $2}'\n200\n\n# Renderiza la home real (mismo <title>), no una 404:\n$ curl -s -A \"$UA\" \"https://gluckbags.com//\" | grep -ioE \"<title>[^<]*</title>\"\n<title>GLÜCK · Bolsos minimalistas de cuero vegano</title>\n\n# Mitigado por canonical correcto (sin doble slash):\n$ curl -s -A \"$UA\" \"https://gluckbags.com//\" | grep -ioE '<link[^>]*rel=[\"'\\'']canonical[\"'\\''][^>]*>'\n<link rel=\"canonical\" href=\"https://gluckbags.com/\">\n\nNota: las demás variantes SÍ están bien resueltas y NO son hallazgos — www→no-www hace 301 a https://gluckbags.com/; las rutas internas con trailing slash (/nosotras/, /categoria/tote/), en mayúsculas (/NOSOTRAS, /categoria/TOTE) e /index.php · /index.html devuelven 404 correctamente; y las URLs con ?utm_source/?fbclid devuelven 200 pero emiten canonical limpio sin parámetros.",
+      "recommendation": "Normalizar las barras repetidas en la ruta a nivel de routing/edge (colapsar '//' → '/') y devolver 301 a https://gluckbags.com/, o directamente 404 para rutas malformadas. El daño SEO está acotado porque el canonical ya apunta a la home sin doble slash; es una limpieza de bajo esfuerzo para no exponer una variante crawleable extra.",
+      "evidenceKind": "table",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "33"
+    },
+    {
+      "title": "International SEO: N/A verified — monolingual single-region site, no hreflang needed or present",
+      "severity": "info",
+      "category": "Internacional (hreflang)",
+      "dimension": "international",
+      "scope": "Sitewide (all 15 sampled URLs: home, categorias, productos, nosotras, envios, contacto, terminos, privacidad, cambios-y-devoluciones)",
+      "symptom": "Verificación N/A: el sitio es monolingüe (es-AR) y mono-región, por lo que no necesita hreflang ni x-default, y no los declara. Correcto.",
+      "evidence": "All sampled records have empty hreflang arrays and htmlLang=\"es\":\n  jq -c '.[] | {key, hreflang, htmlLang}' seo-pages.json  ->  every entry: {\"hreflang\":[], \"htmlLang\":\"es\"}\nNo rel=alternate / hreflang in any artifact:\n  grep -ril \"hreflang\" *.html  -> (no matches)\n  grep -rio 'rel=[\"'\\'']?alternate' *.html  -> (no matches)\nLIVE confirmation (browser UA, paced):\n  curl -s https://gluckbags.com/ | grep '<html'  ->  <html lang=\"es\">\n  curl -sD- https://gluckbags.com/ | grep -i content-language  ->  NO content-language header\n  Live <head> has zero <link rel=\"alternate\"> tags.\nThe site exists in one language (Spanish) on one domain. There is no second-language or second-region version to cross-link, so hreflang is correctly absent — not a defect.",
+      "recommendation": "No action required for hreflang. International SEO is genuinely N/A: a single-language, single-region (Argentina) catalog does not need hreflang annotations, and adding them now (e.g. self-referencing-only tags) would add maintenance with no ranking benefit. Only revisit this dimension if the brand later launches a separate language or country version (e.g. a /en/ store, an es-ES vs es-AR split, or a USD storefront), at which point reciprocal hreflang + x-default would become required.",
+      "evidenceKind": "table",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "34"
+    },
+    {
+      "title": "Sin interstitial intrusivo ni cookie wall en la carga (confirmado: no hay penalización mobile por este motivo)",
+      "severity": "info",
+      "category": "Performance / Core Web Vitals (intrusive interstitials)",
+      "dimension": "performance-cwv",
+      "scope": "Home y resto de páginas muestreadas (rendered-*.html).",
+      "symptom": "Confirmación positiva: no hay pop-ups, cookie walls ni interstitials que tapen el contenido al cargar. El sitio no incurre en la penalización mobile de Google por interstitials intrusivos. Sin acción.",
+      "evidence": "Búsqueda en rendered-gluckbags-com.html: no hay modal/popup/consent/cookie/newsletter/dialog que cubra el contenido al cargar. Los únicos position:fixed son .site-header (header sticky) y .mobile-menu (menú colapsado por defecto, inset header-h 0 auto 0). Los únicos overlays son .hero-overlay y .materia-overlay, ambos decorativos dentro de sus secciones (no cubren el viewport ni bloquean el contenido principal). No hay cookie banner. main.js = 4.6 KB; todo el JS es async/defer (analytics, footer de nexttech, beacon de Cloudflare); TBT=0ms, bootup=0s → sin riesgo de INP por JS pesado.",
+      "recommendation": "Ninguna acción requerida. Se documenta como confirmación de que el sitio NO incurre en la penalización de Google por intrusive interstitials en mobile y no tiene riesgo de INP por JavaScript. Mantener este estado si en el futuro se agrega un banner de cookies/consentimiento: usar un banner no bloqueante (no full-screen) para no degradar este punto.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "35"
+    },
+    {
+      "title": "Correccion del auto-pass: robots.txt NO bloquea el sitio (el Disallow: / es solo para bots de IA, no para User-agent: *)",
+      "severity": "info",
+      "category": "robots.txt",
+      "dimension": "indexability-crawl",
+      "scope": "https://gluckbags.com/robots.txt",
+      "symptom": "Aclaración: el análisis determinístico marcó un 'Disallow: / global' como crítico, pero es un falso positivo. El grupo User-agent:* tiene Allow:/, y los Disallow:/ aplican solo a bots de IA (GPTBot, ClaudeBot, Google-Extended, etc.). Googlebot indexa con normalidad. Sin acción requerida.",
+      "evidence": "El hallazgo determinístico 'robots.txt bloquea todo el sitio (Disallow: /)' [critical] es un FALSO POSITIVO: matcheó los 'Disallow: /' que pertenecen a grupos de bots de IA, no a Googlebot. Verificado en vivo (HTTP 200, 1761 bytes): los únicos grupos 'User-agent: *' (líneas 28 y 61) contienen SOLO 'Allow: /'. Los 'Disallow: /' corresponden a grupos específicos: Amazonbot, Applebot-Extended, Bytespider, CCBot, ClaudeBot, CloudflareBrowserRenderingCrawler, Google-Extended, GPTBot, meta-externalagent. Es el bloque 'Cloudflare Managed Content' (AI Crawl Control). Googlebot, Bingbot y demás buscadores tradicionales tienen Allow: / → el sitio SÍ es rastreable e indexable. NOTA: 'Google-Extended' (Disallow) solo bloquea entrenamiento de Gemini/Vertex, NO afecta el indexado de Google Search.",
+      "recommendation": "No actuar sobre el 'critical' del auto-pass: el sitio no está bloqueado para buscadores. Mantener el bloque de bots de IA si es intencional. Si además se quiere aparecer en resúmenes de IA (AI Overviews / ChatGPT search), revisar que GPTBot/Google-Extended estén deliberadamente bloqueados, ya que hoy se excluye el contenido del entrenamiento/grounding de esos modelos.",
+      "evidenceKind": "code",
+      "status": "PENDIENTE",
+      "source": "workflow",
+      "id": "36"
     }
   ]
 }

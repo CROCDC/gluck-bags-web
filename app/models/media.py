@@ -81,6 +81,28 @@ class Media(db.Model):
         return self._url(f"{w}.jpg") if w else None
 
     @property
+    def has_avif(self) -> bool:
+        """True only when EVERY responsive width has an `.avif` on disk, so templates
+        can add a `<source type="image/avif">`. It must be all-or-nothing because
+        `image_srcset('avif')` emits a candidate per width, and a `<picture>` source
+        does NOT fall back on a network 404 (only on an unsupported type) — so a
+        partial AVIF set would show a broken image. A partial set (interrupted
+        backfill, mid-loop encoder failure) therefore degrades cleanly to WebP/JPEG."""
+        import os
+
+        from flask import current_app, has_app_context
+
+        if not self.is_image or not has_app_context():
+            return False
+        widths = self.widths or []
+        root = current_app.config.get("MEDIA_ROOT")
+        if not widths or not root:
+            return False
+        return all(
+            os.path.exists(os.path.join(root, self.path, f"{w}.avif")) for w in widths
+        )
+
+    @property
     def og_image_url(self) -> str | None:
         """The 1200x630 social-share crop (image/jpeg) when it has been generated,
         else None. Returns None for media processed before the og variant existed,

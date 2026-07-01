@@ -1,29 +1,35 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-AR">
 {% set home = url_for('index') %}
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Open Graph / social link preview (must come first in <head>, before scripts/CSS) -->
+    {# Open Graph / social link preview (must come first in <head>, before scripts/CSS).
+       Per-page by default: og:url matches the page canonical, and og:title/og:description
+       reuse the page's own <title>/description blocks so every section/article/category
+       gets its own social card (not the home's). Product detail overrides this whole
+       block with an og:type=product card; the 404 empties it. #}
     {% block social_meta %}
-    <meta property="og:type"             content="website">
-    <meta property="og:url"              content="{{ site_url }}/">
-    <meta property="og:title"            content="{{ brand }} · {{ tagline }}">
-    <meta property="og:description"      content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
+    <meta property="og:type"             content="{% block og_type %}website{% endblock %}">
+    <meta property="og:url"              content="{{ site_url }}{{ request.path }}">
+    <meta property="og:title"            content="{{ self.title() }}">
+    <meta property="og:description"      content="{{ self.description() }}">
+    {% block og_image %}
     <meta property="og:image"            content="{{ site_url }}/static/img/og-image.jpg">
     <meta property="og:image:secure_url" content="{{ site_url }}/static/img/og-image.jpg">
     <meta property="og:image:type"       content="image/jpeg">
     <meta property="og:image:width"      content="1200">
     <meta property="og:image:height"     content="630">
     <meta property="og:image:alt"        content="Tote de cuero vegano cognac de {{ brand }} en la playa">
+    {% endblock %}
     <meta property="og:locale"           content="es_AR">
     <meta property="og:site_name"        content="{{ brand }}">
 
     <!-- Twitter Card -->
     <meta name="twitter:card"        content="summary_large_image">
-    <meta name="twitter:title"       content="{{ brand }} · {{ tagline }}">
-    <meta name="twitter:description" content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
-    <meta name="twitter:image"       content="{{ site_url }}/static/img/og-image.jpg">
+    <meta name="twitter:title"       content="{{ self.title() }}">
+    <meta name="twitter:description" content="{{ self.description() }}">
+    <meta name="twitter:image"       content="{% block twitter_image %}{{ site_url }}/static/img/og-image.jpg{% endblock %}">
     {% endblock %}
 
     <title>{% block title %}{{ brand }} · {{ tagline }}{% endblock %}</title>
@@ -52,7 +58,9 @@
     {% block head_extra %}{% endblock %}
 
     {% if config.get('UMAMI_WEBSITE_ID') %}
-    <script async src="https://analytics.nexttech.com.ar/script.js" data-website-id="{{ config.UMAMI_WEBSITE_ID }}"></script>
+    {# data-domains scopes tracking to the production host so dev mirrors and the
+       nexttech alias don't pollute the real stats. #}
+    <script async src="https://analytics.nexttech.com.ar/script.js" data-website-id="{{ config.UMAMI_WEBSITE_ID }}" data-domains="{{ site_host }}"></script>
     {% endif %}
 </head>
 <body class="{% block body_class %}{% endblock %}">
@@ -69,7 +77,7 @@
                 <a href="{{ home }}#manifiesto">Nosotras</a>
             </nav>
 
-            <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="header-cta">Comprar</a>
+            <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="header-cta" data-umami-event="comprar-instagram" data-umami-event-ubicacion="header">Comprar</a>
 
             <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú" aria-expanded="false">
                 <span></span><span></span>
@@ -83,7 +91,7 @@
         <a href="{{ home }}#shop">Bolsos</a>
         <a href="{{ home }}#materia">Materia</a>
         <a href="{{ home }}#manifiesto">Nosotras</a>
-        <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="mobile-cta">Comprar en Instagram</a>
+        <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="mobile-cta" data-umami-event="comprar-instagram" data-umami-event-ubicacion="menu-mobile">Comprar en Instagram</a>
     </div>
 
     {% block body %}{% endblock %}

@@ -1,22 +1,29 @@
 {# Compact product card, reused by the category pages and the related-products
-   strip. The home shop grid keeps its own (perf-tuned) markup. #}
-{% macro product_card(product) %}
+   strip. The home shop grid keeps its own (perf-tuned) markup.
+   `priority=True` makes the image eager + fetchpriority=high (use it only for the
+   first above-the-fold card so it can be the LCP element instead of lazy-loading).
+   aria-label gives the link a clean accessible name (the product title) instead of
+   the concatenated card text ("Ver más … Consultar"). #}
+{% macro product_card(product, priority=False) %}
 {% set cover = product.cover %}
-<a href="{{ url_for('product_detail', product_id=product.id) }}" class="product">
+<a href="{{ url_for('product_detail', product_id=product.id) }}" class="product" aria-label="{{ product.title }}">
     <div class="product-media">
         {% if cover and cover.is_image and cover.smallest_width %}
         <picture>
+            {% if cover.has_avif %}<source type="image/avif" srcset="{{ cover.image_srcset('avif', 600) }}"
+                    sizes="(max-width: 768px) 50vw, 33vw">{% endif %}
             <source type="image/webp" srcset="{{ cover.image_srcset('webp', 600) }}"
                     sizes="(max-width: 768px) 50vw, 33vw">
             <img src="{{ cover.image_url(cover.smallest_width) }}"
                  srcset="{{ cover.image_srcset('jpg', 600) }}"
                  sizes="(max-width: 768px) 50vw, 33vw"
                  width="{{ cover.width }}" height="{{ cover.height }}"
-                 alt="{{ product.title }}" loading="lazy">
+                 alt="{{ product.title }}" {% if priority %}fetchpriority="high"{% else %}loading="lazy"{% endif %}>
         </picture>
         {% elif cover and cover.is_video %}
         <img src="{{ cover.poster_url }}" width="{{ cover.width or 640 }}"
-             height="{{ cover.height or 800 }}" alt="{{ product.title }}" loading="lazy">
+             height="{{ cover.height or 800 }}" alt="{{ product.title }}"
+             {% if priority %}fetchpriority="high"{% else %}loading="lazy"{% endif %}>
         {% endif %}
     </div>
     <div class="product-info">
@@ -27,4 +34,34 @@
         <span class="product-price">{{ product.formatted_price or 'Consultar' }}</span>
     </div>
 </a>
+{% endmacro %}
+
+
+{# Visible breadcrumb trail. `crumbs` is a list of (name, url) pairs; the last item
+   is the current page and renders as plain text (no link). Mirrors the
+   BreadcrumbList JSON-LD so on-page nav and markup agree. #}
+{% macro breadcrumb(crumbs) %}
+<nav class="breadcrumb" aria-label="Migas de pan">
+    <ol>
+        {% for name, url in crumbs %}
+        <li>{% if url and not loop.last %}<a href="{{ url }}">{{ name }}</a>{% else %}<span aria-current="page">{{ name }}</span>{% endif %}</li>
+        {% endfor %}
+    </ol>
+</nav>
+{% endmacro %}
+
+
+{# Inter-category navigation chips, present on every category and product page so
+   the categories link to each other (not just from the home) and products link
+   back up to their siblings. `categories` is a list of category names. #}
+{% macro category_nav(categories, current=None) %}
+{% if categories %}
+<nav class="cat-chips" aria-label="Categorías">
+    {% for name in categories %}
+    <a href="{{ url_for('category_page', slug=name|slugify) }}"
+       class="cat-chip{% if name == current %} is-current{% endif %}"
+       {% if name == current %}aria-current="page"{% endif %}>{{ name }}</a>
+    {% endfor %}
+</nav>
+{% endif %}
 {% endmacro %}

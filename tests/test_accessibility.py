@@ -175,7 +175,7 @@ def _login(page: Page, base_url: str, password: str) -> None:
 
 def _assert_common(audit: dict, *, expect_one_h1: bool = True) -> None:
     """Invariants every content page must satisfy."""
-    assert audit["lang"] == "es", f"<html lang> is {audit['lang']!r}, expected 'es'"
+    assert audit["lang"] == "es-AR", f"<html lang> is {audit['lang']!r}, expected 'es-AR'"
     assert audit["title"], "document <title> is empty"
     assert audit["imgsAllHaveAlt"], "some <img> lacks an alt attribute"
     assert not audit["nameIssues"], (

@@ -7,11 +7,11 @@
     <!-- Open Graph / social link preview (must come first in <head>, before scripts/CSS) -->
     
     <meta property="og:type"             content="website">
-    <meta property="og:url"              content="https://gluck.nexttech.com.ar/">
+    <meta property="og:url"              content="https://gluckbags.com/">
     <meta property="og:title"            content="GLÜCK · Bolsos minimalistas de cuero vegano">
     <meta property="og:description"      content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
-    <meta property="og:image"            content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
-    <meta property="og:image:secure_url" content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
+    <meta property="og:image"            content="https://gluckbags.com/static/img/og-image.jpg">
+    <meta property="og:image:secure_url" content="https://gluckbags.com/static/img/og-image.jpg">
     <meta property="og:image:type"       content="image/jpeg">
     <meta property="og:image:width"      content="1200">
     <meta property="og:image:height"     content="630">
@@ -22,14 +22,14 @@
     <meta name="twitter:card"        content="summary_large_image">
     <meta name="twitter:title"       content="GLÜCK · Bolsos minimalistas de cuero vegano">
     <meta name="twitter:description" content="Carteras y bolsos de cuero vegano, hechos a mano. Diseño minimalista y atemporal.">
-    <meta name="twitter:image"       content="https://gluck.nexttech.com.ar/static/img/og-image.jpg">
-    <!-- Same content is served on www and the nexttech alias; pin the canonical
-         to the apex domain so search engines don't see duplicate pages. -->
-    <link rel="canonical" href="https://gluck.nexttech.com.ar/">
+    <meta name="twitter:image"       content="https://gluckbags.com/static/img/og-image.jpg">
 
 
     <title>GLÜCK · Bolsos minimalistas de cuero vegano</title>
     <meta name="description" content="GLÜCK — Bolsos minimalistas de cuero vegano. Carteras y bolsos de cuero vegano, hechos a mano con un diseño minimalista y atemporal.">
+
+    
+    <link rel="canonical" href="https://gluckbags.com/">
 
     <!-- The shared Next Tech footer script + its assets load from this origin;
          preconnecting shaves the TLS/connection setup off the critical path. -->
@@ -1136,6 +1136,8 @@ video.pdp-media { width: 100%; height: auto; display: block; }
 }
 </style>
     
+    <script type="application/ld+json">[{"@context": "https://schema.org", "@type": "Organization", "name": "GLÜCK", "url": "https://gluckbags.com/", "logo": "https://gluckbags.com/static/img/marca/avatar-perfil-gluck.jpg", "sameAs": ["https://www.instagram.com/gluck_bags/"]}, {"@context": "https://schema.org", "@type": "WebSite", "name": "GLÜCK", "url": "https://gluckbags.com/"}]</script>
+
 
     
     <script async src="https://analytics.nexttech.com.ar/script.js" data-website-id="4badbd28-ea2a-4c67-9520-fe0814abcd1d"></script>
@@ -1178,6 +1180,10 @@ video.pdp-media { width: 100%; height: auto; display: block; }
         <!-- ===================== HERO ===================== -->
         <section class="hero">
             <picture class="hero-media">
+                <source type="image/avif"
+                        srcset="/static/img/hero/hero-tote-cognac-playa-768.avif?v=1782772077 768w,
+                                /static/img/hero/hero-tote-cognac-playa.avif?v=1782772077 1080w"
+                        sizes="100vw">
                 <source type="image/webp"
                         srcset="/static/img/hero/hero-tote-cognac-playa-768.webp?v=1780668191 768w,
                                 /static/img/hero/hero-tote-cognac-playa.webp?v=1780604718 1080w"
@@ -1225,7 +1231,7 @@ video.pdp-media { width: 100%; height: auto; display: block; }
 
             <div class="cat-grid">
                 
-                <a href="#shop" class="cat-card reveal" style="--i: 0">
+                <a href="/categoria/tote" class="cat-card reveal" style="--i: 0">
                     <div class="cat-media">
                         <picture>
                             <source type="image/webp"
@@ -1251,7 +1257,7 @@ video.pdp-media { width: 100%; height: auto; display: block; }
                     </div>
                 </a>
                 
-                <a href="#shop" class="cat-card reveal" style="--i: 1">
+                <a href="/categoria/mini-bag" class="cat-card reveal" style="--i: 1">
                     <div class="cat-media">
                         <picture>
                             <source type="image/webp"
@@ -1277,7 +1283,7 @@ video.pdp-media { width: 100%; height: auto; display: block; }
                     </div>
                 </a>
                 
-                <a href="#shop" class="cat-card reveal" style="--i: 2">
+                <a href="/categoria/bucket-bag" class="cat-card reveal" style="--i: 2">
                     <div class="cat-media">
                         <picture>
                             <source type="image/webp"
@@ -1303,7 +1309,7 @@ video.pdp-media { width: 100%; height: auto; display: block; }
                     </div>
                 </a>
                 
-                <a href="#shop" class="cat-card reveal" style="--i: 3">
+                <a href="/categoria/clutch" class="cat-card reveal" style="--i: 3">
                     <div class="cat-media">
                         <picture>
                             <source type="image/webp"
@@ -1336,6 +1342,10 @@ video.pdp-media { width: 100%; height: auto; display: block; }
         <section class="feature">
             <div class="feature-media reveal">
                 <picture>
+                    <source type="image/avif"
+                            srcset="/static/img/hero/hero-tote-gris-velero-768.avif?v=1782772077 768w,
+                                    /static/img/hero/hero-tote-gris-velero.avif?v=1782772077 1080w"
+                            sizes="(max-width: 980px) 100vw, 50vw">
                     <source type="image/webp"
                             srcset="/static/img/hero/hero-tote-gris-velero-768.webp?v=1780668191 768w,
                                     /static/img/hero/hero-tote-gris-velero.webp?v=1780604718 1080w"
@@ -1609,9 +1619,16 @@ video.pdp-media { width: 100%; height: auto; display: block; }
             <nav class="footer-nav" aria-label="Pie de página">
                 <a href="/#categorias">Colección</a>
                 <a href="/#shop">Bolsos</a>
-                <a href="/#materia">Materia</a>
-                <a href="/#manifiesto">Nosotras</a>
+                <a href="/nosotras">Nosotras</a>
+                <a href="/contacto">Contacto</a>
+                <a href="/envios">Envíos</a>
+                <a href="/cambios-y-devoluciones">Cambios</a>
                 <a href="https://www.instagram.com/gluck_bags/" target="_blank" rel="noopener">Instagram</a>
+            </nav>
+
+            <nav class="footer-legal" aria-label="Legales">
+                <a href="/terminos">Términos</a>
+                <a href="/privacidad">Privacidad</a>
             </nav>
         </div>
         <div class="footer-bottom">

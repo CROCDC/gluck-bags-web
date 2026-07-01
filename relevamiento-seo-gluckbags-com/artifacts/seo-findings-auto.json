@@ -13,7 +13,7 @@
       "evidenceCode": "# As a condition of accessing this website, you agree to abide by the following\n# content signals:\n\n# (a)  If a Content-Signal = yes, you may collect content for the corresponding\n#      use.\n# (b)  If a Content-Signal = no, you may not collect content for the\n#      corresponding use.\n# (c)  If the website operator does not include a Content-Signal for a\n#      corresponding use, the website oper"
     },
     {
-      "title": "Títulos duplicados en 3 páginas",
+      "title": "Títulos duplicados en 2 páginas",
       "severity": "high",
       "dimension": "titles-meta",
       "category": "Title",
@@ -30,10 +30,6 @@
         {
           "title": "GLÜCK · Bolsos minimalistas de cuero vegano",
           "url": "https://gluckbags.com/?s=seo"
-        },
-        {
-          "title": "GLÜCK · Bolsos minimalistas de cuero vegano",
-          "url": "https://gluckbags.com/?utm_source=newsletter"
         }
       ]
     },
@@ -50,7 +46,7 @@
       "evidenceCode": "meta robots: None\nX-Robots-Tag: None\nstatus: 200"
     },
     {
-      "title": "Meta descriptions duplicadas en 3 páginas",
+      "title": "Meta descriptions duplicadas en 2 páginas",
       "severity": "medium",
       "dimension": "titles-meta",
       "category": "Description",
@@ -63,83 +59,84 @@
         {
           "desc": "GLÜCK — Bolsos minimalistas de cuero vegano. Carteras y bolsos de cuero vegano, hechos a m",
           "url": "https://gluckbags.com/",
-          "count": 3
+          "count": 2
         }
       ]
     },
     {
-      "title": "3 páginas sin rel=canonical",
+      "title": "1 páginas con canonical apuntando a otra URL",
       "severity": "medium",
       "dimension": "indexability",
       "category": "Canonical",
-      "scope": "3 de 6 indexables",
-      "evidence": "Sin canonical, variantes de URL (parámetros, trailing slash) pueden duplicarse.",
-      "recommendation": "Agregar <link rel=canonical> autorreferente en cada página.",
-      "evidenceKind": "table",
-      "source": "auto",
-      "evidenceTable": [
-        {
-          "url": "https://gluckbags.com/producto/1",
-          "type": "product"
-        },
-        {
-          "url": "https://gluckbags.com/producto/2",
-          "type": "product"
-        },
-        {
-          "url": "https://gluckbags.com/producto/3",
-          "type": "product"
-        }
-      ]
-    },
-    {
-      "title": "3 páginas con canonical apuntando a otra URL",
-      "severity": "medium",
-      "dimension": "indexability",
-      "category": "Canonical",
-      "scope": "3 página(s)",
+      "scope": "1 página(s)",
       "evidence": "Un canonical cruzado le dice a Google que indexe OTRA URL — verificar que sea intencional.",
       "recommendation": "Confirmar que el canonical apunta a la versión correcta (no a la home por error).",
       "evidenceKind": "table",
       "source": "auto",
       "evidenceTable": [
         {
-          "url": "https://gluckbags.com/",
-          "canonical": "https://gluck.nexttech.com.ar/"
-        },
-        {
           "url": "https://gluckbags.com/?s=seo",
-          "canonical": "https://gluck.nexttech.com.ar/"
-        },
-        {
-          "url": "https://gluckbags.com/?utm_source=newsletter",
-          "canonical": "https://gluck.nexttech.com.ar/"
+          "canonical": "https://gluckbags.com/"
         }
       ]
     },
     {
-      "title": "Home sin structured data de Organization/WebSite",
+      "title": "9 páginas con contenido delgado (<300 palabras)",
       "severity": "medium",
-      "dimension": "structured-data",
-      "category": "Datos estructurados",
-      "scope": "home",
-      "evidence": "JSON-LD en home: ninguno. Falta(n): Organization, WebSite.",
-      "recommendation": "Agregar JSON-LD Organization (logo, nombre, sameAs) y WebSite (con SearchAction) en la home.",
-      "evidenceKind": "code",
+      "dimension": "content-quality",
+      "category": "Contenido",
+      "scope": "9 página(s)",
+      "evidence": "Páginas con poco texto rinden mal y pueden verse como thin content.",
+      "recommendation": "Ampliar el contenido útil o consolidar/noindexar las páginas pobres.",
+      "evidenceKind": "table",
       "source": "auto",
-      "evidenceCode": "tipos JSON-LD detectados: (ninguno)"
-    },
-    {
-      "title": "Sin sitemap.xml utilizable",
-      "severity": "medium",
-      "dimension": "indexability",
-      "category": "Sitemap",
-      "scope": "sitemap",
-      "evidence": "No se descubrió ningún sitemap con URLs (ni en robots ni en las rutas habituales).",
-      "recommendation": "Publicar y declarar un sitemap.xml con las URLs indexables.",
-      "evidenceKind": "code",
-      "source": "auto",
-      "evidenceCode": "sitemaps probados: robots + /sitemap.xml + /sitemap_index.xml + /wp-sitemap.xml"
+      "evidenceTable": [
+        {
+          "words": 55,
+          "type": "section",
+          "url": "https://gluckbags.com/categoria/clutch"
+        },
+        {
+          "words": 59,
+          "type": "section",
+          "url": "https://gluckbags.com/categoria/tote"
+        },
+        {
+          "words": 62,
+          "type": "section",
+          "url": "https://gluckbags.com/categoria/mini-bag"
+        },
+        {
+          "words": 101,
+          "type": "static",
+          "url": "https://gluckbags.com/contacto"
+        },
+        {
+          "words": 119,
+          "type": "article",
+          "url": "https://gluckbags.com/envios"
+        },
+        {
+          "words": 134,
+          "type": "article",
+          "url": "https://gluckbags.com/cambios-y-devoluciones"
+        },
+        {
+          "words": 148,
+          "type": "static",
+          "url": "https://gluckbags.com/privacidad"
+        },
+        {
+          "words": 168,
+          "type": "static",
+          "url": "https://gluckbags.com/terminos"
+        },
+        {
+          "words": 172,
+          "type": "article",
+          "url": "https://gluckbags.com/nosotras"
+        }
+      ]
     },
     {
       "title": "3 títulos demasiado cortos (<30 car.)",
@@ -153,44 +150,83 @@
       "source": "auto",
       "evidenceTable": [
         {
-          "len": 19,
-          "title": "Tote Cognac · GLÜCK",
-          "url": "https://gluckbags.com/producto/1"
+          "len": 16,
+          "title": "Nosotras · GLÜCK",
+          "url": "https://gluckbags.com/nosotras"
         },
         {
-          "len": 17,
-          "title": "Tote Gris · GLÜCK",
-          "url": "https://gluckbags.com/producto/2"
+          "len": 14,
+          "title": "Envíos · GLÜCK",
+          "url": "https://gluckbags.com/envios"
         },
         {
-          "len": 22,
-          "title": "Crossbody Rosa · GLÜCK",
-          "url": "https://gluckbags.com/producto/3"
+          "len": 16,
+          "title": "Contacto · GLÜCK",
+          "url": "https://gluckbags.com/contacto"
         }
       ]
     },
     {
-      "title": "3 meta descriptions fuera de rango (70–160 car.)",
+      "title": "1 meta descriptions fuera de rango (70–160 car.)",
       "severity": "low",
       "dimension": "titles-meta",
       "category": "Description",
-      "scope": "3 página(s)",
+      "scope": "1 página(s)",
       "evidence": "Descriptions muy cortas o muy largas (Google las trunca ~155–160 car.).",
       "recommendation": "Ajustar a 70–160 caracteres.",
       "evidenceKind": "table",
       "source": "auto",
       "evidenceTable": [
         {
-          "len": 54,
-          "url": "https://gluckbags.com/producto/1"
-        },
-        {
-          "len": 52,
-          "url": "https://gluckbags.com/producto/2"
-        },
-        {
           "len": 61,
-          "url": "https://gluckbags.com/producto/3"
+          "url": "https://gluckbags.com/terminos"
+        }
+      ]
+    },
+    {
+      "title": "3 páginas con saltos en la jerarquía de encabezados",
+      "severity": "low",
+      "dimension": "titles-meta",
+      "category": "Encabezados",
+      "scope": "3 página(s)",
+      "evidence": "Saltos como H2→H4 rompen el outline semántico.",
+      "recommendation": "No saltar niveles; bajar de a uno.",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "skips": "1->3",
+          "url": "https://gluckbags.com/categoria/tote"
+        },
+        {
+          "skips": "1->3",
+          "url": "https://gluckbags.com/categoria/mini-bag"
+        },
+        {
+          "skips": "1->3",
+          "url": "https://gluckbags.com/categoria/clutch"
+        }
+      ]
+    },
+    {
+      "title": "3 artículos sin schema Article/NewsArticle",
+      "severity": "low",
+      "dimension": "structured-data",
+      "category": "Datos estructurados",
+      "scope": "3 de 3 artículos muestreados",
+      "evidence": "Sin Article schema se pierden rich results (fecha, autor, imagen) en la SERP.",
+      "recommendation": "Agregar JSON-LD Article/NewsArticle con headline, datePublished, author, image.",
+      "evidenceKind": "table",
+      "source": "auto",
+      "evidenceTable": [
+        {
+          "url": "https://gluckbags.com/nosotras"
+        },
+        {
+          "url": "https://gluckbags.com/envios"
+        },
+        {
+          "url": "https://gluckbags.com/cambios-y-devoluciones"
         }
       ]
     },
@@ -208,8 +244,8 @@
     }
   ],
   "stats": {
-    "pages": 8,
-    "indexable": 6,
-    "sitemapUrls": 0
+    "pages": 15,
+    "indexable": 14,
+    "sitemapUrls": 15
   }
 }

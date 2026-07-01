@@ -502,3 +502,155 @@ def test_detail_shows_related_products(
     # The sibling product is linked from the related strip.
     assert "Producto B" in html
     assert f"/producto/{_product_id_by_title(app, 'Producto B')}" in html
+
+
+# --- URL normalization (trailing slash / duplicate slash) ---------------------
+
+
+def test_trailing_slash_301s_to_clean_url(client: FlaskClient) -> None:
+    """A stray trailing slash 301s to the slash-less canonical URL instead of a
+    hard 404, so a mistyped/linked URL with an extra slash still resolves."""
+    resp = client.get("/categoria/tote/", follow_redirects=False)
+    assert resp.status_code == 301
+    assert resp.headers["Location"].endswith("/categoria/tote")
+    # And it actually resolves once followed.
+    assert client.get("/categoria/tote/", follow_redirects=True).status_code == 200
+
+
+def test_trailing_slash_redirect_preserves_query(client: FlaskClient) -> None:
+    """The normalization keeps the query string on the 301."""
+    resp = client.get("/nosotras/?ref=ig", follow_redirects=False)
+    assert resp.status_code == 301
+    assert resp.headers["Location"].endswith("/nosotras?ref=ig")
+
+
+def test_admin_dashboard_does_not_loop(client: FlaskClient) -> None:
+    """The /admin/ dashboard route is defined WITH a trailing slash; the normalizer
+    must not strip it (that would fight Flask's own redirect and loop). It should
+    reach the auth redirect, not bounce between /admin and /admin/."""
+    resp = client.get("/admin/", follow_redirects=False)
+    assert resp.status_code in (302, 303)
+    assert "/admin/login" in resp.headers["Location"]
+
+
+# --- Trust pages have no unfinished placeholder copy --------------------------
+
+
+def test_trust_pages_have_no_placeholder_copy(client: FlaskClient) -> None:
+    """Contact / shipping / returns pages must not ship '(a completar)' or other
+    half-finished template text — it reads as low-quality and hurts E-E-A-T."""
+    for path in ("/contacto", "/envios", "/cambios-y-devoluciones", "/nosotras"):
+        html = client.get(path).get_data(as_text=True)
+        assert client.get(path).status_code == 200
+        low = html.lower()
+        assert "(a completar)" not in low, path
+        assert "a completar" not in low, path
+
+
+# --- Home category grid: stocked categories link even with off-casing -----------
+
+
+def test_home_links_stocked_category_despite_casing(
+    auth_client: FlaskClient, client: FlaskClient
+) -> None:
+    """Admin category input is free-text, so a product may carry 'tote' while the
+    curated home card is 'Tote'. The card must still resolve to a real link (matched
+    by slug), not a non-clickable 'Próximamente' placeholder."""
+    # No products seeded in tests -> every curated category starts as "Próximamente".
+    assert "Próximamente" in client.get("/").get_data(as_text=True)
+    _create_product(auth_client, title="Tote Casing", category="tote")
+    html = client.get("/").get_data(as_text=True)
+    # The Tote card is now a real <a> to its category page (only the cat-grid emits this).
+    assert 'href="/categoria/tote"' in html
+
+
+# --- Internal linking / breadcrumbs / structured data (SEO fixes) --------------
+
+
+def _jsonld_objs(html: str) -> list:
+    """Flatten every JSON-LD object on the page (a block may be a dict or a list)."""
+    import json
+
+    out: list = []
+    for block in re.findall(r'<script type="application/ld\+json">(.*?)</script>', html, re.S):
+        data = json.loads(block)
+        out.extend(data if isinstance(data, list) else [data])
+    return out
+
+
+def test_category_page_has_breadcrumb_chips_intro_and_jsonld(
+    auth_client: FlaskClient, client: FlaskClient
+) -> None:
+    """A category page ships a visible breadcrumb, inter-category nav chips, unique
+    intro copy, and a matching BreadcrumbList JSON-LD."""
+    _create_product(auth_client, title="Tote A", category="Tote")
+    _create_product(auth_client, title="Mini A", category="Mini Bag")
+    html = client.get("/categoria/tote").get_data(as_text=True)
+
+    assert 'aria-label="Migas de pan"' in html  # visible breadcrumb nav
+    assert '<span aria-current="page">Tote</span>' in html
+    assert 'class="cat-chips"' in html  # inter-category nav
+    assert 'href="/categoria/mini-bag"' in html  # links a sibling category
+    assert 'class="section-intro"' in html  # unique intro copy (anti thin-content)
+
+    bc = next(o for o in _jsonld_objs(html) if o.get("@type") == "BreadcrumbList")
+    assert [it["name"] for it in bc["itemListElement"]] == ["Inicio", "Tote"]
+
+
+def test_product_breadcrumb_links_category_and_matches_jsonld(
+    auth_client: FlaskClient, client: FlaskClient, app: Flask
+) -> None:
+    """The product page exposes a crawlable product→category link via a visible
+    breadcrumb, and that trail matches the BreadcrumbList JSON-LD exactly."""
+    _create_product(auth_client, title="Tote Linkeado", category="Tote")
+    pid = _product_id_by_title(app, "Tote Linkeado")
+    html = client.get(f"/producto/{pid}").get_data(as_text=True)
+
+    assert 'class="breadcrumb"' in html
+    assert 'href="/categoria/tote"' in html  # crawlable link up to the parent category
+    assert '<span aria-current="page">Tote Linkeado</span>' in html
+
+    bc = next(o for o in _jsonld_objs(html) if o.get("@type") == "BreadcrumbList")
+    assert [it["name"] for it in bc["itemListElement"]] == ["Inicio", "Tote", "Tote Linkeado"]
+
+
+def test_home_empty_category_is_a_non_link_placeholder(client: FlaskClient) -> None:
+    """With no stock, a curated category renders as a non-clickable 'Próximamente'
+    card — never a crawlable link to its empty (noindex) page."""
+    html = client.get("/").get_data(as_text=True)
+    assert "Próximamente" in html
+    assert 'class="cat-soon"' in html
+    assert 'href="/categoria/bucket-bag"' not in html
+
+
+def test_sitemap_declares_changefreq_and_priority(
+    auth_client: FlaskClient, client: FlaskClient
+) -> None:
+    """The sitemap carries changefreq + priority hints (home=1.0, product=0.7)."""
+    _create_product(auth_client, title="Prio Uno", category="Tote")
+    body = client.get("/sitemap.xml").get_data(as_text=True)
+    assert "<changefreq>" in body
+    assert "<priority>1.0</priority>" in body  # home
+    assert "<priority>0.7</priority>" in body  # product
+
+
+def test_product_and_category_emit_avif_source_when_available(
+    auth_client: FlaskClient, client: FlaskClient, app: Flask
+) -> None:
+    """When the Pillow build can encode AVIF, an upload generates AVIF variants and
+    the product + category templates emit a <source type='image/avif'>. Skipped when
+    no AVIF encoder (best-effort)."""
+    import io
+
+    import pytest
+    from PIL import Image
+
+    try:
+        Image.new("RGB", (4, 4)).save(io.BytesIO(), "AVIF")
+    except Exception:  # noqa: BLE001
+        pytest.skip("Pillow build has no AVIF encoder")
+
+    _create_product(auth_client, title="Avif Tote", category="Tote")
+    pid = _product_id_by_title(app, "Avif Tote")
+    assert 'type="image/avif"' in client.get(f"/producto/{pid}").get_data(as_text=True)
+    assert 'type="image/avif"' in client.get("/categoria/tote").get_data(as_text=True)

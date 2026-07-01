@@ -100,6 +100,29 @@ def test_home_inlines_css_and_rewrites_relative_urls(client: FlaskClient) -> Non
     assert "/static/fonts/" in html
 
 
+def test_inline_css_is_minified_but_intact(client: FlaskClient) -> None:
+    """The inlined critical CSS (shipped on every HTML response) is minified — no
+    /* */ comments, smaller than the source file — yet still functional: key
+    selectors and the rewritten font url survive (a broken minify would 404 fonts
+    or drop styles)."""
+    import re
+    from pathlib import Path
+
+    html = client.get("/").get_data(as_text=True)
+    style = re.search(r"<style>(.*?)</style>", html, re.S).group(1)
+
+    # Comments stripped, and the inlined copy is smaller than the raw stylesheet.
+    assert "/*" not in style and "*/" not in style
+    raw = (Path(__file__).resolve().parent.parent / "app" / "static" / "css" / "styles.css").read_text()
+    assert len(style) < len(raw)
+
+    # Still intact: design tokens, a hero selector, the new SEO components, and the
+    # rewritten (quoted) font url must all survive the minify.
+    for token in (":root", ".hero-title", ".breadcrumb", ".cat-chip", "@font-face",
+                  "@media", '/static/fonts/jost.woff2'):
+        assert token in style, f"minify dropped {token!r}"
+
+
 # --- 4) long-lived Cache-Control on static assets -----------------------------
 
 

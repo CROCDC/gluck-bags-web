@@ -1,0 +1,128 @@
+{
+  "key": "gluckbags-com-producto-1",
+  "pagetype": "product",
+  "requestedUrl": "https://gluckbags.com/producto/1",
+  "captcha_wall": false,
+  "httpStatus": 200,
+  "xRobotsTag": null,
+  "contentType": "text/html; charset=utf-8",
+  "server": "cloudflare",
+  "redirectChain": [],
+  "finalUrl": "https://gluckbags.com/producto/1",
+  "title": "Tote Cognac · Tote de cuero vegano | GLÜCK",
+  "titleLen": 42,
+  "metaDescription": "Tote Cognac, tote de cuero vegano hecho a mano por GLÜCK. Diseño minimalista, sin crueldad animal. Consultá disponibilidad por Instagram.",
+  "metaRobots": null,
+  "metaRobotsGoogle": null,
+  "canonical": "https://gluckbags.com/producto/1",
+  "canonicalSelf": true,
+  "htmlLang": "es",
+  "hreflang": [],
+  "headings": [
+    {
+      "level": 1,
+      "text": "Tote Cognac",
+      "empty": false
+    },
+    {
+      "level": 2,
+      "text": "Otros bolsos",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Tote Gris",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Crossbody Rosa",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Bandolera Rosa",
+      "empty": false
+    },
+    {
+      "level": 3,
+      "text": "Clutch Sobre",
+      "empty": false
+    }
+  ],
+  "h1Count": 1,
+  "h1Texts": [
+    "Tote Cognac"
+  ],
+  "headingSkips": [],
+  "emptyHeadings": 0,
+  "wordCount": 77,
+  "links": {
+    "total": 28,
+    "internal": 23,
+    "external": 5,
+    "nofollow": 0,
+    "emptyAnchor": 0,
+    "genericAnchor": 0,
+    "badAnchors": []
+  },
+  "images": {
+    "total": 5,
+    "missingAlt": 0,
+    "emptyAlt": 0,
+    "lazy": 4,
+    "withDims": 5,
+    "formats": {
+      "png": 0,
+      "jpg": 1,
+      "webp": 4,
+      "avif": 0,
+      "gif": 0,
+      "svg": 0,
+      "other": 0
+    },
+    "missingAltSrc": []
+  },
+  "jsonLdTypes": [
+    "Product",
+    "BreadcrumbList"
+  ],
+  "jsonLdCount": 1,
+  "jsonLdErrors": [],
+  "microdataTypes": [],
+  "og": {
+    "og:type": "product",
+    "og:url": "https://gluckbags.com/producto/1",
+    "og:title": "Tote Cognac · GLÜCK",
+    "og:description": "Tote Cognac. GLÜCK, cuero vegano hecho a mano.",
+    "og:image": "https://gluckbags.com/media/products/1/f884217be34c4337bb7f9c0bf5d0bcdd/787.jpg",
+    "og:image:alt": "Tote Cognac — GLÜCK",
+    "og:site_name": "GLÜCK",
+    "og:locale": "es_AR"
+  },
+  "twitter": {
+    "twitter:card": "summary_large_image",
+    "twitter:title": "Tote Cognac · GLÜCK",
+    "twitter:description": "Tote Cognac · Tote — GLÜCK, cuero vegano hecho a mano.",
+    "twitter:image": "https://gluckbags.com/media/products/1/f884217be34c4337bb7f9c0bf5d0bcdd/787.jpg"
+  },
+  "ogImage": "https://gluckbags.com/media/products/1/f884217be34c4337bb7f9c0bf5d0bcdd/787.jpg",
+  "twitterCard": "summary_large_image",
+  "viewport": "width=device-width, initial-scale=1.0",
+  "charset": "UTF-8",
+  "favicon": true,
+  "appleTouchIcon": true,
+  "manifest": false,
+  "relNext": null,
+  "relPrev": null,
+  "ampHtml": null,
+  "mobile": {
+    "wordCount": 72,
+    "title": "Tote Cognac · Tote de cuero vegano | GLÜCK",
+    "h1Count": 1,
+    "linkCount": 28,
+    "imgCount": 5
+  },
+  "noindex": false,
+  "indexable": true
+}

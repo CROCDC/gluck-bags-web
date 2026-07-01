@@ -34,6 +34,13 @@ try:
 except Exception:  # noqa: BLE001 — degrade gracefully if the codec is unavailable
     pass
 
+# Register an AVIF encoder when Pillow lacks one natively (older builds). No-op when
+# Pillow already supports AVIF or the plugin isn't installed — AVIF stays best-effort.
+try:
+    import pillow_avif  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 # Responsive widths generated for each image. The grid uses 400/600; the product
 # detail page can use up to 1000. Originals are capped at MAX_IMAGE_DIM.
 IMAGE_WIDTHS = [400, 600, 1000]
@@ -114,6 +121,10 @@ def process_image(source: FileStorage | str, product_id: int, media_id: int) -> 
         img.thumbnail((MAX_IMAGE_DIM, MAX_IMAGE_DIM), Image.LANCZOS)
 
     widths = sorted({w for w in IMAGE_WIDTHS if w < img.width} | {img.width})
+    # AVIF is best-effort: ~30-50% smaller than WebP, but needs an encoder (native
+    # in newer Pillow, or pillow-avif-plugin). If the first save fails (no encoder),
+    # we stop trying — WebP/JPEG already cover every browser, so nothing breaks.
+    avif_ok = True
     for width in widths:
         if width == img.width:
             resized = img
@@ -122,6 +133,11 @@ def process_image(source: FileStorage | str, product_id: int, media_id: int) -> 
             resized = img.resize((width, height), Image.LANCZOS)
         resized.save(os.path.join(abs_dir, f"{width}.webp"), "WEBP", quality=80, method=6)
         resized.save(os.path.join(abs_dir, f"{width}.jpg"), "JPEG", quality=82, optimize=True)
+        if avif_ok:
+            try:
+                resized.save(os.path.join(abs_dir, f"{width}.avif"), "AVIF", quality=60)
+            except Exception:  # noqa: BLE001 — no AVIF encoder available; skip silently
+                avif_ok = False
 
     # 1200x630 social-share crop (centered cover-fit) for og:image / twitter:image.
     ImageOps.fit(img, OG_SIZE, Image.LANCZOS).save(

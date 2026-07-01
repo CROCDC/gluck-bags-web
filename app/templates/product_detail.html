@@ -1,5 +1,5 @@
 {% extends "base_public.html" %}
-{% from "macros.html" import product_card %}
+{% from "macros.html" import product_card, breadcrumb, category_nav %}
 {% set cover = product.cover %}
 
 {# No dark hero behind the fixed header here, so render it solid from the top. #}
@@ -44,7 +44,12 @@
 
 {% block body %}
     <main class="pdp" id="top">
-        <a href="{{ url_for('index') }}#shop" class="pdp-back">← Volver a los bolsos</a>
+        {# Visible breadcrumb with a real <a> up to the parent category — matches the
+           BreadcrumbList JSON-LD and gives the product a crawlable product→category link. #}
+        {% set crumbs = [("Inicio", url_for('index'))] %}
+        {% if product.category %}{% set crumbs = crumbs + [(product.category, url_for('category_page', slug=product.category|slugify))] %}{% endif %}
+        {% set crumbs = crumbs + [(product.title, None)] %}
+        {{ breadcrumb(crumbs) }}
 
         <div class="pdp-grid">
             <div class="pdp-gallery">
@@ -52,6 +57,7 @@
                 {% for m in product.media %}
                     {% if m.is_image and m.smallest_width %}
                     <picture class="pdp-media">
+                        {% if m.has_avif %}<source type="image/avif" srcset="{{ m.image_srcset('avif') }}" sizes="(max-width: 980px) 100vw, 58vw">{% endif %}
                         <source type="image/webp" srcset="{{ m.image_srcset('webp') }}" sizes="(max-width: 980px) 100vw, 58vw">
                         <img src="{{ m.image_url(m.smallest_width) }}" srcset="{{ m.image_srcset('jpg') }}"
                              sizes="(max-width: 980px) 100vw, 58vw"
@@ -76,9 +82,11 @@
                 {% if product.description %}
                 <div class="pdp-desc">{{ product.description }}</div>
                 {% endif %}
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark pdp-cta">Consultar por Instagram</a>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark pdp-cta" data-umami-event="comprar-instagram" data-umami-event-ubicacion="producto" data-umami-event-producto="{{ product.title }}">Consultar por Instagram</a>
             </aside>
         </div>
+
+        {{ category_nav(nav_categories, current=product.category) }}
 
         {% if related %}
         <section class="section shop pdp-related">

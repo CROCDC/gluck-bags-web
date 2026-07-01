@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -11,6 +12,7 @@ from markupsafe import Markup
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
+from werkzeug.exceptions import HTTPException
 
 load_dotenv()
 
@@ -53,6 +55,16 @@ def _initialize_schema(data_dir: str, seed_fn: "object") -> None:
         except OperationalError:
             db.session.rollback()  # another worker won the race; tables already exist
         seed_fn()
+        # Self-heal media that predates the og.jpg/AVIF variants (e.g. products
+        # seeded on an older build): regenerate them in place so a deploy needs no
+        # manual reprocess on the server. Idempotent + behind this same lock; a
+        # backfill hiccup must never block boot.
+        try:
+            from app.maintenance import backfill_media_variants
+
+            backfill_media_variants(os.path.join(data_dir, "media"))
+        except Exception:  # noqa: BLE001
+            pass
     finally:
         if lock_fh is not None:
             try:
@@ -119,6 +131,39 @@ def _register_canonical_host(app: Flask) -> None:
             "Strict-Transport-Security", "max-age=31536000; includeSubDomains"
         )
         return response
+
+
+def _register_url_normalization(app: Flask) -> None:
+    """Collapse duplicate slashes and drop a stray trailing slash with a 301, so
+    URL variants don't fork into crawlable duplicates or hard 404s.
+
+    `https://host//` -> `/` and `/categoria/tote/` -> `/categoria/tote`. The trailing
+    slash is stripped ONLY when the slash-less path actually has a route AND the
+    trailing-slash path does not — otherwise we'd fight Flask's own slash redirect
+    (e.g. the admin dashboard lives at `/admin/`) and loop. GET/HEAD only."""
+
+    def _has_route(path: str) -> bool:
+        adapter = app.url_map.bind(request.host)
+        try:
+            adapter.match(path, method="GET")
+        except HTTPException as exc:  # NotFound -> no route; MethodNotAllowed -> route exists
+            return getattr(exc, "code", None) == 405
+        return True
+
+    @app.before_request
+    def _normalize_url() -> Any:
+        if request.method not in ("GET", "HEAD"):
+            return None
+        path = request.path
+        target = re.sub(r"/{2,}", "/", path)  # collapse // -> /
+        if len(target) > 1 and target.endswith("/"):
+            stripped = target.rstrip("/")
+            if _has_route(stripped) and not _has_route(target):
+                target = stripped
+        if target == path:
+            return None
+        qs = request.query_string.decode()
+        return redirect(target + (f"?{qs}" if qs else ""), code=301)
 
 
 def create_app() -> Flask:
@@ -207,10 +252,18 @@ def create_app() -> Flask:
         def inline_css(filename: str) -> Markup:
             """Inline a static CSS file as a <style> tag (no render-blocking request).
             Relative url("../…") refs are rewritten to absolute /static/ so they
-            still resolve once the CSS lives in the HTML document."""
+            still resolve once the CSS lives in the HTML document.
+
+            Minified for the wire (this <style> ships in every HTML response and is
+            parsed before first paint): /* */ comments are dropped and newline +
+            indentation runs collapse to a single space. Intra-line spacing and
+            combinators are left untouched, so it's safe — the repo file stays
+            readable; only the inlined copy is compacted."""
             with open(os.path.join(app.static_folder, filename), encoding="utf-8") as fh:
                 css = fh.read()
             css = css.replace('url("../', 'url("/static/').replace("url('../", "url('/static/")
+            css = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+            css = re.sub(r"\s*\n\s*", " ", css).strip()
             return Markup(f"<style>{css}</style>")
 
         return {"inline_css": inline_css}
@@ -224,6 +277,8 @@ def create_app() -> Flask:
             "instagram_url": "https://www.instagram.com/gluck_bags/",
             # Public/canonical origin for absolute OG, Twitter and canonical URLs.
             "site_url": app.config["SITE_URL"],
+            # Bare host (no scheme), for the Umami data-domains scope.
+            "site_host": urlsplit(app.config["SITE_URL"]).netloc,
         }
 
     with app.app_context():
@@ -239,6 +294,9 @@ def create_app() -> Flask:
 
         register_routes(app)
         register_admin(app)
+
+    # After routes exist, so the trailing-slash normalizer can probe the url_map.
+    _register_url_normalization(app)
 
     @app.errorhandler(404)
     def _not_found(error: object) -> tuple[str, int]:

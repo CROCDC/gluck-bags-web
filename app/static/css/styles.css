@@ -1087,3 +1087,90 @@ video.pdp-media { width: 100%; height: auto; display: block; }
     .pdp-grid { grid-template-columns: 1fr; }
     .pdp-info { position: static; }
 }
+
+/* ============================================================
+   A11y utility · breadcrumbs · category nav (SEO / internal linking)
+   ============================================================ */
+
+/* Visually hidden but kept in the a11y tree — used for headings that preserve the
+   H1->H2->H3 outline without adding visual noise. */
+.sr-only {
+    position: absolute;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+}
+
+.breadcrumb {
+    max-width: var(--maxw);
+    margin: 0 auto clamp(1rem, 3vw, 1.8rem);
+    padding: 0 var(--pad);
+}
+.breadcrumb ol {
+    list-style: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0; padding: 0;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+}
+.breadcrumb li { display: inline-flex; align-items: center; gap: 0.5rem; }
+.breadcrumb li:not(:first-child)::before { content: "›"; opacity: 0.6; }
+.breadcrumb a { color: var(--ink-faint); text-decoration: none; transition: color 0.3s var(--ease); }
+.breadcrumb a:hover { color: var(--cognac); }
+.breadcrumb [aria-current="page"] { color: var(--ink); }
+
+.section-intro {
+    margin-top: 1rem;
+    max-width: 54ch;
+    color: var(--ink-soft);
+    line-height: 1.7;
+}
+
+.cat-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    max-width: var(--maxw);
+    margin: 0 auto clamp(1.6rem, 4vw, 2.6rem);
+    padding: 0 var(--pad);
+}
+.cat-chip {
+    display: inline-block;
+    padding: 0.5rem 1.1rem;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    font-size: 0.74rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    text-decoration: none;
+    transition: all 0.3s var(--ease);
+}
+.cat-chip:hover { border-color: var(--cognac); color: var(--cognac); }
+.cat-chip.is-current { background: var(--ink); border-color: var(--ink); color: var(--cream); }
+
+/* "Próximamente" category card on the home grid: looks like the others but is not
+   a link (the category has no products yet and is noindex). */
+.cat-card.is-soon { cursor: default; }
+.cat-card.is-soon .cat-media { filter: grayscale(0.25); }
+.cat-soon {
+    position: absolute;
+    top: 1rem; right: 1rem;
+    z-index: 2;
+    padding: 0.35rem 0.8rem;
+    background: rgba(26, 23, 20, 0.82);
+    color: var(--cream);
+    font-size: 0.62rem;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    border-radius: 999px;
+}
