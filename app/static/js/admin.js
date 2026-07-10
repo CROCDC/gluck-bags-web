@@ -246,36 +246,43 @@
       window.alert(message);
     };
 
-    const xhr = new XMLHttpRequest();
-    xhr.open("POST", form.action);
-    // Long enough for a video transcode, short enough to surface a dead connection.
-    xhr.timeout = 10 * 60 * 1000;
-    xhr.upload.addEventListener("progress", (ev) => {
-      if (ev.lengthComputable && bar) bar.style.width = Math.round((ev.loaded / ev.total) * 100) + "%";
-    });
-    xhr.upload.addEventListener("load", () => {
-      if (bar) bar.style.width = "100%";
-      if (text) text.textContent = "Optimizando fotos y videos…";
-    });
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 400) {
-        uploading = false; // about to navigate; don't trigger the beforeunload guard
-        window.location.href = xhr.responseURL || form.dataset.listUrl || "/admin/";
-      } else if (xhr.status === 400) {
-        uploading = false;
-        document.open();
-        document.write(xhr.responseText);
-        document.close();
-      } else if (xhr.status === 413) {
-        fail("El archivo es demasiado grande (máximo 200 MB). Probá con un video más corto o de menor calidad.");
-      } else {
-        fail("Hubo un error al guardar. Probá de nuevo.");
-      }
-    });
-    xhr.addEventListener("error", () => fail("Error de conexión. Revisá tu internet y probá de nuevo."));
-    xhr.addEventListener("timeout", () =>
-      fail("La subida tardó demasiado. Probá con un archivo más liviano o mejor conexión.")
-    );
-    xhr.send(new FormData(form));
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", form.action);
+      // Long enough for a video transcode, short enough to surface a dead connection.
+      xhr.timeout = 10 * 60 * 1000;
+      xhr.upload.addEventListener("progress", (ev) => {
+        if (ev.lengthComputable && bar) bar.style.width = Math.round((ev.loaded / ev.total) * 100) + "%";
+      });
+      xhr.upload.addEventListener("load", () => {
+        if (bar) bar.style.width = "100%";
+        if (text) text.textContent = "Optimizando fotos y videos…";
+      });
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 400) {
+          uploading = false; // about to navigate; don't trigger the beforeunload guard
+          window.location.href = xhr.responseURL || form.dataset.listUrl || "/admin/";
+        } else if (xhr.status === 400) {
+          uploading = false;
+          document.open();
+          document.write(xhr.responseText);
+          document.close();
+        } else if (xhr.status === 413) {
+          fail("El archivo es demasiado grande (máximo 200 MB). Probá con un video más corto o de menor calidad.");
+        } else {
+          fail("Hubo un error al guardar. Probá de nuevo.");
+        }
+      });
+      xhr.addEventListener("error", () => fail("Error de conexión. Revisá tu internet y probá de nuevo."));
+      xhr.addEventListener("abort", () => fail("La subida se canceló. Probá de nuevo."));
+      xhr.addEventListener("timeout", () =>
+        fail("La subida tardó demasiado. Probá con un archivo más liviano o mejor conexión.")
+      );
+      xhr.send(new FormData(form));
+    } catch (err) {
+      // Never leave the overlay spinning if the request can't even start (e.g. an
+      // older mobile browser choking on FormData/DataTransfer). Surface it instead.
+      fail("No pudimos iniciar la subida. Probá de nuevo o actualizá el navegador.");
+    }
   }
 })();

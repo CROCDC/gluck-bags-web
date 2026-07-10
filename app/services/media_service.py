@@ -131,11 +131,17 @@ def process_image(source: FileStorage | str, product_id: int, media_id: int) -> 
         else:
             height = round(img.height * width / img.width)
             resized = img.resize((width, height), Image.LANCZOS)
-        resized.save(os.path.join(abs_dir, f"{width}.webp"), "WEBP", quality=80, method=6)
+        # method=4 (not 6): near-identical file size, ~2x faster to encode. With
+        # several photos processed synchronously per upload, method=6 was the
+        # dominant cost and made the admin's upload spinner drag on for minutes.
+        resized.save(os.path.join(abs_dir, f"{width}.webp"), "WEBP", quality=80, method=4)
         resized.save(os.path.join(abs_dir, f"{width}.jpg"), "JPEG", quality=82, optimize=True)
         if avif_ok:
             try:
-                resized.save(os.path.join(abs_dir, f"{width}.avif"), "AVIF", quality=60)
+                # Pin speed explicitly: the encoder's default is build-dependent, and
+                # a slow default (speed 0-2) turns a single image into 20-45s of work,
+                # which is what left the admin uploader stuck on an endless spinner.
+                resized.save(os.path.join(abs_dir, f"{width}.avif"), "AVIF", quality=60, speed=6)
             except Exception:  # noqa: BLE001 — no AVIF encoder available; skip silently
                 avif_ok = False
 
@@ -156,12 +162,25 @@ def process_image(source: FileStorage | str, product_id: int, media_id: int) -> 
 # --- Videos ------------------------------------------------------------------
 
 
+# Hard ceiling on a single ffmpeg invocation. Without it a malformed/stalled clip
+# makes ffmpeg block forever, holding the worker thread and the HTTP request open
+# until the browser's own 10-min timeout — i.e. an endless upload spinner. Stays
+# well under gunicorn's 300s request timeout so we surface a clean error first.
+FFMPEG_TIMEOUT_SECONDS = 240
+
+
 def _run_ffmpeg(args: list[str]) -> None:
-    proc = subprocess.run(
-        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *args],
-        capture_output=True,
-        text=True,
-    )
+    try:
+        proc = subprocess.run(
+            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *args],
+            capture_output=True,
+            text=True,
+            timeout=FFMPEG_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise MediaError(
+            "El video tardó demasiado en procesarse. Probá con un clip más corto o liviano."
+        ) from exc
     if proc.returncode != 0:
         raise MediaError(f"No pudimos procesar el video: {proc.stderr.strip()[:300]}")
 
