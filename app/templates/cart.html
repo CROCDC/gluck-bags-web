@@ -1,0 +1,63 @@
+{% extends "base_public.html" %}
+
+{# Solid header (no dark hero behind it) so the fixed header text stays legible. #}
+{% block body_class %}solid-header{% endblock %}
+
+{% block title %}Tu carrito · {{ brand }}{% endblock %}
+{% block description %}Revisá los bolsos que agregaste a tu carrito en {{ brand }} y finalizá tu compra.{% endblock %}
+
+{# A cart is private and transient — keep it out of the index. #}
+{% block canonical %}<meta name="robots" content="noindex, follow">{% endblock %}
+
+{% block body %}
+<main class="cart-page" id="top">
+    <div class="section-head">
+        <p class="eyebrow">Tu selección</p>
+        <h1 class="section-title">Carrito</h1>
+    </div>
+
+    {% if cart['items'] %}
+    <div class="cart-page-grid">
+        <ul class="cart-lines" data-cart-lines>
+            {% for item in cart['items'] %}
+            <li class="cart-line" data-cart-line="{{ item.id }}">
+                <a class="cart-line-media" href="{{ item.url }}">
+                    {% if item.image %}<img src="{{ item.image }}" alt="{{ item.title }}" loading="lazy" width="88" height="110">{% endif %}
+                </a>
+                <div class="cart-line-info">
+                    <a class="cart-line-title" href="{{ item.url }}">{{ item.title }}</a>
+                    {% if item.category %}<span class="cart-line-cat">{{ item.category }}</span>{% endif %}
+                    <span class="cart-line-price">{{ item.price_formatted }}</span>
+                </div>
+                <div class="cart-line-actions">
+                    <div class="qty-stepper" data-qty-stepper>
+                        <button class="qty-btn" data-qty-dec aria-label="Quitar uno">−</button>
+                        <span class="qty-value" data-qty-value>{{ item.qty }}</span>
+                        <button class="qty-btn" data-qty-inc aria-label="Agregar uno">+</button>
+                    </div>
+                    <span class="cart-line-total" data-line-total>{{ item.line_total_formatted }}</span>
+                    <button class="cart-line-remove" data-cart-remove aria-label="Quitar {{ item.title }}">Quitar</button>
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+
+        <aside class="cart-summary">
+            <div class="cart-subtotal">
+                <span>Subtotal</span>
+                <strong data-cart-subtotal>{{ cart['subtotal_formatted'] }}</strong>
+            </div>
+            <p class="cart-note">Envío e impuestos se calculan en el checkout.</p>
+            <button class="btn btn-dark cart-checkout" data-cart-checkout>Finalizar compra</button>
+            <p class="cart-feedback" data-cart-feedback hidden></p>
+            <a class="cart-keep" href="{{ url_for('index') }}#shop">← Seguir mirando</a>
+        </aside>
+    </div>
+    {% else %}
+    <div class="cart-empty" data-cart-empty>
+        <p>Tu carrito está vacío.</p>
+        <a class="btn btn-dark" href="{{ url_for('index') }}#shop">Ver bolsos</a>
+    </div>
+    {% endif %}
+</main>
+{% endblock %}

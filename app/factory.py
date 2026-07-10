@@ -270,6 +270,14 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_globals() -> dict[str, Any]:
+        # Cart item count for the header badge — read straight from the session
+        # (no DB), and never let a cart hiccup break page rendering.
+        try:
+            from app.services import cart_service
+
+            cart_count = cart_service.count()
+        except Exception:  # noqa: BLE001 — the badge is cosmetic; degrade to 0
+            cart_count = 0
         return {
             "current_year": datetime.now().year,
             "brand": "GLÜCK",
@@ -279,6 +287,7 @@ def create_app() -> Flask:
             "site_url": app.config["SITE_URL"],
             # Bare host (no scheme), for the Umami data-domains scope.
             "site_host": urlsplit(app.config["SITE_URL"]).netloc,
+            "cart_count": cart_count,
         }
 
     with app.app_context():
@@ -287,6 +296,7 @@ def create_app() -> Flask:
         # Importing these registers the Product/Media models with db.metadata
         # (admin/routes/seed all import app.models), so create_all sees them.
         from app.admin import register_admin
+        from app.cart import register_cart
         from app.routes import register_routes
         from app.seed import seed_initial_products
 
@@ -294,6 +304,7 @@ def create_app() -> Flask:
 
         register_routes(app)
         register_admin(app)
+        register_cart(app)
 
     # After routes exist, so the trailing-slash normalizer can probe the url_map.
     _register_url_normalization(app)

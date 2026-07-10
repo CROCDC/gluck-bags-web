@@ -79,6 +79,16 @@
 
             <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="header-cta" data-umami-event="comprar-instagram" data-umami-event-ubicacion="header">Comprar</a>
 
+            <button class="cart-toggle" id="cartToggle" aria-label="Abrir carrito"
+                    aria-haspopup="dialog" aria-expanded="false" aria-controls="cartDrawer">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+                     stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 8h12l-1 12H7L6 8Z"/>
+                    <path d="M9 8V6a3 3 0 0 1 6 0v2"/>
+                </svg>
+                <span class="cart-count" data-cart-count{% if not cart_count %} hidden{% endif %}>{{ cart_count }}</span>
+            </button>
+
             <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú" aria-expanded="false">
                 <span></span><span></span>
             </button>
@@ -95,6 +105,38 @@
     </div>
 
     {% block body %}{% endblock %}
+
+    <!-- ===================== CART DRAWER ===================== -->
+    <div class="cart-drawer" id="cartDrawer" aria-hidden="true">
+        <div class="cart-overlay" data-cart-close></div>
+        <aside class="cart-panel" role="dialog" aria-modal="true" aria-label="Tu carrito"
+               aria-describedby="cartPanelTitle">
+            <header class="cart-panel-head">
+                <p class="eyebrow">Tu selección</p>
+                <h2 class="cart-panel-title" id="cartPanelTitle">Carrito</h2>
+                <button class="cart-close" data-cart-close aria-label="Cerrar carrito">
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+                         stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
+                        <path d="M6 6l12 12M18 6 6 18"/>
+                    </svg>
+                </button>
+            </header>
+
+            <div class="cart-body" data-cart-body aria-live="polite">
+                <!-- filled by cart.js -->
+            </div>
+
+            <footer class="cart-panel-foot" data-cart-foot hidden>
+                <div class="cart-subtotal">
+                    <span>Subtotal</span>
+                    <strong data-cart-subtotal>$ 0</strong>
+                </div>
+                <p class="cart-note">Envío e impuestos se calculan en el checkout.</p>
+                <button class="btn btn-dark cart-checkout" data-cart-checkout>Finalizar compra</button>
+                <p class="cart-feedback" data-cart-feedback hidden></p>
+            </footer>
+        </aside>
+    </div>
 
     <!-- ===================== FOOTER ===================== -->
     <footer class="site-footer">
@@ -140,6 +182,7 @@
     </footer>
 
     <script defer src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/cart.js') }}"></script>
     {% block scripts_extra %}{% endblock %}
 </body>
 </html>

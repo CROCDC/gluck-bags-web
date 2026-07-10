@@ -82,7 +82,16 @@
                 {% if product.description %}
                 <div class="pdp-desc">{{ product.description }}</div>
                 {% endif %}
+                {% if product.price is not none %}
+                {# Purchasable: add to the cart. Instagram stays as a secondary way to ask. #}
+                <button class="btn btn-dark pdp-cta" data-add-to-cart="{{ product.id }}"
+                        data-umami-event="agregar-carrito" data-umami-event-producto="{{ product.title }}">
+                    Agregar al carrito
+                </button>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="pdp-cta-alt" data-umami-event="comprar-instagram" data-umami-event-ubicacion="producto" data-umami-event-producto="{{ product.title }}">o consultá por Instagram</a>
+                {% else %}
                 <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark pdp-cta" data-umami-event="comprar-instagram" data-umami-event-ubicacion="producto" data-umami-event-producto="{{ product.title }}">Consultar por Instagram</a>
+                {% endif %}
             </aside>
         </div>
 
