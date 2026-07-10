@@ -200,3 +200,34 @@ def test_4xx_raises_with_body() -> None:
         client.get_store()
     assert exc.value.status_code == 401
     assert "unauthorized" in exc.value.body
+
+
+# --- create_checkout ---------------------------------------------------------
+
+
+def test_create_checkout_posts_line_items_and_extracts_url() -> None:
+    resp = FakeResponse(
+        json_data={"id": 55, "checkout_url": "https://gluck.mitiendanube.com/checkout/55"},
+        text="x",
+    )
+    client, session = _client([resp])
+    out = client.create_checkout([{"variant_id": 10, "quantity": 2}])
+
+    call = session.calls[0]
+    assert call["method"] == "POST"
+    assert call["url"].endswith("/checkouts")
+    assert call["json"] == {"products": [{"variant_id": 10, "quantity": 2}]}
+    assert out["id"] == 55
+    assert out["checkout_url"].startswith("https://")
+
+
+def test_create_checkout_missing_url_returns_none() -> None:
+    client, _ = _client([FakeResponse(json_data={"id": 9})])  # no url field
+    out = client.create_checkout([{"variant_id": 1, "quantity": 1}])
+    assert out["checkout_url"] is None
+
+
+def test_create_checkout_empty_line_items_raises() -> None:
+    client, _ = _client([])
+    with pytest.raises(ValueError):
+        client.create_checkout([])

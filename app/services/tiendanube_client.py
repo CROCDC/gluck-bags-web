@@ -141,14 +141,15 @@ class TiendaNubeClient:
         path_or_url: str,
         *,
         params: dict[str, Any] | None = None,
+        json: Any = None,
     ) -> requests.Response:
         """Perform one API request, honouring rate limits.
 
         `path_or_url` may be a path relative to the store base (e.g. "products") or
         a full URL (used when following a `Link: rel="next"` header, which already
-        carries the query string). On HTTP 429 we wait for the reset window (from
-        `x-rate-limit-reset`, in ms) and retry up to `max_retries` times. Other 4xx/
-        5xx raise TiendaNubeError.
+        carries the query string). `json` is sent as the request body for writes. On
+        HTTP 429 we wait for the reset window (from `x-rate-limit-reset`, in ms) and
+        retry up to `max_retries` times. Other 4xx/5xx raise TiendaNubeError.
         """
         url = (
             path_or_url
@@ -163,6 +164,7 @@ class TiendaNubeClient:
                 url,
                 headers=self._headers(),
                 params=params,
+                json=json,
                 timeout=self.timeout,
             )
             if response.status_code == 429 and attempt <= self.max_retries:
@@ -252,6 +254,38 @@ class TiendaNubeClient:
     ) -> list[dict[str, Any]]:
         return list(self._paginate("categories", params={"per_page": per_page}))
 
+    # --- checkout handoff (write) --------------------------------------------
+
+    def create_checkout(
+        self, line_items: list[dict[str, Any]]
+    ) -> dict[str, Any]:
+        """Create a cart in Tienda Nube and return its checkout redirect URL.
+
+        `line_items` is ``[{"variant_id": int, "quantity": int}, ...]``. Returns
+        ``{"id", "checkout_url", "raw"}``; `checkout_url` is where the buyer is
+        redirected to finish the purchase (payment/shipping/AFIP all handled by TN).
+
+        NOTE: the endpoint path, request body shape and the response field carrying
+        the redirect URL must be confirmed against the LIVE API once credentials
+        exist (the docs are unreachable from this environment). The extraction is
+        deliberately tolerant to the common field names so a small tweak — or none —
+        is all that's needed. Our own mapping/guard logic is what the tests pin down.
+        """
+        if not line_items:
+            raise ValueError("line_items required")
+        body = {
+            "products": [
+                {"variant_id": int(li["variant_id"]), "quantity": int(li["quantity"])}
+                for li in line_items
+            ]
+        }
+        data = self._request("POST", "checkouts", json=body).json()
+        return {
+            "id": data.get("id") if isinstance(data, dict) else None,
+            "checkout_url": _extract_checkout_url(data),
+            "raw": data,
+        }
+
 
 # --- module helpers ----------------------------------------------------------
 
@@ -261,6 +295,23 @@ def _next_link(link_header: str) -> str | None:
     for match in _LINK_RE.finditer(link_header or ""):
         if match.group("rel") == "next":
             return match.group("url")
+    return None
+
+
+# Field names a Tienda Nube checkout/cart response might use for the redirect URL.
+# Tolerant on purpose — confirm the real one against the live API when the token
+# arrives, then this list can be trimmed to the exact key.
+_CHECKOUT_URL_KEYS = ("checkout_url", "url", "permalink", "link", "checkout")
+
+
+def _extract_checkout_url(data: Any) -> str | None:
+    """Best-effort pull of the buyer redirect URL from a checkout/cart payload."""
+    if not isinstance(data, dict):
+        return None
+    for key in _CHECKOUT_URL_KEYS:
+        value = data.get(key)
+        if isinstance(value, str) and value.startswith("http"):
+            return value
     return None
 
 

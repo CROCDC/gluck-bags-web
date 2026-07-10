@@ -94,20 +94,12 @@ def register_cart(app: Flask) -> None:
 
     @app.route("/checkout", methods=["POST"])
     def checkout() -> Response:
-        """Checkout handoff seam. Fase 3b will create the Tienda Nube cart here and
-        return {"ready": True, "redirect_url": <tn checkout>}."""
-        cart = cart_service.build()
-        if not cart["items"]:
-            return jsonify({"ready": False, "reason": "empty", "cart": cart}), 400
-        # Not wired yet: no Tienda Nube credentials/handoff in this phase.
-        return jsonify(
-            {
-                "ready": False,
-                "reason": "integration_pending",
-                "message": (
-                    "Estamos conectando el pago con Tienda Nube. Mientras tanto, "
-                    "escribinos y coordinamos tu compra."
-                ),
-                "cart": cart,
-            }
-        )
+        """Checkout handoff. Delegates to checkout_service, which creates the Tienda
+        Nube cart and returns a redirect_url when TN is configured, or a clear status
+        (empty / integration_pending / unmapped / …) otherwise. The frontend redirects
+        to `redirect_url` when `ready` is true."""
+        from app.services import checkout_service
+
+        result = checkout_service.start_checkout()
+        status = 400 if result.get("reason") == "empty" else 200
+        return jsonify(result), status

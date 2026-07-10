@@ -115,3 +115,32 @@ def test_checkout_reports_integration_pending(app: "Flask", client: "FlaskClient
     assert data["ready"] is False
     assert data["reason"] == "integration_pending"
     assert "message" in data
+
+
+def test_checkout_redirects_when_tn_ready(app: "Flask", client: "FlaskClient", monkeypatch) -> None:
+    """With TN configured and the product linked in the mirror, /checkout returns a
+    redirect_url the frontend can send the buyer to."""
+    from app.factory import db
+    from app.models import TiendaNubeProduct
+    from app.services import checkout_service
+
+    pid = _make_product(app, title="Tote", price=45000)
+    with app.app_context():
+        db.session.add(
+            TiendaNubeProduct(tn_id=pid).apply_payload(
+                {"id": pid, "name": {"es": "Tote"}, "variants": [{"id": 900, "price": "45000"}]}
+            )
+        )
+        db.session.commit()
+
+    class _Client:
+        def create_checkout(self, line_items):
+            assert line_items == [{"variant_id": 900, "quantity": 1}]
+            return {"id": 7, "checkout_url": "https://tn/checkout/7"}
+
+    monkeypatch.setattr(checkout_service, "build_client_from_env", lambda: _Client())
+
+    client.post("/api/cart/add", json={"product_id": pid, "qty": 1})
+    data = client.post("/checkout").get_json()
+    assert data["ready"] is True
+    assert data["redirect_url"] == "https://tn/checkout/7"

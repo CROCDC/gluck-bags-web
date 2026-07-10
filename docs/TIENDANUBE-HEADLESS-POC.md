@@ -196,3 +196,29 @@ Brandear checkout TN · analítica del embudo · reconciliación · demo y decis
    templates oficiales de TN. *Recomiendo Flask: reusa `ProductRepository` y el deploy actual.*
 4. **Alcance del POC:** ¿1 producto de punta a punta (compra real de prueba) o todo el catálogo
    sincronizado? *Recomiendo 1 flujo completo primero.*
+
+---
+
+## 9. Estado de implementación (branch `claude/tienda-nube-headless-poc-f6ssoo`)
+
+Decisiones tomadas por defecto: **Opción A + tienda TN oculta + BFF en el mismo Flask**.
+
+| Fase | Estado | Qué hay en el código |
+|------|--------|----------------------|
+| **0 — Habilitación** | ⏳ Manual (tuya) | Falta: cuenta Partner, crear app, OAuth → `TN_STORE_ID` + `TN_ACCESS_TOKEN` en `.env`. |
+| **1 — Spike lectura** | ✅ | `app/services/tiendanube_client.py` (auth, paginación, rate-limit, `create_checkout`), `scripts/tn_spike.py`, tests mockeados. |
+| **2 — Mirror catálogo** | ✅ | `app/models/tiendanube.py` (`TiendaNubeProduct`), `app/services/catalog_sync.py` (sync/upsert/prune), tests. Tabla nueva, sin migración. |
+| **3a — Carrito propio** | ✅ | `cart_service` + `app/cart/` (API + `/carrito`), drawer + botón header + `cart.js`, estilos. Sobre `Product` del admin. |
+| **3b — Handoff checkout** | ✅ *(inerte hasta token)* | `app/services/checkout_service.py`: carrito → resolver variante TN (mirror) → `create_checkout` → `redirect_url`. `POST /checkout` ya lo usa; sin token responde `integration_pending` (sitio actual intacto). |
+
+### Lo que falta para que el POC compre de punta a punta
+1. **Token (Fase 0).** Con `TN_STORE_ID`/`TN_ACCESS_TOKEN` seteados, `/checkout` deja de responder
+   `integration_pending` y arma el checkout real.
+2. **Confirmar contra la API viva** (docs bloqueadas en este entorno): endpoint y campos exactos de
+   `create_checkout` (hoy: `POST /checkouts`, body `{products:[{variant_id,quantity}]}`, URL de
+   redirect extraída de forma tolerante). Ajuste de 1 línea si difiere.
+3. **Unir catálogo y carrito.** Hoy el carrito opera sobre `Product` (admin) y el resolver espera
+   ids de producto de TN (`mirror_variant_resolver`). Falta el **swap del storefront para servir
+   desde `TiendaNubeProduct`** (detrás de flag) — recién ahí el carrito lleva ids de TN y el
+   resolver mapea directo. Alternativa mínima: un campo de vínculo `Product → tn_variant_id`.
+4. **Webhooks** `product/*` y `order/paid` + página `/gracias` (Fase 3 restante).
