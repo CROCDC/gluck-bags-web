@@ -257,29 +257,35 @@ class TiendaNubeClient:
     # --- checkout handoff (write) --------------------------------------------
 
     def create_checkout(
-        self, line_items: list[dict[str, Any]]
+        self,
+        line_items: list[dict[str, Any]],
+        *,
+        contact: dict[str, str] | None = None,
     ) -> dict[str, Any]:
-        """Create a cart in Tienda Nube and return its checkout redirect URL.
+        """Create a draft order in Tienda Nube and return its checkout redirect URL.
 
         `line_items` is ``[{"variant_id": int, "quantity": int}, ...]``. Returns
         ``{"id", "checkout_url", "raw"}``; `checkout_url` is where the buyer is
         redirected to finish the purchase (payment/shipping/AFIP all handled by TN).
 
-        NOTE: the endpoint path, request body shape and the response field carrying
-        the redirect URL must be confirmed against the LIVE API once credentials
-        exist (the docs are unreachable from this environment). The extraction is
-        deliberately tolerant to the common field names so a small tweak — or none —
-        is all that's needed. Our own mapping/guard logic is what the tests pin down.
+        Confirmed against the live API: the redirect checkout is a **draft order**
+        (``POST /draft_orders``, scope ``write_draft_orders``); its response carries
+        ``checkout_url``. Tienda Nube requires contact fields to open a draft order —
+        the real buyer completes/edits them at the hosted checkout — so we send a
+        generic placeholder (overridable via `contact`).
         """
         if not line_items:
             raise ValueError("line_items required")
-        body = {
+        body: dict[str, Any] = {
+            **_CHECKOUT_CONTACT,
+            **(contact or {}),
+            "payment_status": "pending",
             "products": [
                 {"variant_id": int(li["variant_id"]), "quantity": int(li["quantity"])}
                 for li in line_items
-            ]
+            ],
         }
-        data = self._request("POST", "checkouts", json=body).json()
+        data = self._request("POST", "draft_orders", json=body).json()
         return {
             "id": data.get("id") if isinstance(data, dict) else None,
             "checkout_url": _extract_checkout_url(data),
@@ -298,9 +304,17 @@ def _next_link(link_header: str) -> str | None:
     return None
 
 
-# Field names a Tienda Nube checkout/cart response might use for the redirect URL.
-# Tolerant on purpose — confirm the real one against the live API when the token
-# arrives, then this list can be trimmed to the exact key.
+# Placeholder buyer identity for the draft order. Tienda Nube requires contact
+# fields to open a draft order; the real buyer fills/confirms them at the hosted
+# checkout. Kept generic and clearly ours so a stray draft order is easy to spot.
+_CHECKOUT_CONTACT = {
+    "contact_name": "Cliente",
+    "contact_lastname": "Web",
+    "contact_email": "ventas@gluckbags.com",
+}
+
+# The redirect URL lives in `checkout_url` on the draft-order response (confirmed
+# against the live API). The extra keys are harmless fallbacks.
 _CHECKOUT_URL_KEYS = ("checkout_url", "url", "permalink", "link", "checkout")
 
 

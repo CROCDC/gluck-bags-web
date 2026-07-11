@@ -210,15 +210,60 @@ Decisiones tomadas por defecto: **Opción A + tienda TN oculta + BFF en el mismo
 | **2 — Mirror catálogo** | ✅ | `app/models/tiendanube.py` (`TiendaNubeProduct`), `app/services/catalog_sync.py` (sync/upsert/prune), tests. Tabla nueva, sin migración. |
 | **3a — Carrito propio** | ✅ | `cart_service` + `app/cart/` (API + `/carrito`), drawer + botón header + `cart.js`, estilos. Sobre `Product` del admin. |
 | **3b — Handoff checkout** | ✅ *(inerte hasta token)* | `app/services/checkout_service.py`: carrito → resolver variante TN (mirror) → `create_checkout` → `redirect_url`. `POST /checkout` ya lo usa; sin token responde `integration_pending` (sitio actual intacto). |
+| **3c — Swap del storefront** | ✅ *(detrás de flag)* | `app/services/catalog.py`: facade `catalog.*` que sirve el storefront y el carrito desde `Product` (default) o desde `TiendaNubeProduct` según `CATALOG_SOURCE`. Con `tiendanube`, el id del producto es el id de TN → el carrito lleva ids de TN y el resolver mapea directo. Adapter `StorefrontProduct`/`RemoteMedia` para que los templates no cambien. |
+| **3d — Webhooks + /gracias** | ✅ | `app/services/webhook_service.py` + `POST /webhooks/tiendanube` (verifica HMAC-SHA256 con `TN_CLIENT_SECRET`) para `product/created\|updated\|deleted` (refresca el mirror) y `order/*` (ack). Página `/gracias` (limpia el carrito). Helper `/tn/callback` para la Fase 0. |
 
-### Lo que falta para que el POC compre de punta a punta
-1. **Token (Fase 0).** Con `TN_STORE_ID`/`TN_ACCESS_TOKEN` seteados, `/checkout` deja de responder
-   `integration_pending` y arma el checkout real.
-2. **Confirmar contra la API viva** (docs bloqueadas en este entorno): endpoint y campos exactos de
-   `create_checkout` (hoy: `POST /checkouts`, body `{products:[{variant_id,quantity}]}`, URL de
-   redirect extraída de forma tolerante). Ajuste de 1 línea si difiere.
-3. **Unir catálogo y carrito.** Hoy el carrito opera sobre `Product` (admin) y el resolver espera
-   ids de producto de TN (`mirror_variant_resolver`). Falta el **swap del storefront para servir
-   desde `TiendaNubeProduct`** (detrás de flag) — recién ahí el carrito lleva ids de TN y el
-   resolver mapea directo. Alternativa mínima: un campo de vínculo `Product → tn_variant_id`.
-4. **Webhooks** `product/*` y `order/paid` + página `/gracias` (Fase 3 restante).
+### Validado contra la API viva (tienda `gluck29`, store_id 7949553)
+- **Payload de producto** (`app/models/tiendanube.py`): correcto. `name/description/handle` llegan
+  localizados `{"es": ...}`; `variants[].price` es string `"1000.00"`; `stock` es `null` cuando
+  `stock_management=false` (= ilimitado, `in_stock=True`); `images[]` traen `src/width/height/position`.
+  Única diferencia: la **moneda no viene en la variante** sino en `store.main_currency` (`ARS`); el
+  adapter ya cae a `ARS`.
+- **Checkout** (`create_checkout`): el redirect-checkout es un **draft order**. Endpoint real
+  `POST /draft_orders` (scope `write_draft_orders`), con `contact_*` + `payment_status` + `products`;
+  la respuesta trae **`checkout_url`**. (El `POST /checkouts` que se asumía no existe → 404.)
+- **HMAC de webhooks**: header `x-linkedstore-hmac-sha256` (a confirmar cuando se registre un webhook real).
+
+### Lo único que falta para comprar de punta a punta
+- **Cargar catálogo real** en la tienda y sincronizar el mirror; poner `CATALOG_SOURCE=tiendanube`.
+  Con eso el flujo completo (storefront → carrito → `/checkout` → checkout de TN → `/gracias`) ya se
+  probó en vivo y devuelve la `checkout_url` real. Guía de credenciales:
+  [`TIENDANUBE-SETUP.md`](./TIENDANUBE-SETUP.md).
+
+### Pendientes para producción (checklist)
+Tienda de prod definida: **`gluck29`** (store_id `7949553`); el dominio público sigue siendo
+`gluckbags.com`; el catálogo lo cargan los operadores en el admin de TN.
+
+Bloqueantes técnicos:
+- [ ] **Secrets en Infisical** (no en git): `TN_STORE_ID`, `TN_ACCESS_TOKEN`, `TN_CLIENT_ID`,
+      `TN_CLIENT_SECRET` (webhooks) y `CATALOG_SOURCE=tiendanube` cuando se prenda.
+- [x] **Sync del mirror wireado.** Comando `flask sync-tn` (manual/cron) + **scheduler in-process
+      horario** (`app/services/tn_scheduler.py`): thread daemon arrancado desde el factory, con
+      **lock `fcntl` cross-worker** (un solo worker sincroniza) y **timestamp** (una corrida por
+      intervalo). Solo arranca si hay token. Config: `TN_SYNC_INTERVAL` (seg, default 3600),
+      `TN_SYNC_ENABLED=0` para desactivar. Es la red de reconciliación además de los webhooks.
+- [ ] **Registrar los webhooks en TN** (`POST /webhooks`) → `https://gluckbags.com/webhooks/tiendanube`
+      para `product/created|updated|deleted` y `order/paid`. Confirmar el header HMAC real
+      (`x-linkedstore-hmac-sha256`) con una entrega de verdad.
+- [ ] **Probar una compra REAL completa** (pago + envío + **factura AFIP**), no solo la creación de
+      la `checkout_url`.
+
+Calidad / decisiones:
+- [ ] **AFIP** (facturación electrónica): la maneja el checkout de TN. Verificar que la tienda tenga
+      la config de facturación activa antes de vender. *(pendiente)*
+- [ ] **Redirect post-pago a `/gracias` (importante):** hoy TN muestra su propia página de gracias y
+      el comprador **no vuelve solo** a `gluckbags.com/gracias` (el webhook `order/paid` es
+      server-side). Definir cómo se lo trae de vuelta (config de checkout / script). *(importante)*
+- [ ] **Ocultar la tienda TN** (`gluck29.mitiendanube.com` → `noindex`/oculta) para no duplicar
+      contenido con `gluckbags.com`. *(acordado — más adelante, no ahora)*
+- [ ] **Selector de variantes** (talle/color) si los productos tienen más de una variante; hoy el
+      resolver usa la primera variante.
+- [ ] **Contacto placeholder** en el draft order (`Cliente/Web/ventas@gluckbags.com`): el comprador
+      completa lo real en el checkout de TN. Verificar que ese paso se sienta bien.
+
+### Cómo activar el circuito completo (una vez que hay token)
+1. Completar `.env`: `TN_STORE_ID`, `TN_ACCESS_TOKEN`, `TN_CLIENT_SECRET` (para webhooks).
+2. Poblar el mirror: `flask sync-tn` (una vez); de ahí en más el scheduler lo refresca cada hora.
+3. Poner `CATALOG_SOURCE=tiendanube` en `.env` → el storefront y el carrito sirven desde el mirror.
+4. Registrar el webhook `product/*` (y `order/paid`) apuntando a `https://<host>/webhooks/tiendanube`.
+5. Comprar: agregar al carrito → **Finalizar compra** → redirect al checkout de TN → `/gracias`.

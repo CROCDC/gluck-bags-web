@@ -10,12 +10,18 @@ Creá una cuenta gratuita en **partners.tiendanube.com** (Argentina). Es distint
 cuenta de tu tienda.
 
 ## 2. Crear la app
-Panel de Partners → **Apps → Crear aplicación**:
+Panel de Partners (**partners.tiendanube.com**) → **Aplicaciones → Crear aplicación**. Es una
+**app**, no una tienda: la app es el conector OAuth que después se instala en tu tienda. Después de
+crearla, entrá a la app → pestaña **Datos básicos** (ahí vive la config técnica; ignorá "Datos de
+publicación", que es solo para publicar en la tienda de apps pública):
 - **Nombre**: p. ej. `GLÜCK Headless POC`.
-- **URL de redirección (redirect URI)**: una URL que controles. Para probar en local:
-  `http://localhost:7010/tn/callback` (no hace falta que exista una página real; solo
-  necesitás leer el `code` que aparece en la URL al redirigir).
-- **Permisos (scopes)**: `read_products`, `read_orders`, `write_orders`.
+- **Distribución**: elegí **"Para tus clientes"** (privada) para no requerir homologación/publicación.
+- **URL para redirigir después de la instalación (redirect URI)**: `http://localhost:7010/tn/callback`.
+  El repo sirve esa ruta (`/tn/callback`) que te muestra el `code` prolijo — corré `python run.py`
+  antes de instalar. (El `code` igual aparece en la URL aunque la página no exista.)
+- **Permisos (scopes)**: tildá **Products** (→ `read_products`), **Orders** (→ `read/write_orders`)
+  y **Manual orders** (→ `read/write_draft_orders`). *El checkout headless se crea como draft order
+  (`POST /draft_orders`), así que `write_draft_orders` es imprescindible.*
 
 Al crearla obtenés **App ID (client_id)** y **Client Secret**. Ponelos en `.env`:
 

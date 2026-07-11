@@ -27,6 +27,14 @@ os.environ["SEED_PRODUCTS"] = "1"
 os.environ["ADMIN_PASSWORD"] = ADMIN_PASSWORD
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 
+# Keep the suite hermetic from a populated .env: with real Tienda Nube credentials
+# present, load_dotenv() would leak them into the process and flip the
+# "integration_pending" / "not_configured" branches the tests assert. Setting them
+# empty (not deleting) means load_dotenv(override=False) won't repopulate them; the
+# code reads empty as "missing". Tests that need credentials set them via monkeypatch.
+for _tn_var in ("TN_STORE_ID", "TN_ACCESS_TOKEN", "TN_CLIENT_ID", "TN_CLIENT_SECRET"):
+    os.environ[_tn_var] = ""
+
 from app import app as flask_app
 
 

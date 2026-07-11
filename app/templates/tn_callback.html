@@ -1,0 +1,38 @@
+{% extends "base_public.html" %}
+
+{% block body_class %}solid-header{% endblock %}
+
+{% block title %}Conexión con Tienda Nube · {{ brand }}{% endblock %}
+{% block description %}Paso de configuración de la integración con Tienda Nube.{% endblock %}
+
+{# Setup-only page — never index it. #}
+{% block canonical %}<meta name="robots" content="noindex, nofollow">{% endblock %}
+
+{% block body %}
+<main class="cart-page" id="top">
+    <div class="cart-empty" style="max-width:640px">
+        <div class="section-head">
+            <p class="eyebrow">Tienda Nube · Fase 0</p>
+            <h1 class="section-title">{% if code %}Código recibido{% else %}Esperando la autorización{% endif %}</h1>
+        </div>
+
+        {% if code %}
+        <p>Copiá este <strong>code</strong> y canjealo por el token permanente:</p>
+        <pre style="user-select:all; padding:1rem; background:#f4f1ec; border-radius:8px; overflow:auto; text-align:left"><code>{{ code }}</code></pre>
+        <p style="text-align:left">En una terminal, desde la raíz del proyecto:</p>
+        <pre style="padding:1rem; background:#111; color:#eee; border-radius:8px; overflow:auto; text-align:left"><code>python scripts/tn_oauth.py {{ code }}</code></pre>
+        <p>Eso imprime <code>TN_STORE_ID</code> y <code>TN_ACCESS_TOKEN</code> para pegar en tu <code>.env</code>.</p>
+        {% else %}
+        <p>
+            Esta página es el destino del <em>redirect</em> de la app de Tienda Nube.
+            Todavía no llegó ningún <code>code</code>.
+        </p>
+        <p style="text-align:left">
+            Instalá la app abriendo (logueado en tu tienda):
+        </p>
+        <pre style="padding:1rem; background:#f4f1ec; border-radius:8px; overflow:auto; text-align:left"><code>https://www.tiendanube.com/apps/&lt;APP_ID&gt;/authorize</code></pre>
+        <p>Al autorizar, Tienda Nube te redirige de vuelta acá con el <code>code</code> en la URL.</p>
+        {% endif %}
+    </div>
+</main>
+{% endblock %}

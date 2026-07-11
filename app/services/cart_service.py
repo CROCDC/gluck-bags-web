@@ -20,7 +20,7 @@ from typing import Any
 
 from flask import session, url_for
 
-from app.repositories import ProductRepository
+from app.services import catalog
 
 CART_SESSION_KEY = "cart"
 # Per-line cap: a sane upper bound so a crafted request can't set an absurd qty.
@@ -99,8 +99,11 @@ def count() -> int:
 
 
 def is_purchasable(product: Any) -> bool:
-    """A product can be added only if it's published and has a price set."""
-    return product is not None and product.is_published and product.price is not None
+    """A product can be added only if it's published, priced and (where the source
+    tracks it) in stock. Delegates to the catalogue facade so the rule is identical
+    whether the storefront is served from the admin catalogue or the Tienda Nube
+    mirror."""
+    return catalog.is_purchasable(product)
 
 
 def build() -> dict[str, Any]:
@@ -116,7 +119,7 @@ def build() -> dict[str, Any]:
     changed = False
 
     for pid, qty in list(raw.items()):
-        product = ProductRepository.get_by_id(int(pid))
+        product = catalog.get_by_id(int(pid))
         if not is_purchasable(product) or qty <= 0:
             raw.pop(pid, None)
             changed = True

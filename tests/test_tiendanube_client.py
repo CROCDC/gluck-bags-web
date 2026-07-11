@@ -205,7 +205,7 @@ def test_4xx_raises_with_body() -> None:
 # --- create_checkout ---------------------------------------------------------
 
 
-def test_create_checkout_posts_line_items_and_extracts_url() -> None:
+def test_create_checkout_posts_draft_order_and_extracts_url() -> None:
     resp = FakeResponse(
         json_data={"id": 55, "checkout_url": "https://gluck.mitiendanube.com/checkout/55"},
         text="x",
@@ -215,10 +215,26 @@ def test_create_checkout_posts_line_items_and_extracts_url() -> None:
 
     call = session.calls[0]
     assert call["method"] == "POST"
-    assert call["url"].endswith("/checkouts")
-    assert call["json"] == {"products": [{"variant_id": 10, "quantity": 2}]}
+    # Redirect checkout = a draft order; its response carries checkout_url.
+    assert call["url"].endswith("/draft_orders")
+    body = call["json"]
+    assert body["products"] == [{"variant_id": 10, "quantity": 2}]
+    assert body["payment_status"] == "pending"
+    # Contact fields are required by Tienda Nube to open a draft order.
+    assert body["contact_email"] and body["contact_name"]
     assert out["id"] == 55
     assert out["checkout_url"].startswith("https://")
+
+
+def test_create_checkout_accepts_custom_contact() -> None:
+    client, session = _client([FakeResponse(json_data={"id": 1, "checkout_url": "https://x/1"})])
+    client.create_checkout(
+        [{"variant_id": 3, "quantity": 1}],
+        contact={"contact_email": "ana@example.com", "contact_name": "Ana"},
+    )
+    body = session.calls[0]["json"]
+    assert body["contact_email"] == "ana@example.com"
+    assert body["contact_name"] == "Ana"
 
 
 def test_create_checkout_missing_url_returns_none() -> None:

@@ -53,9 +53,10 @@ def register_cart(app: Flask) -> None:
             qty = 1
         # Guard: only purchasable products enter the cart. Non-priced/unpublished
         # products keep the Instagram flow, so adding one is a 409 (not silent).
-        from app.repositories import ProductRepository
+        # Looks up through the active catalogue source so a Tienda Nube id resolves.
+        from app.services import catalog
 
-        product = ProductRepository.get_by_id(pid)
+        product = catalog.get_by_id(pid)
         if not cart_service.is_purchasable(product):
             return jsonify({"error": "Producto no disponible para compra online"}), 409
         cart_service.add(pid, qty)
@@ -91,6 +92,14 @@ def register_cart(app: Flask) -> None:
     @app.route("/carrito", methods=["GET"])
     def cart_page() -> str:
         return render_template("cart.html", cart=cart_service.build())
+
+    @app.route("/gracias", methods=["GET"])
+    def checkout_thanks() -> str:
+        """Post-purchase confirmation. The buyer lands here after the Tienda Nube
+        checkout, so the local cart has served its purpose — clear it so a refresh or
+        a new visit starts empty."""
+        cart_service.clear()
+        return render_template("gracias.html")
 
     @app.route("/checkout", methods=["POST"])
     def checkout() -> Response:
