@@ -172,19 +172,22 @@ def test_cart_add_and_checkout_loop(app: "Flask", monkeypatch) -> None:
     captured: dict[str, Any] = {}
 
     class _TNClient:
-        def create_checkout(self, line_items):
+        def create_checkout(self, line_items, *, contact=None):
             captured["line_items"] = line_items
+            captured["contact"] = contact
             return {"id": 3, "checkout_url": "https://checkout.tiendanube/3"}
 
     from app.services import checkout_service
 
     monkeypatch.setattr(checkout_service, "build_client_from_env", lambda: _TNClient())
 
-    data = client.post("/checkout").get_json()
+    data = client.post("/checkout", json={"email": "ana@example.com"}).get_json()
     assert data["ready"] is True
     assert data["redirect_url"] == "https://checkout.tiendanube/3"
-    # The resolver turned the TN product id (95) into its first variant (950).
+    # The resolver turned the TN product id (95) into its first variant (950), and
+    # the buyer email became the draft-order contact (TN prefills checkout with it).
     assert captured["line_items"] == [{"variant_id": 950, "quantity": 1}]
+    assert captured["contact"] == {"contact_email": "ana@example.com"}
 
 
 def test_cart_rejects_unpublished_mirror_product(app: "Flask") -> None:
@@ -192,3 +195,99 @@ def test_cart_rejects_unpublished_mirror_product(app: "Flask") -> None:
     _tn(app)
     resp = app.test_client().post("/api/cart/add", json={"product_id": 20})
     assert resp.status_code == 409
+
+
+# --- SEO under the TN source ---------------------------------------------------
+# Prod runs CATALOG_SOURCE=tiendanube, so the user-visible SEO promises must hold
+# for mirror-served products too (they regressed silently before: double-scheme
+# og:image, hardcoded InStock).
+
+
+def test_tn_pdp_jsonld_offer_from_mirror_price(app: "Flask") -> None:
+    _seed(app, _payload(95, "Tote Cognac", 45000))
+    _tn(app)
+    html = app.test_client().get("/producto/95").get_data(as_text=True)
+    assert '"offers"' in html
+    assert '"price": "45000"' in html
+    assert '"availability": "https://schema.org/InStock"' in html
+
+
+def test_tn_pdp_jsonld_out_of_stock(app: "Flask") -> None:
+    """The mirror tracks real stock and the cart 409s sold-out products — the
+    structured data must say OutOfStock instead of promising availability."""
+    _seed(app, _payload(96, "Tote Agotado", 45000, stock=0))
+    _tn(app)
+    html = app.test_client().get("/producto/96").get_data(as_text=True)
+    assert '"availability": "https://schema.org/OutOfStock"' in html
+
+
+def test_tn_pdp_social_image_is_cdn_url_not_double_prefixed(app: "Flask") -> None:
+    """Mirror covers are ABSOLUTE CDN URLs; og:image/twitter:image/JSON-LD image
+    must emit them verbatim, never site_url + absolute-URL (invalid double scheme)."""
+    _seed(app, _payload(97, "Tote Social", 45000))
+    _tn(app)
+    html = app.test_client().get("/producto/97").get_data(as_text=True)
+    assert 'content="https://cdn.example/97.jpg"' in html
+    assert "https://gluckbags.comhttps://" not in html
+    assert '"image": ["https://cdn.example/97.jpg"]' in html
+
+
+def test_tn_pdp_description_sells_online_not_instagram(app: "Flask") -> None:
+    """A priced, purchasable PDP's SERP snippet must sell the online flow; the
+    Instagram-availability tail only belongs to the unpriced fallback."""
+    _seed(app, _payload(98, "Tote Meta", 45000))
+    _tn(app)
+    html = app.test_client().get("/producto/98").get_data(as_text=True)
+    assert "Comprá online" in html
+    assert "Consultá disponibilidad por Instagram" not in html
+
+
+# --- legacy URL continuity -------------------------------------------------------
+
+
+def test_legacy_product_ids_301_to_category_under_tn(app: "Flask") -> None:
+    """Pre-migration /producto/<id> URLs are indexed by Google; under the TN source
+    they must 301 to the legacy product's category, resolved from the still-present
+    legacy table (the DB is the truth for what each id was — not seed order)."""
+    from app.repositories import ProductRepository
+
+    with app.app_context():
+        tote = ProductRepository.create(title="Tote Cognac", category="Tote")
+        mini = ProductRepository.create(title="Crossbody Rosa", category="Mini Bag")
+        tote_id, mini_id = tote.id, mini.id
+    _tn(app)
+    client = app.test_client()
+    resp = client.get(f"/producto/{tote_id}")
+    assert resp.status_code == 301
+    assert resp.headers["Location"].endswith("/categoria/tote")
+    resp = client.get(f"/producto/{mini_id}")
+    assert resp.status_code == 301
+    assert resp.headers["Location"].endswith("/categoria/mini-bag")
+
+
+def test_unknown_tn_product_still_404s(app: "Flask") -> None:
+    """An id with no legacy row gets a plain 404 (no redirect invented)."""
+    _tn(app)
+    assert app.test_client().get("/producto/999999999").status_code == 404
+
+
+def test_env_boot_with_tiendanube_source_serves_empty_mirror(tmp_path, monkeypatch) -> None:
+    """create_app booted with CATALOG_SOURCE=tiendanube from the ENVIRONMENT (the
+    prod shape, including the docker-compose fallback) must come up serving the
+    empty mirror gracefully: 200s everywhere, no legacy products leaking."""
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("SEED_PRODUCTS", "1")
+    monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-pw")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
+    monkeypatch.setenv("CATALOG_SOURCE", "tiendanube")
+    from app.factory import create_app
+
+    application = create_app()
+    application.testing = True
+    client = application.test_client()
+    home = client.get("/")
+    html = home.get_data(as_text=True)
+    assert home.status_code == 200
+    assert "Muy pronto" in html
+    assert "Tote Cognac" not in html
+    assert client.get("/sitemap.xml").status_code == 200

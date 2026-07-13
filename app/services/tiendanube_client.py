@@ -92,13 +92,21 @@ class TiendaNubeClient:
     # --- construction --------------------------------------------------------
 
     @classmethod
-    def from_env(cls, env: dict[str, str] | None = None) -> "TiendaNubeClient":
+    def from_env(
+        cls,
+        env: dict[str, str] | None = None,
+        *,
+        timeout: int = DEFAULT_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+    ) -> "TiendaNubeClient":
         """Build a client from environment variables.
 
         Reads TN_STORE_ID, TN_ACCESS_TOKEN (required) and TN_API_VERSION,
         TN_USER_AGENT (optional, with sensible defaults). Raises ValueError with a
         clear message if a required variable is missing, so `scripts/tn_spike.py`
-        fails loudly rather than making an unauthenticated call.
+        fails loudly rather than making an unauthenticated call. The defaults suit
+        batch use (sync); interactive request paths pass a tighter timeout and
+        max_retries=0 so they fail fast instead of holding a worker.
         """
         env = env if env is not None else dict(os.environ)
         store_id = env.get("TN_STORE_ID", "").strip()
@@ -121,6 +129,8 @@ class TiendaNubeClient:
             api_version=env.get("TN_API_VERSION", "").strip() or DEFAULT_API_VERSION,
             user_agent=env.get("TN_USER_AGENT", "").strip()
             or "GLUCK Headless POC (dev@gluckbags.com)",
+            timeout=timeout,
+            max_retries=max_retries,
         )
 
     # --- low-level HTTP ------------------------------------------------------
@@ -270,9 +280,9 @@ class TiendaNubeClient:
 
         Confirmed against the live API: the redirect checkout is a **draft order**
         (``POST /draft_orders``, scope ``write_draft_orders``); its response carries
-        ``checkout_url``. Tienda Nube requires contact fields to open a draft order —
-        the real buyer completes/edits them at the hosted checkout — so we send a
-        generic placeholder (overridable via `contact`).
+        ``checkout_url``. Tienda Nube requires non-blank contact fields and PRE-FILLS
+        the hosted checkout with them — pass the buyer's real ``contact`` (at least
+        ``contact_email``) so order emails reach the buyer, not the store.
         """
         if not line_items:
             raise ValueError("line_items required")
@@ -285,12 +295,22 @@ class TiendaNubeClient:
                 for li in line_items
             ],
         }
+        # Fail fast instead of shipping a draft order whose confirmation emails go
+        # nowhere: TN pre-fills its checkout with this address.
+        if not str(body.get("contact_email") or "").strip():
+            raise ValueError("contact['contact_email'] (the real buyer's email) is required")
         data = self._request("POST", "draft_orders", json=body).json()
         return {
             "id": data.get("id") if isinstance(data, dict) else None,
             "checkout_url": _extract_checkout_url(data),
             "raw": data,
         }
+
+    def get_draft_order(self, draft_order_id: int | str) -> dict[str, Any]:
+        """One draft order by id. A completed checkout shows in `completed_at` /
+        `paid_at` / `status` ("closed"); deletion is a soft-cancel (`status`
+        "cancelled"), so old ids keep resolving."""
+        return self._request("GET", f"draft_orders/{draft_order_id}").json()
 
     # --- webhooks (write) ----------------------------------------------------
 
@@ -319,13 +339,14 @@ def _next_link(link_header: str) -> str | None:
     return None
 
 
-# Placeholder buyer identity for the draft order. Tienda Nube requires contact
-# fields to open a draft order; the real buyer fills/confirms them at the hosted
-# checkout. Kept generic and clearly ours so a stray draft order is easy to spot.
+# Placeholder names for the draft order. TN hard-requires non-blank contact_email/
+# name/lastname (verified against the live API: "" and whitespace are rejected) and
+# PRE-FILLS the hosted checkout with them. The names stay generic (the buyer
+# confirms them at checkout); the email has NO fallback — callers must pass the
+# real buyer's, or create_checkout refuses.
 _CHECKOUT_CONTACT = {
     "contact_name": "Cliente",
     "contact_lastname": "Web",
-    "contact_email": "ventas@gluckbags.com",
 }
 
 # The redirect URL lives in `checkout_url` on the draft-order response (confirmed

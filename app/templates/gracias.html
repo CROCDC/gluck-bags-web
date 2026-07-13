@@ -4,7 +4,7 @@
 {% block body_class %}solid-header{% endblock %}
 
 {% block title %}¡Gracias por tu compra! · {{ brand }}{% endblock %}
-{% block description %}Recibimos tu pedido en {{ brand }}. Te contactamos para coordinar el envío de tu bolso de cuero vegano.{% endblock %}
+{% block description %}Recibimos tu pedido en {{ brand }}. Tu pago se procesa en Tienda Nube y te llega la confirmación y el seguimiento del envío por email.{% endblock %}
 
 {# A post-purchase confirmation is transient and personal — keep it out of the index. #}
 {% block canonical %}<meta name="robots" content="noindex, follow">{% endblock %}
@@ -24,8 +24,18 @@
         <div class="hero-actions" style="justify-content:center">
             <a class="btn btn-dark" href="{{ url_for('index') }}#shop">Seguir mirando</a>
             <a class="btn btn-ghost" href="{{ instagram_url }}" target="_blank" rel="noopener"
-               data-umami-event="comprar-instagram" data-umami-event-ubicacion="gracias">Escribinos por Instagram</a>
+               data-umami-event="soporte-postventa" data-umami-event-ubicacion="gracias">Escribinos por Instagram</a>
         </div>
     </div>
 </main>
+{% endblock %}
+
+{% block scripts_extra %}
+{% if confirmed %}
+<script>
+  window.addEventListener("load", function () {
+    if (window.umami) window.umami.track("compra-confirmada");
+  });
+</script>
+{% endif %}
 {% endblock %}

@@ -208,10 +208,11 @@ def create_app() -> Flask:
 
     app.config["UMAMI_WEBSITE_ID"] = os.environ.get("UMAMI_WEBSITE_ID")
 
-    # Where the storefront + cart read products from (headless POC seam, see
-    # app/services/catalog.py). "admin" = the admin-managed Product table (default,
-    # today's production). "tiendanube" = the mirrored Tienda Nube catalogue, so cart
-    # lines carry TN ids and the checkout handoff resolves them to variants directly.
+    # Where the storefront + cart read products from (see app/services/catalog.py).
+    # "tiendanube" = the mirrored TN catalogue (production; cart lines carry TN ids
+    # and the checkout resolves them to variants). "admin" = the legacy
+    # admin-managed Product table — the code default only so local dev and tests
+    # work without TN credentials; docker-compose defaults to tiendanube.
     app.config["CATALOG_SOURCE"] = os.environ.get("CATALOG_SOURCE", "admin").strip().lower()
 
     # Public/canonical origin for absolute OG, Twitter, canonical and sitemap URLs

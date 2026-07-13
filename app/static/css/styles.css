@@ -1409,6 +1409,29 @@ body.cart-open { overflow: hidden; }
     color: var(--ink-faint);
     margin: 0 0 1.1rem;
 }
+.cart-email-label {
+    display: block;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 0.35rem;
+}
+.cart-email {
+    width: 100%;
+    padding: 0.7rem 0.85rem;
+    margin-bottom: 0.9rem;
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    color: var(--ink);
+    background: var(--cream);
+    border: 1px solid var(--line-strong);
+    border-radius: 2px;
+}
+.cart-email:focus {
+    outline: 2px solid var(--cognac);
+    outline-offset: 1px;
+}
 .cart-checkout { width: 100%; text-align: center; }
 .cart-feedback {
     margin: 0.9rem 0 0;

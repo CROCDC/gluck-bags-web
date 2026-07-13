@@ -11,17 +11,18 @@ def _utcnow() -> datetime:
 
 
 class Product(db.Model):
-    """A bag shown on the landing page and managed from the admin panel."""
+    """A bag in the legacy admin catalogue (the `admin` CATALOG_SOURCE). Prod serves
+    the Tienda Nube mirror instead; this table remains the dev/rollback source."""
 
     __tablename__ = "products"
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
-    # Nullable: the live catalogue has no descriptions (products link to Instagram),
-    # so seeded/imported products store NULL. The admin form normalises blanks to "".
+    # Nullable: the pre-migration lookbook had no descriptions, so seeded products
+    # store NULL. The admin form normalises blanks to "".
     description = db.Column(db.Text, nullable=True)
-    # Whole ARS pesos. None means "price not set yet" (shown as "Consultar"). The
-    # live catalogue shows no prices, so seeded products are NULL here too.
+    # Whole ARS pesos. None means "price not set" (shown as "Consultar" with the
+    # Instagram-consultation fallback instead of add-to-cart).
     price = db.Column(db.Integer, nullable=True)
     currency = db.Column(db.String(8), nullable=False, default="ARS")
     category = db.Column(db.String(80), nullable=True)
@@ -31,6 +32,11 @@ class Product(db.Model):
     position = db.Column(db.Integer, nullable=False, default=0)
     created_at = db.Column(db.DateTime, nullable=False, default=_utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
+
+    # The legacy catalogue has no stock concept — always sellable when priced.
+    # Mirrors StorefrontProduct.in_stock so consumers (cart guard, JSON-LD offers)
+    # read one real attribute instead of duck-typing per source.
+    in_stock = True
 
     media = db.relationship(
         "Media",

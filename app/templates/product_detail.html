@@ -6,7 +6,7 @@
 {% block body_class %}solid-header{% endblock %}
 
 {% block title %}{{ product.title }} · {{ product.category or 'Cartera' }} de cuero vegano | {{ brand }}{% endblock %}
-{% block description %}{{ product.title }}{% if product.category %}, {{ product.category | lower }}{% endif %} de cuero vegano hecho a mano por {{ brand }}. Diseño minimalista, sin crueldad animal.{% if product.formatted_price %} {{ product.formatted_price }}.{% endif %} Consultá disponibilidad por Instagram.{% endblock %}
+{% block description %}{{ product.title }}{% if product.category %}, {{ product.category | lower }}{% endif %} de cuero vegano hecho a mano por {{ brand }}. Diseño minimalista, sin crueldad animal.{% if product.formatted_price %} {{ product.formatted_price }}. Comprá online con envío a todo el país.{% else %} Consultá disponibilidad por Instagram.{% endif %}{% endblock %}
 
 {# Canonical to the normalized URL so /producto/01 and /producto/001 collapse to /producto/<id>. #}
 {% block canonical %}<link rel="canonical" href="{{ site_url }}{{ url_for('product_detail', product_id=product.id) }}">{% endblock %}
@@ -19,14 +19,14 @@
     <meta property="og:title"       content="{{ product.title }} · {{ brand }}">
     <meta property="og:description" content="{{ product.title }}{% if product.formatted_price %} — {{ product.formatted_price }}{% endif %}. {{ brand }}, cuero vegano hecho a mano.">
     {% if og_image %}
-    <meta property="og:image"        content="{{ site_url }}{{ og_image }}">
+    <meta property="og:image"        content="{{ og_image | absolute }}">
     <meta property="og:image:width"  content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:image:type"   content="image/jpeg">
     {% elif cover and cover.is_image %}
-    <meta property="og:image"        content="{{ site_url }}{{ cover.default_image_url }}">
+    <meta property="og:image"        content="{{ cover.default_image_url | absolute }}">
     {% elif cover and cover.is_video %}
-    <meta property="og:image"        content="{{ site_url }}{{ cover.poster_url }}">
+    <meta property="og:image"        content="{{ cover.poster_url | absolute }}">
     {% endif %}
     <meta property="og:image:alt"   content="{{ product.title }} — {{ brand }}">
     <meta property="og:site_name"   content="{{ brand }}">
@@ -35,7 +35,7 @@
     <meta name="twitter:title"       content="{{ product.title }} · {{ brand }}">
     <meta name="twitter:description" content="{{ product.title }}{% if product.category %} · {{ product.category }}{% endif %} — {{ brand }}, cuero vegano hecho a mano.">
     {% set tw_image = og_image or (cover.default_image_url if cover and cover.is_image else (cover.poster_url if cover and cover.is_video else None)) %}
-    {% if tw_image %}<meta name="twitter:image" content="{{ site_url }}{{ tw_image }}">{% endif %}
+    {% if tw_image %}<meta name="twitter:image" content="{{ tw_image | absolute }}">{% endif %}
 {% endblock %}
 
 {% block head_extra %}
@@ -88,9 +88,9 @@
                         data-umami-event="agregar-carrito" data-umami-event-producto="{{ product.title }}">
                     Agregar al carrito
                 </button>
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="pdp-cta-alt" data-umami-event="comprar-instagram" data-umami-event-ubicacion="producto" data-umami-event-producto="{{ product.title }}">o consultá por Instagram</a>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="pdp-cta-alt" data-umami-event="consulta-instagram" data-umami-event-ubicacion="producto" data-umami-event-producto="{{ product.title }}">o consultá por Instagram</a>
                 {% else %}
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark pdp-cta" data-umami-event="comprar-instagram" data-umami-event-ubicacion="producto" data-umami-event-producto="{{ product.title }}">Consultar por Instagram</a>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark pdp-cta" data-umami-event="consulta-instagram" data-umami-event-ubicacion="producto" data-umami-event-producto="{{ product.title }}">Consultar por Instagram</a>
                 {% endif %}
             </aside>
         </div>

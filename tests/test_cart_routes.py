@@ -108,12 +108,25 @@ def test_checkout_empty_cart_is_rejected(client: "FlaskClient") -> None:
     assert res.get_json()["reason"] == "empty"
 
 
-def test_checkout_reports_integration_pending(app: "Flask", client: "FlaskClient") -> None:
+def test_checkout_requires_buyer_email(app: "Flask", client: "FlaskClient") -> None:
+    """The buyer email is what TN prefills at the hosted checkout — without it the
+    handoff is rejected (400) before ever calling TN."""
     pid = _make_product(app, price=1000)
     client.post("/api/cart/add", json={"product_id": pid, "qty": 1})
-    data = client.post("/checkout").get_json()
+    res = client.post("/checkout", json={})
+    assert res.status_code == 400
+    data = res.get_json()
     assert data["ready"] is False
-    assert data["reason"] == "integration_pending"
+    assert data["reason"] == "email_required"
+    assert "email" in data["message"]
+
+
+def test_checkout_reports_not_configured(app: "Flask", client: "FlaskClient") -> None:
+    pid = _make_product(app, price=1000)
+    client.post("/api/cart/add", json={"product_id": pid, "qty": 1})
+    data = client.post("/checkout", json={"email": "ana@example.com"}).get_json()
+    assert data["ready"] is False
+    assert data["reason"] == "not_configured"
     assert "message" in data
 
 
@@ -134,13 +147,47 @@ def test_checkout_redirects_when_tn_ready(app: "Flask", client: "FlaskClient", m
         db.session.commit()
 
     class _Client:
-        def create_checkout(self, line_items):
+        def create_checkout(self, line_items, *, contact=None):
             assert line_items == [{"variant_id": 900, "quantity": 1}]
+            assert contact == {"contact_email": "ana@example.com"}
             return {"id": 7, "checkout_url": "https://tn/checkout/7"}
 
     monkeypatch.setattr(checkout_service, "build_client_from_env", lambda: _Client())
 
     client.post("/api/cart/add", json={"product_id": pid, "qty": 1})
-    data = client.post("/checkout").get_json()
+    data = client.post("/checkout", json={"email": "ana@example.com"}).get_json()
     assert data["ready"] is True
     assert data["redirect_url"] == "https://tn/checkout/7"
+
+    with client.session_transaction() as sess:
+        assert sess[checkout_service.PENDING_SESSION_KEY]["id"] == 7
+
+
+# --- /gracias ------------------------------------------------------------------
+
+
+def test_gracias_consumes_pending_handoff(app: "Flask", client: "FlaskClient") -> None:
+    """A session that handed a checkout to TN gets its purchased lines dropped."""
+    from app.services import checkout_service
+
+    pid = _make_product(app, title="Tote", price=45000)
+    client.post("/api/cart/add", json={"product_id": pid, "qty": 1})
+    with client.session_transaction() as sess:
+        sess[checkout_service.PENDING_SESSION_KEY] = {
+            "id": 42, "ts": 0, "checked": 0, "items": {str(pid): 1},
+        }
+
+    assert client.get("/gracias").status_code == 200
+    assert client.get("/api/cart").get_json()["count"] == 0
+    with client.session_transaction() as sess:
+        assert checkout_service.PENDING_SESSION_KEY not in sess
+
+
+def test_gracias_never_wipes_a_visitors_cart(app: "Flask", client: "FlaskClient") -> None:
+    """Anyone can open /gracias (history, a shared link): without a pending TN
+    handoff the in-progress cart must survive."""
+    pid = _make_product(app, title="Tote", price=45000)
+    client.post("/api/cart/add", json={"product_id": pid, "qty": 2})
+
+    assert client.get("/gracias").status_code == 200
+    assert client.get("/api/cart").get_json()["count"] == 2

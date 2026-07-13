@@ -24,13 +24,15 @@ SITE = "https://gluckbags.com"
 class _FakeProduct:
     """Minimal stand-in matching the attributes app.seo reads off Product."""
 
-    def __init__(self, id, title, category=None, price=None, currency="ARS", description=None):
+    def __init__(self, id, title, category=None, price=None, currency="ARS", description=None,
+                 in_stock=True):
         self.id = id
         self.title = title
         self.category = category
         self.price = price
         self.currency = currency
         self.description = description
+        self.in_stock = in_stock
         self.cover = None  # no media -> no image key (kept simple)
 
 
@@ -98,6 +100,11 @@ def test_product_with_price_emits_offer() -> None:
     assert offer["priceCurrency"] == "ARS"
     assert offer["availability"].endswith("InStock")
     assert offer["url"] == f"{SITE}/producto/2"
+
+
+def test_product_out_of_stock_emits_out_of_stock() -> None:
+    data = product_jsonld(_FakeProduct(2, "Mini Bag", price=45000, in_stock=False), SITE)
+    assert data["offers"]["availability"].endswith("OutOfStock")
 
 
 def test_product_description_falls_back_when_missing() -> None:

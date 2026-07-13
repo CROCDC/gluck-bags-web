@@ -104,8 +104,9 @@ def process(
         return _handle_product_upsert(event, int(resource_id), client)
 
     if event in _ORDER_EVENTS:
-        # Orders drive backend reconciliation, not the buyer's page — acknowledge so
-        # Tienda Nube stops retrying; the /gracias page is reached via the redirect.
+        # Acknowledge so Tienda Nube stops retrying. Note: TN does NOT redirect the
+        # buyer back to /gracias; the session cart is reconciled lazily on the next
+        # visit (checkout_service.reconcile_pending), not from this webhook.
         return {"ok": True, "event": event, "action": "acknowledged", "order_id": int(resource_id)}, 200
 
     return {"ok": True, "event": event, "action": "ignored"}, 200

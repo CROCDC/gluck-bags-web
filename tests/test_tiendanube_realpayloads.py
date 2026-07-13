@@ -158,7 +158,9 @@ class _Session:
 def test_create_checkout_extracts_url_from_real_draft_order() -> None:
     session = _Session(_Resp(REAL_DRAFT_ORDER))
     client = TiendaNubeClient(store_id="7949553", access_token="tok", user_agent="ua (x@y.z)", session=session)
-    out = client.create_checkout([{"variant_id": 1557286433, "quantity": 1}])
+    out = client.create_checkout(
+        [{"variant_id": 1557286433, "quantity": 1}], contact={"contact_email": "ana@example.com"}
+    )
 
     assert session.calls[0]["url"].endswith("/draft_orders")
     assert out["id"] == 2016171999
