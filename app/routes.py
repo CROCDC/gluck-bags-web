@@ -2,7 +2,7 @@ from typing import Any
 
 from flask import Flask, Response, abort, render_template, url_for
 
-from app.repositories import ProductRepository
+from app.services import catalog
 from app.seo import (
     breadcrumb_jsonld,
     category_breadcrumb_jsonld,
@@ -101,7 +101,7 @@ CATEGORY_INTRO: dict[str, str] = {
 def _category_name_for_slug(slug: str) -> str | None:
     """Map a URL slug back to a category name. Considers both the curated category
     cards and any category actually present on published products."""
-    names = [c["name"] for c in CATEGORIES] + ProductRepository.published_categories()
+    names = [c["name"] for c in CATEGORIES] + catalog.published_categories()
     for name in names:
         if slugify(name) == slug:
             return name
@@ -120,18 +120,18 @@ def register_routes(app: Flask) -> None:
         # avoid linking an empty (noindex) category as if it were shoppable. Keyed by
         # slug (not raw name) so an off-casing product category (admin input is
         # free-text, e.g. "tote") still matches the curated card ("Tote").
-        published_cats = {slugify(c) for c in ProductRepository.published_categories()}
+        published_cats = {slugify(c) for c in catalog.published_categories()}
         context: dict[str, Any] = {
             "categories": CATEGORIES,
             "published_cats": published_cats,
-            "products": ProductRepository.get_published(),
+            "products": catalog.get_published(),
             "jsonld": jsonld,
         }
         return render_template("index.html", **context)
 
     @app.route("/producto/<int:product_id>")
     def product_detail(product_id: int) -> str:
-        product = ProductRepository.get_by_id(product_id)
+        product = catalog.get_by_id(product_id)
         if product is None or not product.is_published:
             abort(404)
         site_url = app.config["SITE_URL"]
@@ -141,8 +141,8 @@ def register_routes(app: Flask) -> None:
         return render_template(
             "product_detail.html",
             product=product,
-            related=ProductRepository.get_related(product),
-            nav_categories=ProductRepository.published_categories(),
+            related=catalog.get_related(product),
+            nav_categories=catalog.published_categories(),
             jsonld=jsonld,
         )
 
@@ -152,14 +152,14 @@ def register_routes(app: Flask) -> None:
         if name is None:
             abort(404)
         site_url = app.config["SITE_URL"]
-        products = ProductRepository.get_published_by_category(name)
+        products = catalog.get_published_by_category(name)
         return render_template(
             "category.html",
             category=name,
             products=products,
             intro=CATEGORY_INTRO.get(name),
             # Sibling categories (non-empty) for the inter-category nav chips.
-            nav_categories=ProductRepository.published_categories(),
+            nav_categories=catalog.published_categories(),
             jsonld=dump_jsonld(category_breadcrumb_jsonld(name, site_url)),
             # An empty (but known) category is a thin page — keep it out of the index.
             noindex=not products,
@@ -206,7 +206,7 @@ def register_routes(app: Flask) -> None:
             urls.append(
                 {"loc": f"{site_url}/{slug}", "lastmod": None, "changefreq": "yearly", "priority": "0.3"}
             )
-        for name in ProductRepository.published_categories():
+        for name in catalog.published_categories():
             urls.append(
                 {
                     "loc": f"{site_url}/categoria/{slugify(name)}",
@@ -215,7 +215,7 @@ def register_routes(app: Flask) -> None:
                     "priority": "0.8",
                 }
             )
-        for product in ProductRepository.get_published():
+        for product in catalog.get_published():
             lastmod = product.updated_at.date().isoformat() if product.updated_at else None
             urls.append(
                 {

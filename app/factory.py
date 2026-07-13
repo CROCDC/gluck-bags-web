@@ -208,6 +208,12 @@ def create_app() -> Flask:
 
     app.config["UMAMI_WEBSITE_ID"] = os.environ.get("UMAMI_WEBSITE_ID")
 
+    # Where the storefront + cart read products from (headless POC seam, see
+    # app/services/catalog.py). "admin" = the admin-managed Product table (default,
+    # today's production). "tiendanube" = the mirrored Tienda Nube catalogue, so cart
+    # lines carry TN ids and the checkout handoff resolves them to variants directly.
+    app.config["CATALOG_SOURCE"] = os.environ.get("CATALOG_SOURCE", "admin").strip().lower()
+
     # Public/canonical origin for absolute OG, Twitter, canonical and sitemap URLs
     # (no trailing slash). Defaults to the real apex domain; overridable per env.
     app.config["SITE_URL"] = os.environ.get("SITE_URL", "https://gluckbags.com").rstrip("/")
@@ -270,6 +276,14 @@ def create_app() -> Flask:
 
     @app.context_processor
     def inject_globals() -> dict[str, Any]:
+        # Cart item count for the header badge — read straight from the session
+        # (no DB), and never let a cart hiccup break page rendering.
+        try:
+            from app.services import cart_service
+
+            cart_count = cart_service.count()
+        except Exception:  # noqa: BLE001 — the badge is cosmetic; degrade to 0
+            cart_count = 0
         return {
             "current_year": datetime.now().year,
             "brand": "GLÜCK",
@@ -279,6 +293,7 @@ def create_app() -> Flask:
             "site_url": app.config["SITE_URL"],
             # Bare host (no scheme), for the Umami data-domains scope.
             "site_host": urlsplit(app.config["SITE_URL"]).netloc,
+            "cart_count": cart_count,
         }
 
     with app.app_context():
@@ -287,13 +302,25 @@ def create_app() -> Flask:
         # Importing these registers the Product/Media models with db.metadata
         # (admin/routes/seed all import app.models), so create_all sees them.
         from app.admin import register_admin
+        from app.cart import register_cart
         from app.routes import register_routes
         from app.seed import seed_initial_products
+        from app.tiendanube import register_tiendanube
 
         _initialize_schema(data_dir, seed_initial_products)
 
         register_routes(app)
         register_admin(app)
+        register_cart(app)
+        register_tiendanube(app)
+
+        # Hourly mirror sync: registers the `flask sync-tn` command and, when Tienda
+        # Nube credentials are present, starts the background sync thread (no-op in
+        # dev/test without a token). See app/services/tn_scheduler.py.
+        from app.services.tn_scheduler import register_cli, start_scheduler
+
+        register_cli(app)
+        start_scheduler(app)
 
     # After routes exist, so the trailing-slash normalizer can probe the url_map.
     _register_url_normalization(app)

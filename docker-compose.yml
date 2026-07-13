@@ -25,6 +25,15 @@ services:
       VIRTUAL_HOST: gluckbags.com,www.gluckbags.com,gluck.nexttech.com.ar
       VIRTUAL_PORT: 7014
       UMAMI_WEBSITE_ID: 4badbd28-ea2a-4c67-9520-fe0814abcd1d
+      # Tienda Nube headless POC. Values come from Infisical (prod) via `infisical run`.
+      # CATALOG_SOURCE stays "admin" (current site) until go-live; flip the Infisical
+      # value to "tiendanube" to serve the storefront from the TN mirror. The TN_* vars
+      # are read by the checkout handoff, the webhook HMAC check and the hourly sync.
+      CATALOG_SOURCE: ${CATALOG_SOURCE:-admin}
+      TN_STORE_ID: ${TN_STORE_ID:-}
+      TN_ACCESS_TOKEN: ${TN_ACCESS_TOKEN:-}
+      TN_CLIENT_ID: ${TN_CLIENT_ID:-}
+      TN_CLIENT_SECRET: ${TN_CLIENT_SECRET:-}
     ports:
       - "7014:7014"
     expose:

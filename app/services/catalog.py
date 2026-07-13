@@ -1,0 +1,269 @@
+"""Storefront catalogue facade (headless POC — closing the loop).
+
+The storefront (home, product detail, category, sitemap) and the cart read products
+through THIS module instead of talking to a repository directly. That indirection is
+the swap seam: a single flag, ``CATALOG_SOURCE``, decides where products come from.
+
+- ``admin`` (default) — the admin-managed ``Product`` table, via ``ProductRepository``.
+  The site behaves exactly as before; this is production today.
+- ``tiendanube`` — the mirrored Tienda Nube catalogue (``TiendaNubeProduct``), wrapped
+  in a thin adapter so the existing templates render it unchanged. Crucially, in this
+  mode a product's ``id`` is its **Tienda Nube product id**, so a cart line carries a
+  TN id and the checkout resolver (``mirror_variant_resolver``) maps straight to a TN
+  variant — the loop is closed end to end.
+
+The adapter (``StorefrontProduct`` + ``RemoteMedia``) exposes exactly the read surface
+the templates and the cart use on a ``Product``/``Media`` (title, price, formatted_price,
+cover, media, images, videos, …). Tienda Nube serves plain image URLs with no responsive
+variants, so ``RemoteMedia`` advertises a single candidate and lets the ``<picture>``
+webp/avif sources fall through to the ``<img>`` — no template change, clean degradation.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Optional
+
+from flask import current_app, has_app_context
+
+from app.models import TiendaNubeProduct
+from app.repositories import ProductRepository
+
+SOURCE_ADMIN = "admin"
+SOURCE_TIENDANUBE = "tiendanube"
+
+
+def source() -> str:
+    """The active catalogue source, from ``CATALOG_SOURCE`` (default 'admin')."""
+    if not has_app_context():
+        return SOURCE_ADMIN
+    return (current_app.config.get("CATALOG_SOURCE") or SOURCE_ADMIN).strip().lower()
+
+
+def is_tiendanube() -> bool:
+    return source() == SOURCE_TIENDANUBE
+
+
+# --- Tienda Nube mirror adapters ---------------------------------------------
+
+
+class RemoteMedia:
+    """A ``Media``-compatible view over a single Tienda Nube image URL.
+
+    Tienda Nube has no responsive derivatives, so we advertise one candidate for the
+    JPEG ``<img>`` fallback and return an empty srcset for webp/avif — a ``<source>``
+    with an empty srcset is skipped by the browser, which then uses the ``<img>``. No
+    lie about content type, and no broken image.
+    """
+
+    is_image = True
+    is_video = False
+    has_avif = False
+    og_image_url = None
+
+    def __init__(
+        self,
+        src: str,
+        width: Optional[int] = None,
+        height: Optional[int] = None,
+        media_id: int = 0,
+    ) -> None:
+        self.src = src
+        # Stable per-image id so product_detail's "first image gets fetchpriority"
+        # comparison (m.id == first_image.id) picks exactly one image.
+        self.id = media_id
+        # Sane 4:5 default when Tienda Nube omits dimensions, so <img width/height>
+        # still reserves space (avoids layout shift).
+        self.width = int(width) if width else 1000
+        self.height = int(height) if height else 1250
+
+    @property
+    def smallest_width(self) -> int:
+        return self.width
+
+    @property
+    def largest_width(self) -> int:
+        return self.width
+
+    def image_url(self, width: Optional[int] = None, ext: str = "jpg") -> str:
+        return self.src
+
+    def image_srcset(self, ext: str = "jpg", max_width: Optional[int] = None) -> str:
+        return f"{self.src} {self.width}w" if ext == "jpg" else ""
+
+    @property
+    def default_image_url(self) -> str:
+        return self.src
+
+    @property
+    def thumb_url(self) -> str:
+        return self.src
+
+    # Present for interface parity (images-only in the POC; never rendered).
+    @property
+    def poster_url(self) -> str:
+        return self.src
+
+    @property
+    def video_url(self) -> str:
+        return self.src
+
+
+class StorefrontProduct:
+    """A ``Product``-compatible view over a mirrored ``TiendaNubeProduct`` row.
+
+    ``id`` is the Tienda Nube product id: cart lines built from these carry TN ids, so
+    the checkout resolver maps them straight to variants.
+    """
+
+    def __init__(self, row: TiendaNubeProduct) -> None:
+        self._row = row
+        self._media_cache: Optional[list[RemoteMedia]] = None
+
+    @property
+    def id(self) -> int:
+        return self._row.tn_id
+
+    @property
+    def title(self) -> str:
+        return self._row.name
+
+    @property
+    def description(self) -> Optional[str]:
+        return self._row.description
+
+    @property
+    def category(self) -> Optional[str]:
+        return self._row.category
+
+    @property
+    def currency(self) -> str:
+        return self._row.currency or "ARS"
+
+    @property
+    def is_published(self) -> bool:
+        return bool(self._row.published)
+
+    @property
+    def in_stock(self) -> bool:
+        return self._row.in_stock
+
+    @property
+    def updated_at(self) -> Any:
+        return self._row.updated_at
+
+    @property
+    def price(self) -> Optional[int]:
+        """Lowest variant price as whole ARS pesos (the storefront/cart use ints)."""
+        raw = self._row.price
+        if raw in (None, ""):
+            return None
+        try:
+            return int(round(float(raw)))
+        except (TypeError, ValueError):
+            return None
+
+    @property
+    def formatted_price(self) -> Optional[str]:
+        price = self.price
+        if price is None:
+            return None
+        return "$ " + f"{price:,.0f}".replace(",", ".")
+
+    def _media(self) -> list[RemoteMedia]:
+        if self._media_cache is not None:
+            return self._media_cache
+        result: list[RemoteMedia] = []
+        raw = self._row.raw if isinstance(self._row.raw, dict) else {}
+        images = raw.get("images")
+        if isinstance(images, list) and images:
+            for index, img in enumerate(sorted(images, key=lambda i: (i or {}).get("position") or 0)):
+                src = (img or {}).get("src")
+                if src:
+                    result.append(
+                        RemoteMedia(src, img.get("width"), img.get("height"), media_id=img.get("id") or index + 1)
+                    )
+        else:
+            # Fallback: the mirror keeps a flat list of src strings.
+            for index, src in enumerate(self._row.images or []):
+                if src:
+                    result.append(RemoteMedia(src, media_id=index + 1))
+        self._media_cache = result
+        return result
+
+    @property
+    def media(self) -> list[RemoteMedia]:
+        return self._media()
+
+    @property
+    def images(self) -> list[RemoteMedia]:
+        return self._media()
+
+    @property
+    def videos(self) -> list[RemoteMedia]:
+        # Tienda Nube product videos are external embeds; the POC renders images only.
+        return []
+
+    @property
+    def cover(self) -> Optional[RemoteMedia]:
+        media = self._media()
+        return media[0] if media else None
+
+
+def _published_query():
+    return TiendaNubeProduct.query.filter_by(published=True).order_by(TiendaNubeProduct.tn_id.asc())
+
+
+# --- facade (source-dispatching) ---------------------------------------------
+
+
+def get_published() -> list[Any]:
+    if is_tiendanube():
+        return [StorefrontProduct(row) for row in _published_query().all()]
+    return ProductRepository.get_published()
+
+
+def get_by_id(product_id: int) -> Any:
+    if is_tiendanube():
+        row = TiendaNubeProduct.query.filter_by(tn_id=int(product_id)).one_or_none()
+        return StorefrontProduct(row) if row is not None else None
+    return ProductRepository.get_by_id(product_id)
+
+
+def get_published_by_category(category: str) -> list[Any]:
+    if is_tiendanube():
+        rows = _published_query().filter_by(category=category).all()
+        return [StorefrontProduct(row) for row in rows]
+    return ProductRepository.get_published_by_category(category)
+
+
+def published_categories() -> list[str]:
+    if is_tiendanube():
+        seen: list[str] = []
+        for row in _published_query().all():
+            if row.category and row.category not in seen:
+                seen.append(row.category)
+        return seen
+    return ProductRepository.published_categories()
+
+
+def get_related(product: Any, limit: int = 4) -> list[Any]:
+    if is_tiendanube():
+        others = [p for p in get_published() if p.id != product.id]
+        same = [p for p in others if product.category and p.category == product.category]
+        rest = [p for p in others if p not in same]
+        return (same + rest)[:limit]
+    return ProductRepository.get_related(product, limit)
+
+
+def is_purchasable(product: Any) -> bool:
+    """A product can be bought online: published, priced and in stock.
+
+    Source-agnostic (plain attribute checks). ``Product`` has no ``in_stock``, so it
+    defaults to True there — preserving the admin-source behaviour exactly.
+    """
+    return (
+        product is not None
+        and getattr(product, "is_published", False)
+        and getattr(product, "price", None) is not None
+        and getattr(product, "in_stock", True)
+    )
