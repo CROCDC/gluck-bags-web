@@ -267,9 +267,13 @@ Calidad / decisiones:
       resolver usa la primera variante.
 - [ ] **Contacto placeholder** en el draft order (`Cliente/Web/ventas@gluckbags.com`): el comprador
       completa lo real en el checkout de TN. Verificar que ese paso se sienta bien.
-- [ ] **Chequeo de seguridad** antes del go-live: revisar el endpoint público de webhooks (HMAC,
-      superficie), el manejo del token, el resguardo de secrets (Infisical), CSRF/headers del checkout
-      y el `/tn/callback` (solo setup). Correr `/security-review` sobre el diff.
+- [x] **Chequeo de seguridad** (hecho 2026-07-13, `/security-review` sobre el diff). Sin hallazgos
+      HIGH. Verificados OK: HMAC del webhook (raw body + `compare_digest` + 503 si falta el secret →
+      no forjable), manejo del token/secret (sin leaks), `redirect_url` del checkout (viene de la
+      respuesta server-to-server de TN → sin open redirect ni price tampering), JSON-LD, `/tn/callback`
+      (autoescapado). Un hallazgo MEDIUM corregido: `cart.js` escapaba `it.title` pero no `it.image`/
+      `it.url` en el drawer (contenido externo del mirror) → ahora se escapa parejo, con test E2E de
+      regresión.
 
 ### Cómo activar el circuito completo (una vez que hay token)
 1. Completar `.env`: `TN_STORE_ID`, `TN_ACCESS_TOKEN`, `TN_CLIENT_SECRET` (para webhooks).
