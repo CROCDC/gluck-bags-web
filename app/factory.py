@@ -305,22 +305,29 @@ def create_app() -> Flask:
         from app.cart import register_cart
         from app.routes import register_routes
         from app.seed import seed_initial_products
-        from app.tiendanube import register_tiendanube
 
         _initialize_schema(data_dir, seed_initial_products)
 
         register_routes(app)
         register_admin(app)
         register_cart(app)
-        register_tiendanube(app)
 
-        # Hourly mirror sync: registers the `flask sync-tn` command and, when Tienda
-        # Nube credentials are present, starts the background sync thread (no-op in
-        # dev/test without a token). See app/services/tn_scheduler.py.
-        from app.services.tn_scheduler import register_cli, start_scheduler
+        # Tienda Nube wiring (webhook receiver, /tn/callback, `flask sync-tn` + the
+        # hourly sync thread). Isolated in a guard so a failure here — a missing
+        # dependency, an import error — degrades only the TN integration and never
+        # takes down the core storefront (inert under CATALOG_SOURCE=admin). A boot
+        # error here 502'd the whole site once; the guard makes that impossible.
+        try:
+            from app.services.tn_scheduler import register_cli, start_scheduler
+            from app.tiendanube import register_tiendanube
 
-        register_cli(app)
-        start_scheduler(app)
+            register_tiendanube(app)
+            register_cli(app)
+            start_scheduler(app)
+        except Exception:  # noqa: BLE001 — the storefront must boot regardless of TN
+            app.logger.exception(
+                "Tienda Nube wiring failed to initialize; continuing without it"
+            )
 
     # After routes exist, so the trailing-slash normalizer can probe the url_map.
     _register_url_normalization(app)
