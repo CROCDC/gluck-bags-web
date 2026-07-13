@@ -52,13 +52,18 @@
 
   /* ---- drawer rendering ---- */
   function lineHTML(it) {
+    // Escape EVERY interpolated value (not just title): it.image comes from the
+    // catalogue source's cover URL, which under CATALOG_SOURCE=tiendanube is external
+    // (mirrored Tienda Nube data). An unescaped value in an attribute could break out
+    // of src="/href=" — escapeHtml keeps it inert while staying a valid URL.
+    const url = escapeHtml(it.url);
     return (
       '<li class="cart-line" data-cart-line="' + it.id + '">' +
-      '<a class="cart-line-media" href="' + it.url + '">' +
-      (it.image ? '<img src="' + it.image + '" alt="" width="72" height="90" loading="lazy">' : "") +
+      '<a class="cart-line-media" href="' + url + '">' +
+      (it.image ? '<img src="' + escapeHtml(it.image) + '" alt="" width="72" height="90" loading="lazy">' : "") +
       "</a>" +
       '<div class="cart-line-info">' +
-      '<a class="cart-line-title" href="' + it.url + '">' + escapeHtml(it.title) + "</a>" +
+      '<a class="cart-line-title" href="' + url + '">' + escapeHtml(it.title) + "</a>" +
       '<span class="cart-line-price">' + it.price_formatted + "</span>" +
       '<div class="qty-stepper">' +
       '<button class="qty-btn" data-qty-dec aria-label="Quitar uno">−</button>' +

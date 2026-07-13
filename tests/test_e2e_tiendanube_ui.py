@@ -47,7 +47,7 @@ def _free_port() -> int:
 def _seed_payloads() -> list[dict[str, Any]]:
     """Two published, purchasable TN products with a real, same-origin image."""
 
-    def mk(tn_id: int, name: str, price: int, category: str) -> dict[str, Any]:
+    def mk(tn_id: int, name: str, price: int, category: str, img_src: str = "/static/img/og-image.jpg") -> dict[str, Any]:
         return {
             "id": tn_id,
             "name": {"es": name},
@@ -58,10 +58,17 @@ def _seed_payloads() -> list[dict[str, Any]]:
             "categories": [{"id": 1, "name": {"es": category}}],
             "variants": [{"id": tn_id * 10, "price": f"{price}.00", "stock": 8}],
             # Same-origin real asset so <img> loads and dimensions reserve space.
-            "images": [{"id": tn_id * 100, "src": "/static/img/og-image.jpg", "position": 1, "width": 1200, "height": 630}],
+            "images": [{"id": tn_id * 100, "src": img_src, "position": 1, "width": 1200, "height": 630}],
         }
 
-    return [mk(101, "Tote Cognac", 45000, "Tote"), mk(102, "Mini Rosa", 30000, "Mini Bag")]
+    return [
+        mk(101, "Tote Cognac", 45000, "Tote"),
+        mk(102, "Mini Rosa", 30000, "Mini Bag"),
+        # A mirrored product whose TN image src is an attribute-breaking XSS payload
+        # (invalid URL so a pre-fix drawer would fire the injected onerror). Exercises
+        # the escaping in cart.js lineHTML.
+        mk(103, "XSS Probe", 15000, "Tote", img_src='x" onerror="window.__xss=1"'),
+    ]
 
 
 @pytest.fixture(scope="module")
@@ -176,6 +183,24 @@ def test_checkout_without_credentials_shows_feedback(tn_live_server: str, page: 
     feedback = page.locator("[data-cart-feedback]").first
     expect(feedback).to_be_visible()
     expect(page).to_have_url(re.compile(r"/carrito$"))
+
+
+# --- 4b. the drawer escapes an attribute-breaking image src (stored-XSS guard) ---
+
+
+def test_drawer_escapes_malicious_image_src(tn_live_server: str, page: Page) -> None:
+    """A TN-mirrored product whose image src is `x" onerror="..."` must NOT inject an
+    onerror handler when cart.js builds the drawer HTML. Guards the escaping in
+    lineHTML (the server-rendered cart.html is already safe via Jinja)."""
+    page.goto(f"{tn_live_server}/producto/103", wait_until="load")
+    page.locator('[data-add-to-cart="103"]').click()
+    page.wait_for_function("() => document.querySelector('[data-cart-count]').textContent === '1'")
+
+    # The payload's `onerror` must not have survived as a real attribute...
+    assert page.locator("#cartDrawer img[onerror]").count() == 0
+    # ...and must not have executed (the img src is invalid, so a raw injection would
+    # have fired onerror by now).
+    assert page.evaluate("() => window.__xss") is None
 
 
 # --- 5. /gracias renders and clears the cart ---------------------------------
