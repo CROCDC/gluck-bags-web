@@ -1,15 +1,16 @@
-"""Server-side shopping cart (headless POC, Fase 3a).
+"""Server-side shopping cart.
 
 The cart lives in the signed Flask session as a simple ``{product_id: qty}`` map;
 `build()` turns it into rich, display-ready line items by looking each product up
-through `ProductRepository`. Products are the source of pricing, so a line whose
-product was unpublished, deleted or had its price cleared is silently dropped when
-the cart is rebuilt — the cart can never show a stale or unpurchasable item.
+through the `catalog` facade (in prod, the Tienda Nube mirror — ids are TN product
+ids). Products are the source of pricing, so a line whose product was unpublished,
+deleted or had its price cleared is silently dropped when the cart is rebuilt — the
+cart can never show a stale or unpurchasable item.
 
-Only **purchasable** products (published + with a price) can be added; the rest keep
-the "Consultar por Instagram" flow. When the Tienda Nube checkout handoff lands
-(Fase 3b), `build()` stays the same and only the checkout endpoint changes: it will
-create the TN cart from these line items and redirect.
+Only **purchasable** products (published + priced + in stock) can be added; the
+rest fall back to the PDP's "Consultar por Instagram" secondary channel. The
+checkout endpoint turns these line items into a TN draft order and redirects to its
+hosted checkout (see checkout_service).
 
 Every function runs inside a Flask request context (it reads `session`).
 """
@@ -53,11 +54,22 @@ def _clamp_qty(qty: Any) -> int:
         return 0
 
 
+def _reconcile_pending_checkout() -> None:
+    """Settle a completed TN handoff before reading or mutating the cart, so a
+    buyer who never returned to /gracias can't re-buy (or keep seeing) lines they
+    already purchased. Lazy import: checkout_service pulls the TN client chain,
+    which must never load at boot (see the factory's TN guard)."""
+    from app.services import checkout_service
+
+    checkout_service.reconcile_pending()
+
+
 # --- mutations ---------------------------------------------------------------
 
 
 def add(product_id: int, qty: int = 1) -> None:
     """Add `qty` of a product (accumulates with what's already in the cart)."""
+    _reconcile_pending_checkout()
     pid = str(int(product_id))
     raw = _raw()
     total = _clamp_qty(raw.get(pid, 0) + _clamp_qty(qty))
@@ -70,6 +82,7 @@ def add(product_id: int, qty: int = 1) -> None:
 
 def set_qty(product_id: int, qty: int) -> None:
     """Set the absolute quantity for a product (0 removes it)."""
+    _reconcile_pending_checkout()
     pid = str(int(product_id))
     raw = _raw()
     clamped = _clamp_qty(qty)
@@ -81,8 +94,23 @@ def set_qty(product_id: int, qty: int) -> None:
 
 
 def remove(product_id: int) -> None:
+    _reconcile_pending_checkout()
     raw = _raw()
     raw.pop(str(int(product_id)), None)
+    _save(raw)
+
+
+def remove_quantities(items: dict[str, int]) -> None:
+    """Subtract quantities (the lines of a completed TN checkout) without touching
+    lines added afterwards. No reconcile hook: this IS the reconciliation write."""
+    raw = _raw()
+    for pid, qty in items.items():
+        key = str(pid)
+        left = raw.get(key, 0) - _clamp_qty(qty)
+        if left > 0:
+            raw[key] = left
+        else:
+            raw.pop(key, None)
     _save(raw)
 
 
@@ -94,8 +122,15 @@ def clear() -> None:
 
 
 def count() -> int:
-    """Total item quantity, straight from the session (no DB) — for the header badge."""
+    """Total item quantity, straight from the session (no DB, no reconcile) — the
+    header badge renders on every page and must stay free of I/O; a stale badge
+    settles on the next cart interaction."""
     return sum(_raw().values())
+
+
+def raw_items() -> dict[str, int]:
+    """A copy of the raw {product_id: qty} map (the checkout handoff snapshot)."""
+    return dict(_raw())
 
 
 def is_purchasable(product: Any) -> bool:
@@ -113,6 +148,7 @@ def build() -> dict[str, Any]:
     the item count, and the subtotal. Shipping/taxes are intentionally absent — they
     are computed by Tienda Nube at checkout.
     """
+    _reconcile_pending_checkout()
     raw = _raw()
     items: list[dict[str, Any]] = []
     subtotal = 0

@@ -1,9 +1,10 @@
 from typing import Any
 
-from flask import Flask, Response, abort, render_template, url_for
+from flask import Flask, Response, abort, redirect, render_template, url_for
 
 from app.services import catalog
 from app.seo import (
+    absolute_url,
     breadcrumb_jsonld,
     category_breadcrumb_jsonld,
     dump_jsonld,
@@ -39,7 +40,7 @@ CATEGORIES: list[dict[str, str]] = [
 ]
 
 # Editorial trust pages (E-E-A-T). Each renders templates/pages/<template> and is
-# listed in the sitemap. Contact details / legal copy are placeholders to refine.
+# listed in the sitemap.
 STATIC_PAGES: dict[str, dict[str, str]] = {
     "nosotras": {
         "template": "nosotras.html",
@@ -49,7 +50,7 @@ STATIC_PAGES: dict[str, dict[str, str]] = {
     "contacto": {
         "template": "contacto.html",
         "title": "Contacto",
-        "description": "Escribinos por Instagram, WhatsApp o email. Te ayudamos a elegir tu bolso GLÜCK y coordinamos el envío.",
+        "description": "Escribinos por Instagram y te ayudamos a elegir tu bolso GLÜCK. Las compras se hacen online en la tienda del sitio.",
     },
     "envios": {
         "template": "envios.html",
@@ -64,7 +65,7 @@ STATIC_PAGES: dict[str, dict[str, str]] = {
     "terminos": {
         "template": "terminos.html",
         "title": "Términos y condiciones",
-        "description": "Términos y condiciones de uso y de compra del sitio de GLÜCK: cómo comprar, coordinar pagos y envíos por Instagram, y las condiciones generales del servicio.",
+        "description": "Términos y condiciones de uso y de compra del sitio de GLÜCK: cómo comprar online, medios de pago, envíos y las condiciones generales del servicio.",
     },
     "privacidad": {
         "template": "privacidad.html",
@@ -98,6 +99,12 @@ CATEGORY_INTRO: dict[str, str] = {
 }
 
 
+# Slugs of the curated category cards: permanent URLs with pre-migration ranking
+# history, kept indexable and sitemap-listed even while empty (their editorial
+# intro carries the page until the TN catalogue fills them).
+CURATED_SLUGS: list[str] = [slugify(c["name"]) for c in CATEGORIES]
+
+
 def _category_name_for_slug(slug: str) -> str | None:
     """Map a URL slug back to a category name. Considers both the curated category
     cards and any category actually present on published products."""
@@ -111,6 +118,13 @@ def _category_name_for_slug(slug: str) -> str | None:
 def register_routes(app: Flask) -> None:
     # Expose slugify to templates so links can build /categoria/<slug> URLs.
     app.add_template_filter(slugify, "slugify")
+
+    # Media URLs may be root-relative (admin uploads) or absolute (TN CDN); this
+    # keeps og:image/twitter:image from double-prefixing the absolute ones.
+    def _absolute(url: str | None) -> str | None:
+        return absolute_url(url, app.config["SITE_URL"])
+
+    app.add_template_filter(_absolute, "absolute")
 
     @app.route("/")
     def index() -> str:
@@ -130,9 +144,23 @@ def register_routes(app: Flask) -> None:
         return render_template("index.html", **context)
 
     @app.route("/producto/<int:product_id>")
-    def product_detail(product_id: int) -> str:
+    def product_detail(product_id: int) -> Any:
         product = catalog.get_by_id(product_id)
         if product is None or not product.is_published:
+            # Pre-migration /producto/<id> URLs (Google-indexed) meant legacy admin
+            # ids; under the TN source the same route means TN ids, so those URLs
+            # would 404. The legacy table is still the source of truth for what
+            # each id was — 301 to its category to transfer the equity. Only under
+            # the TN source: legacy ids never collide with 9-digit TN ids there,
+            # and under the admin source an unpublished product stays a 404.
+            if catalog.is_tiendanube():
+                from app.repositories import ProductRepository
+
+                legacy = ProductRepository.get_by_id(product_id)
+                if legacy is not None and legacy.category:
+                    slug = slugify(legacy.category)
+                    if _category_name_for_slug(slug) is not None:
+                        return redirect(url_for("category_page", slug=slug), code=301)
             abort(404)
         site_url = app.config["SITE_URL"]
         jsonld = dump_jsonld(
@@ -161,8 +189,9 @@ def register_routes(app: Flask) -> None:
             # Sibling categories (non-empty) for the inter-category nav chips.
             nav_categories=catalog.published_categories(),
             jsonld=dump_jsonld(category_breadcrumb_jsonld(name, site_url)),
-            # An empty (but known) category is a thin page — keep it out of the index.
-            noindex=not products,
+            # Curated categories stay indexable even while empty (see CURATED_SLUGS);
+            # only ad-hoc empty categories (free-text admin input) leave the index.
+            noindex=not products and slug not in CURATED_SLUGS,
         )
 
     # Register the editorial trust pages from STATIC_PAGES (one thin view each).
@@ -206,10 +235,18 @@ def register_routes(app: Flask) -> None:
             urls.append(
                 {"loc": f"{site_url}/{slug}", "lastmod": None, "changefreq": "yearly", "priority": "0.3"}
             )
-        for name in catalog.published_categories():
+        # Curated categories are always listed (same rule as the noindex exemption
+        # in category_page); published_categories() adds ad-hoc ones with products.
+        category_slugs = list(CURATED_SLUGS)
+        category_slugs += [
+            slug
+            for slug in (slugify(n) for n in catalog.published_categories())
+            if slug not in category_slugs
+        ]
+        for slug in category_slugs:
             urls.append(
                 {
-                    "loc": f"{site_url}/categoria/{slugify(name)}",
+                    "loc": f"{site_url}/categoria/{slug}",
                     "lastmod": None,
                     "changefreq": "weekly",
                     "priority": "0.8",

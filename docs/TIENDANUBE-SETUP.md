@@ -56,7 +56,7 @@ TN_ACCESS_TOKEN=<access_token>
 python scripts/tn_spike.py --all
 ```
 Debería imprimir el nombre de tu tienda, categorías y productos. Si eso anda, el POC
-tiene contra qué correr: `/checkout` deja de responder `integration_pending` y el resto
+tiene contra qué correr: `/checkout` deja de responder `not_configured` y el resto
 de las fases se pueden probar de verdad.
 
 ---

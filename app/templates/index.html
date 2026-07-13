@@ -37,7 +37,7 @@
                 <p class="hero-sub">Bolsos de líneas puras, pensados para durar. Sin pieles, sin excesos.</p>
                 <div class="hero-actions">
                     <a href="#categorias" class="btn btn-light">Ver la colección</a>
-                    <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-ghost" data-umami-event="comprar-instagram" data-umami-event-ubicacion="hero">Comprar ahora</a>
+                    <a href="#shop" class="btn btn-ghost" data-umami-event="ir-al-shop" data-umami-event-ubicacion="hero">Comprar ahora</a>
                 </div>
             </div>
 
@@ -136,7 +136,8 @@
                     <li>Cortada con láser desde un molde propio</li>
                     <li>Plegada y unida con remaches y broches</li>
                 </ul>
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark" data-umami-event="comprar-instagram" data-umami-event-ubicacion="feature">Quiero el mío</a>
+                {% set tote_url = url_for('category_page', slug='tote') if 'tote' in published_cats else '#shop' %}
+                <a href="{{ tote_url }}" class="btn btn-dark" data-umami-event="ir-al-shop" data-umami-event-ubicacion="feature">Quiero el mío</a>
             </div>
         </section>
 
@@ -255,15 +256,15 @@
                 <p class="eyebrow">Listo para regalar</p>
                 <h2 class="section-title">Cada pedido llega<br>como un regalo</h2>
                 <p class="feature-body">
-                    Empaque kraft con el sello {{ brand }}. Hacé tu pedido por Instagram y te
-                    acompañamos en todo el proceso.
+                    Empaque kraft con el sello {{ brand }}. Hacé tu pedido en la tienda online
+                    y lo recibís listo para regalar; si tenés dudas, te acompañamos por Instagram.
                 </p>
                 <ul class="feature-specs closer-specs">
                     <li>Envíos a todo el país</li>
                     <li>Packaging de regalo incluido</li>
-                    <li>Atención personalizada por mensaje</li>
+                    <li>Atención personalizada por Instagram</li>
                 </ul>
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-light-on-dark" data-umami-event="comprar-instagram" data-umami-event-ubicacion="closer">Escribinos por Instagram</a>
+                <a href="#shop" class="btn btn-light-on-dark" data-umami-event="ir-al-shop" data-umami-event-ubicacion="closer">Ver los bolsos</a>
             </div>
         </section>
 

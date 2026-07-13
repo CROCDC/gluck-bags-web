@@ -80,12 +80,19 @@ def test_callback_with_code_shows_it(client) -> None:
 # --- /gracias ----------------------------------------------------------------
 
 
-def test_gracias_clears_the_cart(app) -> None:
+def test_gracias_clears_the_cart_after_a_handoff(app) -> None:
+    """Only a session that actually handed a checkout to TN gets its cart cleared
+    on /gracias — the URL is publicly reachable (see the cart-routes tests for the
+    no-handoff case)."""
+    from app.services import checkout_service
+
     c = app.test_client()
     with c.session_transaction() as sess:
         sess[cart_service.CART_SESSION_KEY] = {"1": 2}
+        sess[checkout_service.PENDING_SESSION_KEY] = {"id": 9, "ts": 0, "checked": 0, "items": {}}
     resp = c.get("/gracias")
     assert resp.status_code == 200
     assert "Gracias por tu compra".encode() in resp.data
     with c.session_transaction() as sess:
         assert not sess.get(cart_service.CART_SESSION_KEY)
+        assert checkout_service.PENDING_SESSION_KEY not in sess

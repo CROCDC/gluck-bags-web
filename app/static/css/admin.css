@@ -99,6 +99,7 @@ img { display: block; max-width: 100%; }
 }
 .adm-flash-success { background: rgba(46,125,82,0.1); border-color: rgba(46,125,82,0.35); color: var(--adm-ok); }
 .adm-flash-error { background: rgba(192,57,43,0.08); border-color: rgba(192,57,43,0.35); color: var(--adm-err); }
+.adm-flash-notice { background: rgba(181,106,58,0.1); border-color: rgba(181,106,58,0.4); color: #8a4f28; }
 
 /* ---------- login ---------- */
 .adm-login {

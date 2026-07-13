@@ -479,11 +479,17 @@ def test_category_unknown_slug_404s(client: FlaskClient) -> None:
     assert resp.status_code == 404
 
 
-def test_empty_known_category_is_noindex(client: FlaskClient) -> None:
-    """A known category card with no products yet renders (200) but is noindex'd."""
+def test_empty_curated_category_stays_indexable(client: FlaskClient) -> None:
+    """The four curated categories are permanent URLs with pre-migration ranking:
+    even with no products yet they render 200, stay indexable (their editorial
+    intro carries the page) and remain listed in the sitemap."""
     resp = client.get("/categoria/bucket-bag")  # in CATEGORIES, no seeded products
     assert resp.status_code == 200
-    assert 'name="robots" content="noindex"' in resp.get_data(as_text=True)
+    html = resp.get_data(as_text=True)
+    assert 'name="robots" content="noindex"' not in html
+    assert "Próximamente" in html or "Muy pronto" in html
+    sitemap = client.get("/sitemap.xml").get_data(as_text=True)
+    assert "/categoria/bucket-bag" in sitemap
 
 
 # --- Related products on the PDP ----------------------------------------------

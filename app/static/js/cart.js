@@ -1,6 +1,6 @@
-// GLÜCK — carrito (headless POC, Fase 3a)
-// Drawer + página /carrito. Toda mutación devuelve el carrito completo desde el
-// backend, así que el front sólo renderiza lo que recibe (no reconcilia estado).
+// GLÜCK — cart (drawer + /carrito page). Every mutation returns the full cart from
+// the backend, so the frontend only renders what it receives (no state reconciling).
+// Checkout hands off to Tienda Nube's hosted checkout via POST /checkout.
 
 (function () {
   "use strict";
@@ -221,14 +221,26 @@
     const checkout = e.target.closest("[data-cart-checkout]");
     if (checkout) {
       e.preventDefault();
-      checkout.disabled = true;
-      const r = await api("/checkout", {});
-      checkout.disabled = false;
-      const d = r.data || {};
-      if (d.ready && d.redirect_url) {
-        window.location.href = d.redirect_url; // Fase 3b: redirect a Tienda Nube
+      // TN requires a buyer email to open the draft order; it also prefills the
+      // hosted checkout, so the confirmation email reaches the real buyer.
+      const scope = checkout.closest("[data-cart-foot], .cart-summary");
+      const emailInput = scope ? scope.querySelector("[data-checkout-email]") : null;
+      const email = emailInput ? emailInput.value.trim() : "";
+      if (emailInput && (!email || !emailInput.checkValidity())) {
+        showFeedback(checkout, "Ingresá tu email para recibir la confirmación del pedido.");
+        emailInput.focus();
         return;
       }
+      checkout.disabled = true;
+      const r = await api("/checkout", { email: email });
+      const d = r.data || {};
+      if (d.ready && d.redirect_url) {
+        // Stay disabled while the browser navigates: a second click here would
+        // create a duplicate TN draft order and overwrite the tracked handoff.
+        window.location.href = d.redirect_url; // Tienda Nube hosted checkout
+        return;
+      }
+      checkout.disabled = false;
       showFeedback(
         checkout,
         d.message || "No pudimos iniciar el checkout. Probá de nuevo en un momento."

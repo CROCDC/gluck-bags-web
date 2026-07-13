@@ -2,9 +2,8 @@
 
 Plain dicts so they're unit-testable; routes serialize them with `json.dumps` and
 the templates emit `<script type="application/ld+json">`. Kept faithful to the
-visible page: no invented price (the catalogue sells via Instagram and shows
-"Consultar"), so `offers` is emitted only when a real price exists — fabricated
-markup risks a manual spam action.
+visible page: `offers` is emitted only when a real price exists (unpriced products
+render "Consultar" and get no Offer) — fabricated markup risks a manual spam action.
 """
 
 from __future__ import annotations
@@ -70,14 +69,29 @@ def website_jsonld(site_url: str) -> dict[str, Any]:
     }
 
 
+def absolute_url(url: str | None, site_url: str) -> str | None:
+    """Absolutize a media URL. Admin media is root-relative (/media/...), but the
+    Tienda Nube mirror serves absolute CDN URLs — prefixing those would produce an
+    invalid double-scheme URL, so only root-relative paths get the site origin."""
+    if not url:
+        return None
+    if url.startswith("//"):
+        # Protocol-relative (some CDNs): pin https rather than emitting a URL that
+        # og:image consumers may resolve against the wrong scheme.
+        return f"https:{url}"
+    if url.startswith(("http://", "https://")):
+        return url
+    return f"{site_url}{url}"
+
+
 def _cover_image(product: Product, site_url: str) -> str | None:
     cover = product.cover
     if cover is None:
         return None
     if cover.is_image and cover.default_image_url:
-        return f"{site_url}{cover.default_image_url}"
+        return absolute_url(cover.default_image_url, site_url)
     if cover.is_video:
-        return f"{site_url}{cover.poster_url}"
+        return absolute_url(cover.poster_url, site_url)
     return None
 
 
@@ -99,13 +113,19 @@ def product_jsonld(product: Product, site_url: str) -> dict[str, Any]:
         data["image"] = [image]
     if product.category:
         data["category"] = product.category
-    # Only emit an Offer when there is a real price — never fabricate one.
+    # Only emit an Offer when there is a real price — never fabricate one. The TN
+    # mirror tracks real stock and the cart refuses out-of-stock adds — keep the
+    # markup honest instead of promising InStock unconditionally.
     if product.price is not None:
         data["offers"] = {
             "@type": "Offer",
             "price": str(product.price),
             "priceCurrency": product.currency,
-            "availability": "https://schema.org/InStock",
+            "availability": (
+                "https://schema.org/InStock"
+                if product.in_stock
+                else "https://schema.org/OutOfStock"
+            ),
             "url": url,
         }
     return data

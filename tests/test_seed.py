@@ -36,13 +36,13 @@ def _seed_count() -> int:
 def test_seed_populates_empty_db(tmp_path, monkeypatch) -> None:
     app = _build_seeded_app(tmp_path, monkeypatch)
     expected = _seed_count()
-    assert expected == 6  # guard: catalogue mirrors the 6 live products
+    assert expected == 6  # guard: seed mirrors the 6-product pre-migration lookbook
 
     with app.app_context():
         products = Product.query.order_by(Product.position).all()
         assert len(products) == expected
 
-        # Order + per-product invariants mirror seed.py / production.
+        # Order + per-product invariants mirror seed.py (the legacy admin source).
         for index, (product, (title, category, _stem)) in enumerate(
             zip(products, seed_module._SEED)
         ):
@@ -50,8 +50,8 @@ def test_seed_populates_empty_db(tmp_path, monkeypatch) -> None:
             assert product.category == category
             assert isinstance(product.category, str) and product.category
             assert product.is_published is True
-            assert product.price is None  # prod shows "Consultar", not a price
-            assert product.description is None  # prod has no descriptions
+            assert product.price is None  # legacy lookbook showed "Consultar"
+            assert product.description is None  # the legacy lookbook had none
             assert product.position == index
 
             # Exactly one media row, the cover image.

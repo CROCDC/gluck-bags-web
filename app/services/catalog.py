@@ -4,9 +4,10 @@ The storefront (home, product detail, category, sitemap) and the cart read produ
 through THIS module instead of talking to a repository directly. That indirection is
 the swap seam: a single flag, ``CATALOG_SOURCE``, decides where products come from.
 
-- ``admin`` (default) — the admin-managed ``Product`` table, via ``ProductRepository``.
-  The site behaves exactly as before; this is production today.
-- ``tiendanube`` — the mirrored Tienda Nube catalogue (``TiendaNubeProduct``), wrapped
+- ``admin`` (code default; dev/rollback) — the admin-managed ``Product`` table, via
+  ``ProductRepository``. The pre-migration site.
+- ``tiendanube`` (**production**, via Infisical) — the mirrored Tienda Nube catalogue
+  (``TiendaNubeProduct``), wrapped
   in a thin adapter so the existing templates render it unchanged. Crucially, in this
   mode a product's ``id`` is its **Tienda Nube product id**, so a cart line carries a
   TN id and the checkout resolver (``mirror_variant_resolver``) maps straight to a TN

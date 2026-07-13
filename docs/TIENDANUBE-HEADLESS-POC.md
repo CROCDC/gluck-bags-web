@@ -209,7 +209,7 @@ Decisiones tomadas por defecto: **Opción A + tienda TN oculta + BFF en el mismo
 | **1 — Spike lectura** | ✅ | `app/services/tiendanube_client.py` (auth, paginación, rate-limit, `create_checkout`), `scripts/tn_spike.py`, tests mockeados. |
 | **2 — Mirror catálogo** | ✅ | `app/models/tiendanube.py` (`TiendaNubeProduct`), `app/services/catalog_sync.py` (sync/upsert/prune), tests. Tabla nueva, sin migración. |
 | **3a — Carrito propio** | ✅ | `cart_service` + `app/cart/` (API + `/carrito`), drawer + botón header + `cart.js`, estilos. Sobre `Product` del admin. |
-| **3b — Handoff checkout** | ✅ *(inerte hasta token)* | `app/services/checkout_service.py`: carrito → resolver variante TN (mirror) → `create_checkout` → `redirect_url`. `POST /checkout` ya lo usa; sin token responde `integration_pending` (sitio actual intacto). |
+| **3b — Handoff checkout** | ✅ *(live)* | `app/services/checkout_service.py`: cart → TN variant resolver (mirror) → `create_checkout` (with the buyer's email as contact) → `redirect_url`. `POST /checkout` uses it; without credentials it responds `not_configured` (an ops regression in prod, logged as error). |
 | **3c — Swap del storefront** | ✅ *(detrás de flag)* | `app/services/catalog.py`: facade `catalog.*` que sirve el storefront y el carrito desde `Product` (default) o desde `TiendaNubeProduct` según `CATALOG_SOURCE`. Con `tiendanube`, el id del producto es el id de TN → el carrito lleva ids de TN y el resolver mapea directo. Adapter `StorefrontProduct`/`RemoteMedia` para que los templates no cambien. |
 | **3d — Webhooks + /gracias** | ✅ | `app/services/webhook_service.py` + `POST /webhooks/tiendanube` (verifica HMAC-SHA256 con `TN_CLIENT_SECRET`) para `product/created\|updated\|deleted` (refresca el mirror) y `order/*` (ack). Página `/gracias` (limpia el carrito). Helper `/tn/callback` para la Fase 0. |
 
@@ -235,8 +235,17 @@ Tienda de prod definida: **`gluck29`** (store_id `7949553`); el dominio público
 `gluckbags.com`; el catálogo lo cargan los operadores en el admin de TN.
 
 Bloqueantes técnicos:
-- [ ] **Secrets en Infisical** (no en git): `TN_STORE_ID`, `TN_ACCESS_TOKEN`, `TN_CLIENT_ID`,
-      `TN_CLIENT_SECRET` (webhooks) y `CATALOG_SOURCE=tiendanube` cuando se prenda.
+- [x] **Secrets in Infisical** (done 2026-07-13): `TN_STORE_ID`, `TN_ACCESS_TOKEN`, `TN_CLIENT_ID`,
+      `TN_CLIENT_SECRET` and `CATALOG_SOURCE=tiendanube` — flipped live (commit 827b4fd).
+- [ ] **Payment methods in the TN admin** — **CRITICAL, found 2026-07-13**: the store has ZERO
+      gateways enabled; the hosted checkout renders "No encontramos ninguna opción de pago" and
+      the buy button does nothing. Enable Pago Nube / Mercado Pago before anything can sell.
+- [ ] **Shipping methods in the TN admin** — the only live option is "te contactamos para
+      coordinar · A convenir" (no carrier quotes). Configure real carriers so the checkout
+      quotes shipping by destination.
+- [ ] **Load the real catalogue** in the TN store — today it only has the placeholder "TEST"
+      product ($ 1.000), which is what gluckbags.com indexes and sells. Unpublish TEST once
+      real products exist.
 - [x] **Sync del mirror wireado.** Comando `flask sync-tn` (manual/cron) + **scheduler in-process
       horario** (`app/services/tn_scheduler.py`): thread daemon arrancado desde el factory, con
       **lock `fcntl` cross-worker** (un solo worker sincroniza) y **timestamp** (una corrida por
@@ -258,15 +267,24 @@ Bloqueantes técnicos:
 Calidad / decisiones:
 - [ ] **AFIP** (facturación electrónica): la maneja el checkout de TN. Verificar que la tienda tenga
       la config de facturación activa antes de vender. *(pendiente)*
-- [ ] **Redirect post-pago a `/gracias` (importante):** hoy TN muestra su propia página de gracias y
-      el comprador **no vuelve solo** a `gluckbags.com/gracias` (el webhook `order/paid` es
-      server-side). Definir cómo se lo trae de vuelta (config de checkout / script). *(importante)*
-- [ ] **Ocultar la tienda TN** (`gluck29.mitiendanube.com` → `noindex`/oculta) para no duplicar
-      contenido con `gluckbags.com`. *(acordado — más adelante, no ahora)*
+- [x] **Post-payment return to `/gracias`** (2026-07-13): confirmed against the live API that the
+      draft order carries **no configurable return/success URL**, so the buyer ends on TN's own
+      thank-you page. Mitigated with lazy reconciliation: `/checkout` stores the draft-order id in
+      the session and the next cart read polls `GET /draft_orders/{id}` (throttled) — a completed
+      checkout (`completed_at`/`paid_at`/`status=closed`) clears the already-purchased cart. A
+      TN-side checkout script could still improve this later.
+- [ ] **Hide the TN storefront** (`gluck29.mitiendanube.com`): it 302s to `/password/` ("Estamos
+      renovando la tienda… Volvé en unos días") with NO link back to gluckbags.com — and the
+      checkout header logo links there mid-purchase. Customize that under-construction page in the
+      TN admin to link https://gluckbags.com (found 2026-07-13).
 - [ ] **Selector de variantes** (talle/color) si los productos tienen más de una variante; hoy el
       resolver usa la primera variante.
-- [ ] **Contacto placeholder** en el draft order (`Cliente/Web/ventas@gluckbags.com`): el comprador
-      completa lo real en el checkout de TN. Verificar que ese paso se sienta bien.
+- [x] **Draft-order contact** (2026-07-13): TN hard-requires non-blank contact fields and
+      PRE-FILLS the hosted checkout with them (verified: empty/whitespace contact → 422/400), so
+      the placeholder meant order emails went to `ventas@gluckbags.com` and orders were named
+      "Cliente Web". Fixed: the cart now captures the buyer's email and sends it as
+      `contact_email` on the draft order. Names still default to "Cliente Web" — the buyer
+      confirms them at checkout.
 - [x] **Chequeo de seguridad** (hecho 2026-07-13, `/security-review` sobre el diff). Sin hallazgos
       HIGH. Verificados OK: HMAC del webhook (raw body + `compare_digest` + 503 si falta el secret →
       no forjable), manejo del token/secret (sin leaks), `redirect_url` del checkout (viene de la

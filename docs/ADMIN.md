@@ -1,9 +1,17 @@
 # Product Admin
 
-A simple, login-protected panel to manage the products shown on the GLÜCK site:
+A simple, login-protected panel to manage the products of the LEGACY catalogue:
 title, description, price, and multiple photos and videos per product. It is built
-for someone with no technical knowledge — uploads happen from the phone, media is
-optimized automatically, and changes appear on the site instantly (no deploy).
+for someone with no technical knowledge — uploads happen from the phone and media
+is optimized automatically.
+
+> **⚠️ Since the Tienda Nube migration (2026-07-13), the public site does NOT read
+> this catalogue.** Production runs `CATALOG_SOURCE=tiendanube`: the products shown
+> on gluckbags.com are managed in the **Tienda Nube admin** (store `gluck29`) and
+> mirrored automatically (webhooks + hourly sync). Changes made in this panel do
+> not appear on the site — it shows a banner saying so. The panel and its catalogue
+> remain as the local-dev source and the rollback fallback
+> (`CATALOG_SOURCE=admin`), where changes do appear instantly (no deploy).
 
 ## For the owner (how to use it)
 

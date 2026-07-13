@@ -20,6 +20,15 @@
     </header>
 
     <main class="adm-main">
+        {% if session.admin and config.get('CATALOG_SOURCE') == 'tiendanube' %}
+        <div class="adm-flashes">
+            <div class="adm-flash adm-flash-notice">
+                El catálogo público se administra en <strong>Tienda Nube</strong>:
+                lo que edites acá no aparece en el sitio. Este panel solo maneja el
+                catálogo legacy (fallback de rollback).
+            </div>
+        </div>
+        {% endif %}
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
         <div class="adm-flashes">

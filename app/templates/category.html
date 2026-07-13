@@ -7,7 +7,8 @@
 {% block description %}{{ category }}: carteras y bolsos de cuero vegano hechos a mano de {{ brand }}. Diseño minimalista y atemporal.{% endblock %}
 
 {% block head_extra %}
-    {# Keep empty (but known) categories out of the index until they have products. #}
+    {# Only ad-hoc empty categories are noindexed; the curated ones stay indexable
+       (the route decides). #}
     {% if noindex %}<meta name="robots" content="noindex">{% endif %}
     {% if jsonld %}<script type="application/ld+json">{{ jsonld | safe }}</script>{% endif %}
 {% endblock %}

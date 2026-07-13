@@ -1,13 +1,12 @@
-"""One-time seed: import the live catalogue into the DB/media.
+"""One-time seed: import the legacy admin catalogue into the DB/media.
 
-Mirrors exactly what production currently shows (gluck.nexttech.com.ar): the same
-6 products, in the same order, each with its category and a single cover image.
-Production has no prices and no descriptions (the cards link straight to
-Instagram), so those fields are seeded as NULL — see the nullable columns on
-Product.
+Mirrors the PRE-MIGRATION lookbook (6 products, no prices/descriptions — the era
+when the site sold via Instagram DM). Production now runs CATALOG_SOURCE=tiendanube
+and serves the TN mirror instead; this seed only backs the `admin` source, which
+remains the local-dev default and the rollback fallback.
 
 Runs on startup only when the products table is empty, so a fresh volume comes
-up with the existing catalogue (editable from the admin) instead of blank. The
+up with the legacy catalogue (editable from the admin) instead of blank. The
 source images are the full-res originals already shipped under static/.
 """
 
@@ -55,8 +54,8 @@ def seed_initial_products() -> None:
         product = Product(
             title=title,
             category=category,
-            description=None,  # not shown in prod
-            price=None,  # not shown in prod ("Consultar")
+            description=None,  # the legacy lookbook had none
+            price=None,  # legacy lookbook showed "Consultar"
             is_published=True,
             position=position,
         )

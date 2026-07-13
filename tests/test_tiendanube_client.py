@@ -211,7 +211,9 @@ def test_create_checkout_posts_draft_order_and_extracts_url() -> None:
         text="x",
     )
     client, session = _client([resp])
-    out = client.create_checkout([{"variant_id": 10, "quantity": 2}])
+    out = client.create_checkout(
+        [{"variant_id": 10, "quantity": 2}], contact={"contact_email": "ana@example.com"}
+    )
 
     call = session.calls[0]
     assert call["method"] == "POST"
@@ -220,8 +222,10 @@ def test_create_checkout_posts_draft_order_and_extracts_url() -> None:
     body = call["json"]
     assert body["products"] == [{"variant_id": 10, "quantity": 2}]
     assert body["payment_status"] == "pending"
-    # Contact fields are required by Tienda Nube to open a draft order.
-    assert body["contact_email"] and body["contact_name"]
+    # Contact fields are required by Tienda Nube to open a draft order; the email
+    # is the buyer's (no placeholder fallback), the names default generic.
+    assert body["contact_email"] == "ana@example.com"
+    assert body["contact_name"]
     assert out["id"] == 55
     assert out["checkout_url"].startswith("https://")
 
@@ -239,14 +243,27 @@ def test_create_checkout_accepts_custom_contact() -> None:
 
 def test_create_checkout_missing_url_returns_none() -> None:
     client, _ = _client([FakeResponse(json_data={"id": 9})])  # no url field
-    out = client.create_checkout([{"variant_id": 1, "quantity": 1}])
+    out = client.create_checkout(
+        [{"variant_id": 1, "quantity": 1}], contact={"contact_email": "ana@example.com"}
+    )
     assert out["checkout_url"] is None
 
 
 def test_create_checkout_empty_line_items_raises() -> None:
     client, _ = _client([])
     with pytest.raises(ValueError):
-        client.create_checkout([])
+        client.create_checkout([], contact={"contact_email": "ana@example.com"})
+
+
+def test_create_checkout_requires_buyer_email() -> None:
+    """No placeholder email fallback: a draft order without the real buyer's email
+    would send order confirmations to nobody."""
+    client, session = _client([FakeResponse(json_data={"id": 1, "checkout_url": "https://x/1"})])
+    with pytest.raises(ValueError):
+        client.create_checkout([{"variant_id": 1, "quantity": 1}])
+    with pytest.raises(ValueError):
+        client.create_checkout([{"variant_id": 1, "quantity": 1}], contact={"contact_email": "  "})
+    assert session.calls == []
 
 
 # --- webhooks ----------------------------------------------------------------

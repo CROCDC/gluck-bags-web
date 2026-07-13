@@ -171,14 +171,30 @@ def test_cart_page_lists_item_and_subtotal(tn_live_server: str, page: Page) -> N
 # --- 4. checkout degrades gracefully (no TN payment configured) --------------
 
 
-def test_checkout_without_credentials_shows_feedback(tn_live_server: str, page: Page) -> None:
+def test_checkout_requires_email_before_handoff(tn_live_server: str, page: Page) -> None:
+    """Clicking "Finalizar compra" without an email never leaves the page: the email
+    is what TN prefills at its hosted checkout, so the UI gates on it client-side."""
     page.goto(f"{tn_live_server}/producto/101", wait_until="load")
     page.locator('[data-add-to-cart="101"]').click()
     page.wait_for_function("() => document.querySelector('[data-cart-count]').textContent === '1'")
 
     page.goto(f"{tn_live_server}/carrito", wait_until="load")
     page.locator("[data-cart-checkout]").first.click()
-    # No token in this env -> integration_pending -> a visible message, never a crash
+    feedback = page.locator("[data-cart-feedback]").first
+    expect(feedback).to_be_visible()
+    expect(feedback).to_contain_text("email")
+    expect(page).to_have_url(re.compile(r"/carrito$"))
+
+
+def test_checkout_without_credentials_shows_feedback(tn_live_server: str, page: Page) -> None:
+    page.goto(f"{tn_live_server}/producto/101", wait_until="load")
+    page.locator('[data-add-to-cart="101"]').click()
+    page.wait_for_function("() => document.querySelector('[data-cart-count]').textContent === '1'")
+
+    page.goto(f"{tn_live_server}/carrito", wait_until="load")
+    page.locator(".cart-summary [data-checkout-email]").fill("ana@example.com")
+    page.locator("[data-cart-checkout]").first.click()
+    # No token in this env -> not_configured -> a visible message, never a crash
     # and never a redirect off-site.
     feedback = page.locator("[data-cart-feedback]").first
     expect(feedback).to_be_visible()
@@ -206,7 +222,9 @@ def test_drawer_escapes_malicious_image_src(tn_live_server: str, page: Page) -> 
 # --- 5. /gracias renders and clears the cart ---------------------------------
 
 
-def test_gracias_renders_and_clears_cart(tn_live_server: str, page: Page) -> None:
+def test_gracias_renders_and_preserves_unrelated_cart(tn_live_server: str, page: Page) -> None:
+    """Without a pending TN handoff (this session never checked out), /gracias must
+    NOT touch the in-progress cart — the URL is publicly reachable."""
     page.goto(f"{tn_live_server}/producto/101", wait_until="load")
     page.locator('[data-add-to-cart="101"]').click()
     page.wait_for_function("() => document.querySelector('[data-cart-count]').textContent === '1'")
@@ -214,10 +232,10 @@ def test_gracias_renders_and_clears_cart(tn_live_server: str, page: Page) -> Non
     page.goto(f"{tn_live_server}/gracias", wait_until="load")
     expect(page.get_by_role("heading", name="¡Gracias por tu compra!")).to_be_visible()
 
-    # Cart cleared: the badge is hidden/zero on the next page load.
+    # The visitor's cart survives: the badge still shows the item afterwards.
     page.goto(f"{tn_live_server}/", wait_until="load")
     badge = page.locator("[data-cart-count]").first
-    assert badge.get_attribute("hidden") is not None or badge.text_content() == "0"
+    assert badge.text_content() == "1"
 
 
 # --- 6. no horizontal overflow on the new pages ------------------------------

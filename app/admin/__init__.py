@@ -3,6 +3,11 @@
 Mounted at /admin. One shared password (ADMIN_PASSWORD). Designed to be usable
 from a phone by someone non-technical: big buttons, drag-and-drop media, the
 first photo is automatically the cover.
+
+Scope: this panel edits the LEGACY admin catalogue only. Production serves the
+storefront from the Tienda Nube mirror (CATALOG_SOURCE=tiendanube), where the
+real catalogue is managed in the TN admin — the UI shows a banner saying so.
+This table remains the local-dev source and the rollback fallback.
 """
 
 from __future__ import annotations

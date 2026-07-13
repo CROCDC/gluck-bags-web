@@ -49,17 +49,20 @@ _SAMPLE_JPEG = (
 
 
 def _create_published_product_with_image(
-    auth_client: FlaskClient, *, title: str
+    auth_client: FlaskClient, *, title: str, price: str | None = None
 ) -> None:
     """Create a published product with one JPEG cover via the admin form."""
+    data = {
+        "title": title,
+        "is_published": "on",
+        "media": (io.BytesIO(_SAMPLE_JPEG.read_bytes()), "foto.jpg"),
+        "order": '["new:0"]',
+    }
+    if price is not None:
+        data["price"] = price
     resp = auth_client.post(
         "/admin/products/new",
-        data={
-            "title": title,
-            "is_published": "on",
-            "media": (io.BytesIO(_SAMPLE_JPEG.read_bytes()), "foto.jpg"),
-            "order": '["new:0"]',
-        },
+        data=data,
         content_type="multipart/form-data",
     )
     assert resp.status_code == 302, resp.data
@@ -246,21 +249,43 @@ def test_internal_pages_have_unique_social_title(client: FlaskClient) -> None:
     )
 
 
-def test_instagram_cta_is_tracked_as_conversion(
+def test_purchase_funnel_is_tracked(
     auth_client: FlaskClient, client: FlaskClient, app: Flask
 ) -> None:
-    """The buy CTA (the site's only conversion: a click out to Instagram) carries a
-    Umami custom-event attribute so the conversion is measurable, not just pageviews."""
-    # Home buy CTAs.
+    """The real conversion funnel (shop entry -> add to cart -> checkout handoff)
+    carries Umami custom events; the legacy "comprar-instagram" buy event is gone —
+    Instagram survives only as a consultation channel with its own event."""
     home = client.get("/").get_data(as_text=True)
-    assert 'data-umami-event="comprar-instagram"' in home
-    # The product detail CTA tags the event with the product name.
+    assert 'data-umami-event="ir-al-shop"' in home
+    assert 'data-umami-event="abrir-carrito"' in home
+    assert 'data-umami-event="iniciar-checkout"' in home
+    assert "comprar-instagram" not in home
+
     title = "Tote Trackeado"
-    _create_published_product_with_image(auth_client, title=title)
+    _create_published_product_with_image(auth_client, title=title, price="45000")
     pid = _product_id_by_title(app, title)
     pdp = client.get(f"/producto/{pid}").get_data(as_text=True)
-    assert 'data-umami-event="comprar-instagram"' in pdp
+    assert 'data-umami-event="agregar-carrito"' in pdp
     assert f'data-umami-event-producto="{title}"' in pdp
+    assert 'data-umami-event="consulta-instagram"' in pdp
+    assert "comprar-instagram" not in pdp
+
+
+def test_thanks_page_tracks_confirmed_purchase_only(client: FlaskClient) -> None:
+    """/gracias fires the purchase-completed event ONLY for a session that actually
+    handed a checkout to TN (anyone can open the URL), and tags its Instagram link
+    as post-sale support, so nothing inflates a buy metric."""
+    from app.services import checkout_service
+
+    plain = client.get("/gracias").get_data(as_text=True)
+    assert 'umami.track("compra-confirmada")' not in plain
+    assert 'data-umami-event="soporte-postventa"' in plain
+    assert "comprar-instagram" not in plain
+
+    with client.session_transaction() as sess:
+        sess[checkout_service.PENDING_SESSION_KEY] = {"id": 42, "ts": 0, "checked": 0, "items": {}}
+    confirmed = client.get("/gracias").get_data(as_text=True)
+    assert 'umami.track("compra-confirmada")' in confirmed
 
 
 def test_404_emits_no_social_card(client: FlaskClient) -> None:
