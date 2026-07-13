@@ -292,6 +292,21 @@ class TiendaNubeClient:
             "raw": data,
         }
 
+    # --- webhooks (write) ----------------------------------------------------
+
+    def list_webhooks(self) -> list[dict[str, Any]]:
+        """Every webhook registered for this store (auto-paginated)."""
+        return list(self._paginate("webhooks"))
+
+    def create_webhook(self, event: str, url: str) -> dict[str, Any]:
+        """Register a webhook: Tienda Nube will POST `event` notifications to `url`
+        (signed with the app secret; verified in webhook_service). Returns the created
+        webhook (with its `id`)."""
+        return self._request("POST", "webhooks", json={"event": event, "url": url}).json()
+
+    def delete_webhook(self, webhook_id: int | str) -> None:
+        self._request("DELETE", f"webhooks/{webhook_id}")
+
 
 # --- module helpers ----------------------------------------------------------
 

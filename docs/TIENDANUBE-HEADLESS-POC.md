@@ -242,9 +242,16 @@ Bloqueantes técnicos:
       **lock `fcntl` cross-worker** (un solo worker sincroniza) y **timestamp** (una corrida por
       intervalo). Solo arranca si hay token. Config: `TN_SYNC_INTERVAL` (seg, default 3600),
       `TN_SYNC_ENABLED=0` para desactivar. Es la red de reconciliación además de los webhooks.
-- [ ] **Registrar los webhooks en TN** (`POST /webhooks`) → `https://gluckbags.com/webhooks/tiendanube`
-      para `product/created|updated|deleted` y `order/paid`. Confirmar el header HMAC real
-      (`x-linkedstore-hmac-sha256`) con una entrega de verdad.
+- [~] **Registrar los webhooks en TN** — acción **one-shot** (no hay script en el repo; los
+      `create/list/delete_webhook` viven en el cliente). Header HMAC confirmado
+      (`x-linkedstore-hmac-sha256`, firmado con el client secret). **DESPUÉS de deployar** el endpoint
+      (TN deshabilita un webhook que responde 404 repetidamente), correr una sola vez:
+      ```
+      python -c "from dotenv import load_dotenv; load_dotenv(); \
+        from app.services.tiendanube_client import TiendaNubeClient as C; c=C.from_env(); \
+        [c.create_webhook(e,'https://gluckbags.com/webhooks/tiendanube') \
+         for e in ['product/created','product/updated','product/deleted','order/paid']]"
+      ```
 - [ ] **Probar una compra REAL completa** (pago + envío + **factura AFIP**), no solo la creación de
       la `checkout_url`.
 
@@ -260,6 +267,9 @@ Calidad / decisiones:
       resolver usa la primera variante.
 - [ ] **Contacto placeholder** en el draft order (`Cliente/Web/ventas@gluckbags.com`): el comprador
       completa lo real en el checkout de TN. Verificar que ese paso se sienta bien.
+- [ ] **Chequeo de seguridad** antes del go-live: revisar el endpoint público de webhooks (HMAC,
+      superficie), el manejo del token, el resguardo de secrets (Infisical), CSRF/headers del checkout
+      y el `/tn/callback` (solo setup). Correr `/security-review` sobre el diff.
 
 ### Cómo activar el circuito completo (una vez que hay token)
 1. Completar `.env`: `TN_STORE_ID`, `TN_ACCESS_TOKEN`, `TN_CLIENT_SECRET` (para webhooks).

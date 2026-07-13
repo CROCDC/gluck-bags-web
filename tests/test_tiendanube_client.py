@@ -247,3 +247,32 @@ def test_create_checkout_empty_line_items_raises() -> None:
     client, _ = _client([])
     with pytest.raises(ValueError):
         client.create_checkout([])
+
+
+# --- webhooks ----------------------------------------------------------------
+
+
+def test_list_webhooks_hits_path() -> None:
+    client, session = _client(
+        [FakeResponse(json_data=[{"id": 1, "event": "product/updated", "url": "https://x/w"}], text="x")]
+    )
+    hooks = client.list_webhooks()
+    assert hooks[0]["event"] == "product/updated"
+    assert session.calls[0]["url"].endswith("/webhooks")
+
+
+def test_create_webhook_posts_event_and_url() -> None:
+    client, session = _client([FakeResponse(json_data={"id": 9, "event": "order/paid", "url": "https://x/w"})])
+    out = client.create_webhook("order/paid", "https://x/w")
+    call = session.calls[0]
+    assert call["method"] == "POST"
+    assert call["url"].endswith("/webhooks")
+    assert call["json"] == {"event": "order/paid", "url": "https://x/w"}
+    assert out["id"] == 9
+
+
+def test_delete_webhook_hits_delete_path() -> None:
+    client, session = _client([FakeResponse(json_data={}, text="x")])
+    client.delete_webhook(9)
+    assert session.calls[0]["method"] == "DELETE"
+    assert session.calls[0]["url"].endswith("/webhooks/9")
