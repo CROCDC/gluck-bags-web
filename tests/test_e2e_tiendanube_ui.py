@@ -231,6 +231,37 @@ def test_pdp_gallery_thumbs_navigate_slides(tn_live_server: str, page: Page) -> 
     expect(thumbs.nth(2)).to_have_class(re.compile("is-current"))
 
 
+def test_pdp_gallery_autoplays(tn_live_server: str, page: Page) -> None:
+    """Untouched, the gallery advances to the next slide on its own (5s cadence)."""
+    page.goto(f"{tn_live_server}/producto/104", wait_until="load")
+    track = page.locator("[data-gallery]")
+    assert page.evaluate("() => document.querySelector('[data-gallery]').scrollLeft") == 0
+    page.wait_for_function(
+        "() => document.querySelector('[data-gallery]').scrollLeft > 0", timeout=8_000
+    )
+    expect(page.locator("[data-gallery-thumb]").nth(1)).to_have_class(re.compile("is-current"))
+
+
+def test_pdp_gallery_autoplay_stops_after_interaction(tn_live_server: str, page: Page) -> None:
+    """One interaction (a thumb click) hands control to the buyer for good."""
+    page.goto(f"{tn_live_server}/producto/104", wait_until="load")
+    page.locator("[data-gallery-thumb]").nth(0).click()
+    page.wait_for_timeout(6_500)
+    assert page.evaluate("() => document.querySelector('[data-gallery]').scrollLeft") == 0
+    expect(page.locator("[data-gallery-thumb]").nth(0)).to_have_class(re.compile("is-current"))
+
+
+def test_pdp_gallery_respects_reduced_motion(tn_live_server: str, browser: Browser) -> None:
+    context = browser.new_context(reduced_motion="reduce")
+    pg = context.new_page()
+    try:
+        pg.goto(f"{tn_live_server}/producto/104", wait_until="load")
+        pg.wait_for_timeout(6_500)
+        assert pg.evaluate("() => document.querySelector('[data-gallery]').scrollLeft") == 0
+    finally:
+        context.close()
+
+
 def test_pdp_single_image_has_no_thumbs(tn_live_server: str, page: Page) -> None:
     page.goto(f"{tn_live_server}/producto/101", wait_until="load")
     expect(page.locator(".pdp-gallery .pdp-media")).to_have_count(1)
