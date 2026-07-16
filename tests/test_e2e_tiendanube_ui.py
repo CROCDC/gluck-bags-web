@@ -231,6 +231,29 @@ def test_pdp_gallery_thumbs_navigate_slides(tn_live_server: str, page: Page) -> 
     expect(thumbs.nth(2)).to_have_class(re.compile("is-current"))
 
 
+def test_pdp_gallery_arrows_step_and_wrap(tn_live_server: str, page: Page) -> None:
+    """The arrows step between slides (wrapping at the ends) and, like any other
+    interaction, switch the autoplay off."""
+    page.goto(f"{tn_live_server}/producto/104", wait_until="load")
+    thumbs = page.locator("[data-gallery-thumb]")
+
+    page.locator("[data-gallery-next]").click()
+    page.wait_for_function("() => document.querySelector('[data-gallery]').scrollLeft > 0")
+    expect(thumbs.nth(1)).to_have_class(re.compile("is-current"))
+
+    page.locator("[data-gallery-prev]").click()
+    page.wait_for_function("() => document.querySelector('[data-gallery]').scrollLeft === 0")
+    expect(thumbs.nth(0)).to_have_class(re.compile("is-current"))
+
+    page.locator("[data-gallery-prev]").click()
+    expect(thumbs.nth(2)).to_have_class(re.compile("is-current"))
+
+    page.locator("[data-gallery-thumb]").nth(0).click()
+    page.wait_for_function("() => document.querySelector('[data-gallery]').scrollLeft === 0")
+    page.wait_for_timeout(6_000)
+    assert page.evaluate("() => document.querySelector('[data-gallery]').scrollLeft") == 0
+
+
 def test_pdp_gallery_autoplays(tn_live_server: str, page: Page) -> None:
     """Untouched, the gallery advances to the next slide on its own (5s cadence)."""
     page.goto(f"{tn_live_server}/producto/104", wait_until="load")

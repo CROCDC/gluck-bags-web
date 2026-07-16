@@ -159,6 +159,15 @@
       });
     });
 
+    const step = (delta) => {
+      stopAutoplay();
+      goTo((current + delta + slides.length) % slides.length);
+    };
+    const prevArrow = document.querySelector("[data-gallery-prev]");
+    const nextArrow = document.querySelector("[data-gallery-next]");
+    if (prevArrow) prevArrow.addEventListener("click", () => step(-1));
+    if (nextArrow) nextArrow.addEventListener("click", () => step(1));
+
     if ("IntersectionObserver" in window) {
       const io = new IntersectionObserver(
         (entries) => {

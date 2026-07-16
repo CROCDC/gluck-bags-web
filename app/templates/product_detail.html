@@ -53,9 +53,10 @@
 
         <div class="pdp-grid">
             <div class="pdp-media-col">
-                {# Snap-scroll gallery: swipe/scroll works without JS; the thumbnail
-                   strip (below, outside .pdp-gallery so the slide count stays
-                   testable) jumps between slides via main.js. #}
+                {# Snap-scroll gallery: swipe/scroll works without JS; the arrows
+                   and the thumbnail strip (below, outside .pdp-gallery so the
+                   slide count stays testable) step between slides via main.js. #}
+                <div class="pdp-gallery-shell">
                 <div class="pdp-gallery" data-gallery>
                     {% set first_image = product.images[0] if product.images else None %}
                     {% for m in product.media %}
@@ -77,6 +78,23 @@
                     {% else %}
                         <div class="pdp-noimg" aria-hidden="true"></div>
                     {% endfor %}
+                </div>
+                {% if product.media | length > 1 %}
+                <button class="pdp-gallery-arrow is-prev" type="button" data-gallery-prev
+                        aria-label="Imagen anterior">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M15 5 8 12l7 7"/>
+                    </svg>
+                </button>
+                <button class="pdp-gallery-arrow is-next" type="button" data-gallery-next
+                        aria-label="Imagen siguiente">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+                         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="m9 5 7 7-7 7"/>
+                    </svg>
+                </button>
+                {% endif %}
                 </div>
                 {% if product.media | length > 1 %}
                 <div class="pdp-thumbs" role="tablist" aria-label="Imágenes del producto">

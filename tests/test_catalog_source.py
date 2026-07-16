@@ -341,8 +341,11 @@ def test_tn_pdp_gallery_thumbs_only_with_multiple_images(app: "Flask") -> None:
     assert 'class="pdp-thumbs"' in multi
     assert multi.count("data-gallery-thumb") == 3
 
+    assert "data-gallery-prev" in multi and "data-gallery-next" in multi
+
     solo = client.get("/producto/92").get_data(as_text=True)
     assert 'class="pdp-thumbs"' not in solo
+    assert "data-gallery-prev" not in solo
 
 
 def test_pdp_category_chips_have_context_label(app: "Flask") -> None:
