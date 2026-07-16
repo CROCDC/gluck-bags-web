@@ -57,10 +57,13 @@ HOME_CONTAINERS: list[str] = PUBLIC_CONTAINERS + [
     ".manifiesto-inner",
 ]
 
-# Extra containers specific to the product detail page.
+# Extra containers specific to the product detail page. (.pdp-thumbs is NOT
+# listed: it only renders for multi-image products, and the resolve-guard test
+# requires every selector to exist on the seeded single-image PDP.)
 PDP_CONTAINERS: list[str] = PUBLIC_CONTAINERS + [
     ".pdp",
     ".pdp-grid",
+    ".pdp-media-col",
     ".pdp-gallery",
     ".pdp-info",
 ]

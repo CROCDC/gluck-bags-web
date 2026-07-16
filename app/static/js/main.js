@@ -111,6 +111,67 @@
   });
   menu.querySelectorAll("a").forEach((a) => a.addEventListener("click", closeMenu));
 
+  /* ---- PDP gallery: thumbnail strip drives the snap-scroll track ----
+     The track scrolls/swipes natively (scroll-snap, no JS needed); the thumbs
+     jump between slides and mirror the visible one. Slides auto-advance every
+     5s until the buyer interacts (any touch/click/wheel stops it for good),
+     never under prefers-reduced-motion or with the tab hidden. Progressive
+     enhancement: without JS the thumbs are inert but every slide stays
+     reachable by swipe. */
+  const galleryTrack = document.querySelector("[data-gallery]");
+  const galleryThumbs = Array.from(document.querySelectorAll("[data-gallery-thumb]"));
+  if (galleryTrack && galleryThumbs.length) {
+    const slides = Array.from(galleryTrack.children);
+    let current = 0;
+    const setCurrent = (index) => {
+      current = index;
+      galleryThumbs.forEach((t, i) => t.classList.toggle("is-current", i === index));
+    };
+    const goTo = (index) => {
+      const slide = slides[index];
+      if (slide) galleryTrack.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
+      setCurrent(index);
+    };
+
+    const AUTOPLAY_MS = 5000;
+    let autoplay = null;
+    const stopAutoplay = () => {
+      if (autoplay) {
+        clearInterval(autoplay);
+        autoplay = null;
+      }
+    };
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reducedMotion && slides.length > 1) {
+      autoplay = setInterval(() => {
+        if (document.hidden) return;
+        goTo((current + 1) % slides.length);
+      }, AUTOPLAY_MS);
+    }
+    ["pointerdown", "wheel", "touchstart"].forEach((evt) =>
+      galleryTrack.addEventListener(evt, stopAutoplay, { passive: true })
+    );
+
+    galleryThumbs.forEach((thumb, index) => {
+      thumb.addEventListener("click", () => {
+        stopAutoplay();
+        goTo(index);
+      });
+    });
+
+    if ("IntersectionObserver" in window) {
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) setCurrent(slides.indexOf(entry.target));
+          });
+        },
+        { root: galleryTrack, threshold: 0.6 }
+      );
+      slides.forEach((s) => io.observe(s));
+    }
+  }
+
   /* ---- Reveal on scroll ---- */
   const reveals = document.querySelectorAll(".reveal");
   if ("IntersectionObserver" in window) {
