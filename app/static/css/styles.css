@@ -1051,6 +1051,28 @@ nexttech-footer {
     align-items: start;
 }
 .pdp-media-col { min-width: 0; }
+.pdp-gallery-shell { position: relative; }
+.pdp-gallery-arrow {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 42px;
+    height: 42px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    background: rgba(250, 247, 243, 0.88);
+    color: var(--ink);
+    cursor: pointer;
+    transition: color 0.25s var(--ease), border-color 0.25s var(--ease), background 0.25s var(--ease);
+}
+.pdp-gallery-arrow.is-prev { left: 0.8rem; }
+.pdp-gallery-arrow.is-next { right: 0.8rem; }
+.pdp-gallery-arrow:hover { color: var(--cognac); border-color: var(--cognac); background: var(--cream); }
+.pdp-gallery-arrow:focus-visible { outline: 2px solid var(--cognac); outline-offset: 2px; }
 .pdp-gallery {
     display: flex;
     overflow-x: auto;
