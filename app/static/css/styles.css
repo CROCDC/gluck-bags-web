@@ -1061,6 +1061,9 @@ nexttech-footer {
     scrollbar-width: none;
 }
 .pdp-gallery::-webkit-scrollbar { display: none; }
+@media (prefers-reduced-motion: reduce) {
+    .pdp-gallery { scroll-behavior: auto; }
+}
 .pdp-media {
     flex: 0 0 100%;
     width: 100%;

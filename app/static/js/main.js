@@ -113,20 +113,49 @@
 
   /* ---- PDP gallery: thumbnail strip drives the snap-scroll track ----
      The track scrolls/swipes natively (scroll-snap, no JS needed); the thumbs
-     jump between slides and mirror the visible one. Progressive enhancement:
-     without JS the thumbs are inert but every slide stays reachable by swipe. */
+     jump between slides and mirror the visible one. Slides auto-advance every
+     5s until the buyer interacts (any touch/click/wheel stops it for good),
+     never under prefers-reduced-motion or with the tab hidden. Progressive
+     enhancement: without JS the thumbs are inert but every slide stays
+     reachable by swipe. */
   const galleryTrack = document.querySelector("[data-gallery]");
   const galleryThumbs = Array.from(document.querySelectorAll("[data-gallery-thumb]"));
   if (galleryTrack && galleryThumbs.length) {
     const slides = Array.from(galleryTrack.children);
-    const setCurrent = (index) =>
+    let current = 0;
+    const setCurrent = (index) => {
+      current = index;
       galleryThumbs.forEach((t, i) => t.classList.toggle("is-current", i === index));
+    };
+    const goTo = (index) => {
+      const slide = slides[index];
+      if (slide) galleryTrack.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
+      setCurrent(index);
+    };
+
+    const AUTOPLAY_MS = 5000;
+    let autoplay = null;
+    const stopAutoplay = () => {
+      if (autoplay) {
+        clearInterval(autoplay);
+        autoplay = null;
+      }
+    };
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!reducedMotion && slides.length > 1) {
+      autoplay = setInterval(() => {
+        if (document.hidden) return;
+        goTo((current + 1) % slides.length);
+      }, AUTOPLAY_MS);
+    }
+    ["pointerdown", "wheel", "touchstart"].forEach((evt) =>
+      galleryTrack.addEventListener(evt, stopAutoplay, { passive: true })
+    );
 
     galleryThumbs.forEach((thumb, index) => {
       thumb.addEventListener("click", () => {
-        const slide = slides[index];
-        if (slide) galleryTrack.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
-        setCurrent(index);
+        stopAutoplay();
+        goTo(index);
       });
     });
 
