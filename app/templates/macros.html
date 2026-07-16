@@ -53,15 +53,20 @@
 
 {# Inter-category navigation chips, present on every category and product page so
    the categories link to each other (not just from the home) and products link
-   back up to their siblings. `categories` is a list of category names. #}
-{% macro category_nav(categories, current=None) %}
+   back up to their siblings. `categories` is a list of category names; `label`
+   adds a small heading above the chips where the context doesn't explain them
+   (e.g. after the PDP gallery). #}
+{% macro category_nav(categories, current=None, label=None) %}
 {% if categories %}
-<nav class="cat-chips" aria-label="Categorías">
-    {% for name in categories %}
-    <a href="{{ url_for('category_page', slug=name|slugify) }}"
-       class="cat-chip{% if name == current %} is-current{% endif %}"
-       {% if name == current %}aria-current="page"{% endif %}>{{ name }}</a>
-    {% endfor %}
+<nav class="cat-nav" aria-label="Categorías">
+    {% if label %}<p class="cat-nav-label">{{ label }}</p>{% endif %}
+    <div class="cat-chips">
+        {% for name in categories %}
+        <a href="{{ url_for('category_page', slug=name|slugify) }}"
+           class="cat-chip{% if name == current %} is-current{% endif %}"
+           {% if name == current %}aria-current="page"{% endif %}>{{ name }}</a>
+        {% endfor %}
+    </div>
 </nav>
 {% endif %}
 {% endmacro %}

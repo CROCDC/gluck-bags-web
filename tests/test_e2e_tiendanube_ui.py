@@ -61,6 +61,14 @@ def _seed_payloads() -> list[dict[str, Any]]:
             "images": [{"id": tn_id * 100, "src": img_src, "position": 1, "width": 1200, "height": 630}],
         }
 
+    gallery = mk(104, "Tote Galeria", 52000, "Tote")
+    gallery["description"] = {"es": "<p>Cartera tipo tote color suela.</p><p>Cuero vegano.</p>"}
+    gallery["images"] = [
+        {"id": 104001, "src": "/static/img/og-image.jpg", "position": 1, "width": 1200, "height": 630},
+        {"id": 104002, "src": "/static/img/productos/tote-cognac-01.jpg", "position": 2, "width": 1080, "height": 1350},
+        {"id": 104003, "src": "/static/img/productos/tote-gris-interior.jpg", "position": 3, "width": 1080, "height": 1350},
+    ]
+
     return [
         mk(101, "Tote Cognac", 45000, "Tote"),
         mk(102, "Mini Rosa", 30000, "Mini Bag"),
@@ -68,6 +76,9 @@ def _seed_payloads() -> list[dict[str, Any]]:
         # (invalid URL so a pre-fix drawer would fire the injected onerror). Exercises
         # the escaping in cart.js lineHTML.
         mk(103, "XSS Probe", 15000, "Tote", img_src='x" onerror="window.__xss=1"'),
+        # Multi-image product with a rich-text (HTML) TN description: drives the
+        # snap-scroll gallery + thumbs and the html-to-text description path.
+        gallery,
     ]
 
 
@@ -199,6 +210,38 @@ def test_checkout_without_credentials_shows_feedback(tn_live_server: str, page: 
     feedback = page.locator("[data-cart-feedback]").first
     expect(feedback).to_be_visible()
     expect(page).to_have_url(re.compile(r"/carrito$"))
+
+
+# --- 3b. PDP gallery: thumbs drive the snap track; description is clean text ---
+
+
+def test_pdp_gallery_thumbs_navigate_slides(tn_live_server: str, page: Page) -> None:
+    page.goto(f"{tn_live_server}/producto/104", wait_until="load")
+
+    slides = page.locator(".pdp-gallery .pdp-media")
+    expect(slides).to_have_count(3)
+    thumbs = page.locator("[data-gallery-thumb]")
+    expect(thumbs).to_have_count(3)
+    expect(thumbs.nth(0)).to_have_class(re.compile("is-current"))
+
+    thumbs.nth(2).click()
+    page.wait_for_function(
+        "() => document.querySelector('[data-gallery]').scrollLeft > 0"
+    )
+    expect(thumbs.nth(2)).to_have_class(re.compile("is-current"))
+
+
+def test_pdp_single_image_has_no_thumbs(tn_live_server: str, page: Page) -> None:
+    page.goto(f"{tn_live_server}/producto/101", wait_until="load")
+    expect(page.locator(".pdp-gallery .pdp-media")).to_have_count(1)
+    assert page.locator(".pdp-thumbs").count() == 0
+
+
+def test_pdp_description_renders_clean_paragraphs(tn_live_server: str, page: Page) -> None:
+    page.goto(f"{tn_live_server}/producto/104", wait_until="load")
+    desc = page.locator(".pdp-desc")
+    expect(desc).to_contain_text("Cartera tipo tote color suela.")
+    assert "<p>" not in (desc.text_content() or "")
 
 
 # --- 4b. the drawer escapes an attribute-breaking image src (stored-XSS guard) ---

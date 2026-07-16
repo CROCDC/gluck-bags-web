@@ -111,6 +111,38 @@
   });
   menu.querySelectorAll("a").forEach((a) => a.addEventListener("click", closeMenu));
 
+  /* ---- PDP gallery: thumbnail strip drives the snap-scroll track ----
+     The track scrolls/swipes natively (scroll-snap, no JS needed); the thumbs
+     jump between slides and mirror the visible one. Progressive enhancement:
+     without JS the thumbs are inert but every slide stays reachable by swipe. */
+  const galleryTrack = document.querySelector("[data-gallery]");
+  const galleryThumbs = Array.from(document.querySelectorAll("[data-gallery-thumb]"));
+  if (galleryTrack && galleryThumbs.length) {
+    const slides = Array.from(galleryTrack.children);
+    const setCurrent = (index) =>
+      galleryThumbs.forEach((t, i) => t.classList.toggle("is-current", i === index));
+
+    galleryThumbs.forEach((thumb, index) => {
+      thumb.addEventListener("click", () => {
+        const slide = slides[index];
+        if (slide) galleryTrack.scrollTo({ left: slide.offsetLeft, behavior: "smooth" });
+        setCurrent(index);
+      });
+    });
+
+    if ("IntersectionObserver" in window) {
+      const io = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) setCurrent(slides.indexOf(entry.target));
+          });
+        },
+        { root: galleryTrack, threshold: 0.6 }
+      );
+      slides.forEach((s) => io.observe(s));
+    }
+  }
+
   /* ---- Reveal on scroll ---- */
   const reveals = document.querySelectorAll(".reveal");
   if ("IntersectionObserver" in window) {

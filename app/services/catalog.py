@@ -22,6 +22,8 @@ webp/avif sources fall through to the ``<img>`` — no template change, clean de
 
 from __future__ import annotations
 
+import re
+from html.parser import HTMLParser
 from typing import Any, Optional
 
 from flask import current_app, has_app_context
@@ -31,6 +33,45 @@ from app.repositories import ProductRepository
 
 SOURCE_ADMIN = "admin"
 SOURCE_TIENDANUBE = "tiendanube"
+
+
+class _TextExtractor(HTMLParser):
+    """Flatten Tienda Nube's rich-text HTML into plain paragraphs."""
+
+    _BLOCK_TAGS = {"p", "div", "li", "ul", "ol", "h1", "h2", "h3", "h4", "br", "tr"}
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.parts: list[str] = []
+
+    def handle_data(self, data: str) -> None:
+        self.parts.append(data)
+
+    def handle_starttag(self, tag: str, attrs: Any) -> None:
+        if tag in self._BLOCK_TAGS:
+            self.parts.append("\n")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag in self._BLOCK_TAGS:
+            self.parts.append("\n")
+
+
+def html_to_text(value: Optional[str]) -> Optional[str]:
+    """Plain text out of TN's HTML descriptions (block tags become line breaks).
+
+    The templates auto-escape whatever they interpolate, so raw HTML from the TN
+    admin would otherwise surface as literal "<p>" text on the PDP — and leak
+    markup into the JSON-LD/meta descriptions. Rendering it unescaped instead is
+    not an option: the mirror is third-party data."""
+    if not value:
+        return value
+    parser = _TextExtractor()
+    parser.feed(value)
+    parser.close()
+    text = "".join(parser.parts)
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    text = re.sub(r"\n{2,}", "\n\n", text)
+    return text.strip() or None
 
 
 def source() -> str:
@@ -130,7 +171,7 @@ class StorefrontProduct:
 
     @property
     def description(self) -> Optional[str]:
-        return self._row.description
+        return html_to_text(self._row.description)
 
     @property
     def category(self) -> Optional[str]:
