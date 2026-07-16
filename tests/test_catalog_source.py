@@ -20,17 +20,22 @@ if TYPE_CHECKING:
 
 
 def _payload(tn_id: int, name: str, price: int, *, category: str = "Tote",
-             published: bool = True, stock: int | None = 5, variant_id: int | None = None) -> dict[str, Any]:
+             published: bool = True, stock: int | None = 5, variant_id: int | None = None,
+             description: str | None = None, image_count: int = 1) -> dict[str, Any]:
     return {
         "id": tn_id,
         "name": {"es": name},
         "handle": {"es": name.lower().replace(" ", "-")},
-        "description": {"es": f"Bolso {name} de cuero vegano."},
+        "description": {"es": description if description is not None else f"Bolso {name} de cuero vegano."},
         "published": published,
         "canonical_url": f"https://tienda.example/{tn_id}",
         "categories": [{"id": 1, "name": {"es": category}}],
         "variants": [{"id": variant_id or tn_id * 10, "price": str(price), "stock": stock, "currency": "ARS"}],
-        "images": [{"id": tn_id * 100, "src": f"https://cdn.example/{tn_id}.jpg", "position": 1, "width": 1080, "height": 1350}],
+        "images": [
+            {"id": tn_id * 100 + n, "src": f"https://cdn.example/{tn_id}-{n}.jpg", "position": n + 1,
+             "width": 1080, "height": 1350}
+            for n in range(image_count)
+        ],
     }
 
 
@@ -88,7 +93,7 @@ def test_adapter_exposes_product_interface(app: "Flask") -> None:
         assert p.currency == "ARS"
         assert p.is_published is True
         assert p.in_stock is True
-        assert p.cover.src == "https://cdn.example/5.jpg"
+        assert p.cover.src == "https://cdn.example/5-0.jpg"
         assert p.cover.width == 1080 and p.cover.height == 1350
         assert len(p.images) == 1 and p.videos == []
         assert catalog.is_purchasable(p) is True
@@ -119,7 +124,7 @@ def test_home_renders_mirror_products(app: "Flask") -> None:
     html = app.test_client().get("/").get_data(as_text=True)
     assert "Tote Cognac" in html
     assert "$ 45.000" in html
-    assert "https://cdn.example/1.jpg" in html
+    assert "https://cdn.example/1-0.jpg" in html
 
 
 def test_product_detail_renders_mirror_product(app: "Flask") -> None:
@@ -227,9 +232,9 @@ def test_tn_pdp_social_image_is_cdn_url_not_double_prefixed(app: "Flask") -> Non
     _seed(app, _payload(97, "Tote Social", 45000))
     _tn(app)
     html = app.test_client().get("/producto/97").get_data(as_text=True)
-    assert 'content="https://cdn.example/97.jpg"' in html
+    assert 'content="https://cdn.example/97-0.jpg"' in html
     assert "https://gluckbags.comhttps://" not in html
-    assert '"image": ["https://cdn.example/97.jpg"]' in html
+    assert '"image": ["https://cdn.example/97-0.jpg"]' in html
 
 
 def test_tn_pdp_description_sells_online_not_instagram(app: "Flask") -> None:
@@ -291,3 +296,58 @@ def test_env_boot_with_tiendanube_source_serves_empty_mirror(tmp_path, monkeypat
     assert "Muy pronto" in html
     assert "Tote Cognac" not in html
     assert client.get("/sitemap.xml").status_code == 200
+
+
+# --- rich-text descriptions from the TN admin ------------------------------------
+
+
+def test_html_to_text_flattens_tn_rich_text() -> None:
+    assert catalog.html_to_text("<p>Cartera tipo tote.</p><p>Cuero vegano.</p>") == (
+        "Cartera tipo tote.\n\nCuero vegano."
+    )
+    assert catalog.html_to_text("L&iacute;neas puras<br>sin costuras") == "Líneas puras\nsin costuras"
+    assert catalog.html_to_text("<ul><li>Uno</li><li>Dos</li></ul>") == "Uno\n\nDos"
+    assert catalog.html_to_text("texto plano") == "texto plano"
+    assert catalog.html_to_text("") == ""
+    assert catalog.html_to_text(None) is None
+    assert catalog.html_to_text("<p></p>") is None
+
+
+def test_tn_pdp_renders_description_without_raw_html(app: "Flask") -> None:
+    """TN descriptions are rich text; the PDP (and the JSON-LD) must show clean
+    paragraphs, never literal escaped tags."""
+    _seed(app, _payload(90, "Tote Suela", 45000,
+                        description="<p>Cartera tipo tote color suela.</p><p>Hecha a mano.</p>"))
+    _tn(app)
+    html = app.test_client().get("/producto/90").get_data(as_text=True)
+    assert "Cartera tipo tote color suela." in html
+    assert "&lt;p&gt;" not in html
+    assert "u003cp" not in html
+
+
+# --- gallery + category chips -----------------------------------------------------
+
+
+def test_tn_pdp_gallery_thumbs_only_with_multiple_images(app: "Flask") -> None:
+    """Multi-image products get a thumbnail strip (one button per slide, outside
+    .pdp-gallery so the slide count stays the media count); single-image ones don't."""
+    _seed(app, _payload(91, "Tote Multi", 45000, image_count=3),
+          _payload(92, "Tote Solo", 45000))
+    _tn(app)
+    client = app.test_client()
+
+    multi = client.get("/producto/91").get_data(as_text=True)
+    assert multi.count('class="pdp-media"') == 3
+    assert 'class="pdp-thumbs"' in multi
+    assert multi.count("data-gallery-thumb") == 3
+
+    solo = client.get("/producto/92").get_data(as_text=True)
+    assert 'class="pdp-thumbs"' not in solo
+
+
+def test_pdp_category_chips_have_context_label(app: "Flask") -> None:
+    _seed(app, _payload(93, "Tote Label", 45000))
+    _tn(app)
+    html = app.test_client().get("/producto/93").get_data(as_text=True)
+    assert "Explorá por categoría" in html
+    assert 'class="cat-nav"' in html
