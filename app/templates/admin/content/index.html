@@ -1,0 +1,59 @@
+{% extends "admin/base.html" %}
+{% set section = 'content' %}
+{% block title %}Textos · {{ brand }} Admin{% endblock %}
+
+{% block head %}{{ inline_css('css/admin-content.css') }}{% endblock %}
+
+{% block content %}
+<div class="adm-list-head">
+    <h1>Textos de la web</h1>
+    <a href="{{ url_for('admin_content.editor') }}" class="btn btn-primary">✎ Editor visual</a>
+</div>
+
+<p class="ct-lead">
+    Elegí una sección para editar lo que dice la web. Los cambios se guardan como
+    borrador: los ves en la previsualización y recién aparecen en el sitio cuando
+    tocás <strong>Publicar</strong>.
+</p>
+
+{% if pending_total %}
+<div class="ct-pending-bar">
+    <p>
+        Tenés <strong>{{ pending_total }}</strong>
+        {{ 'texto sin publicar' if pending_total == 1 else 'textos sin publicar' }}.
+    </p>
+    <div class="ct-pending-actions">
+        <form method="post" action="{{ url_for('admin_content.publish_all') }}">
+            <button type="submit" class="btn btn-primary">Publicar todo el sitio</button>
+        </form>
+        <form method="post" action="{{ url_for('admin_content.discard_all') }}"
+              onsubmit="return confirm('¿Descartar todos los cambios sin publicar? No se puede deshacer.');">
+            <button type="submit" class="btn btn-ghost">Descartar</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+
+{% for category, groups in groups_by_category.items() %}
+<h2 class="ct-cat-title">{{ category }}</h2>
+<ul class="ct-grid">
+    {% for group in groups %}
+    {% set stat = stats[group.key] %}
+    <li class="ct-card">
+        <a href="{{ url_for('admin_content.group_edit', group_key=group.key) }}" class="ct-card-link">
+            <span class="ct-card-icon" aria-hidden="true">{{ group.icon }}</span>
+            <span class="ct-card-body">
+                <span class="ct-card-title">{{ group.title }}</span>
+                <span class="ct-card-desc">{{ group.description }}</span>
+                <span class="ct-card-meta">
+                    <span class="ct-count">{{ stat.total }} textos</span>
+                    {% if stat.pending %}<span class="adm-tag ct-tag-draft">{{ stat.pending }} sin publicar</span>{% endif %}
+                    {% if stat.overridden %}<span class="adm-tag ct-tag-edited">{{ stat.overridden }} {{ 'distinto del original' if stat.overridden == 1 else 'distintos del original' }}</span>{% endif %}
+                </span>
+            </span>
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+{% endfor %}
+{% endblock %}

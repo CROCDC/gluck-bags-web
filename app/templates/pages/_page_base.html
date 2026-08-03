@@ -1,10 +1,13 @@
-{# Shared shell for the editorial / legal trust pages. Each page sets page_title
-   and page_description (passed by the route) and fills the page_body block. #}
+{# Shared shell for the editorial / legal trust pages (/nosotras, /contacto, …).
+   The route passes `page_key` plus the resolved heading and meta description; the
+   body is rich text edited from the admin, which is why the six pages no longer
+   need one template each — adding a page is a registry entry plus a STATIC_PAGES
+   row (see app/routes.py). #}
 {% extends "base_public.html" %}
 
 {% block body_class %}solid-header{% endblock %}
 
-{% block title %}{{ page_title }} · {{ brand }}{% endblock %}
+{% block title %}{{ t('seo.page_title_format', title=page_title) }}{% endblock %}
 {% block description %}{{ page_description }}{% endblock %}
 
 {% block body %}
@@ -12,10 +15,10 @@
         <div style="max-width: 760px; margin: 0 auto;">
             <div class="section-head">
                 <p class="eyebrow">{{ brand }}</p>
-                <h1 class="section-title">{{ page_title }}</h1>
+                <h1 class="section-title">{{ t('page.' ~ page_key ~ '.title') }}</h1>
             </div>
             <div class="page-body">
-                {% block page_body %}{% endblock %}
+                {{ t('page.' ~ page_key ~ '.body') }}
             </div>
         </div>
     </main>

@@ -75,6 +75,40 @@ ADMIN_CONTAINERS: list[str] = [
 ]
 
 ADMIN_LOGIN_CONTAINERS: list[str] = ADMIN_CONTAINERS + [".adm-login", ".adm-form"]
+
+# The "Textos" section (app/admin_content). Its three screens have very different
+# layouts — a card grid, a long form, and a scaled device frame — so each gets its
+# own container list instead of one shared guess.
+ADMIN_CONTENT_INDEX_CONTAINERS: list[str] = ADMIN_CONTAINERS + [
+    ".adm-sections",
+    ".ct-grid",
+    ".ct-card",
+    ".ct-card-link",
+]
+ADMIN_CONTENT_EDITOR_CONTAINERS: list[str] = ADMIN_CONTAINERS + [
+    ".adm-sections",
+    "#contentForm",
+    ".ct-section",
+    ".ct-field",
+    ".ct-field-head",
+    ".ct-actions",
+]
+ADMIN_CONTENT_EDITOR_VISUAL_CONTAINERS: list[str] = [
+    "body.admin",
+    "header.adm-header",
+    "main.adm-main",
+    ".ed-bar",
+    ".ed-devices",
+    ".ed-actions",
+    ".ed-body",
+    ".ed-stage",
+]
+ADMIN_CONTENT_PREVIEW_CONTAINERS: list[str] = ADMIN_CONTAINERS + [
+    ".adm-sections",
+    ".ct-formats",
+    ".ct-preview-bar",
+    ".ct-stage",
+]
 ADMIN_LIST_CONTAINERS: list[str] = ADMIN_CONTAINERS + [".adm-list-head", ".adm-list"]
 ADMIN_FORM_CONTAINERS: list[str] = ADMIN_CONTAINERS + [
     "#productForm",

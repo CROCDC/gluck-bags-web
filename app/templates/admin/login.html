@@ -4,7 +4,7 @@
 {% block content %}
 <div class="adm-login">
     <h1>Panel de {{ brand }}</h1>
-    <p>Ingresá tu contraseña para administrar los productos.</p>
+    <p>Ingresá tu contraseña para administrar los productos y los textos del sitio.</p>
     <form method="post" action="{{ url_for('admin.login') }}" class="adm-form">
         <div class="adm-field">
             <input type="password" name="password" placeholder="Contraseña" autocomplete="current-password"

@@ -29,9 +29,9 @@
     <div class="product-info">
         <div class="product-meta">
             <h3 class="product-name">{{ product.title }}</h3>
-            {% if product.category %}<span class="product-cat">{{ product.category }}</span>{% endif %}
+            {% if product.category %}<span class="product-cat">{{ category_label(product.category) }}</span>{% endif %}
         </div>
-        <span class="product-price">{{ product.formatted_price or 'Consultar' }}</span>
+        <span class="product-price">{{ product.formatted_price or t('product.price_fallback') }}</span>
     </div>
 </a>
 {% endmacro %}
@@ -64,7 +64,7 @@
         {% for name in categories %}
         <a href="{{ url_for('category_page', slug=name|slugify) }}"
            class="cat-chip{% if name == current %} is-current{% endif %}"
-           {% if name == current %}aria-current="page"{% endif %}>{{ name }}</a>
+           {% if name == current %}aria-current="page"{% endif %}>{{ category_label(name) }}</a>
         {% endfor %}
     </div>
 </nav>
@@ -77,11 +77,11 @@
    surrounding [data-cart-foot]/.cart-summary, so both surfaces must render this
    exact markup — that's why it lives here once. #}
 {% macro cart_checkout_form(input_id) %}
-<p class="cart-note">El costo de envío se confirma en el checkout, antes de pagar.</p>
-<label class="cart-email-label" for="{{ input_id }}">Email para la confirmación del pedido</label>
+<p class="cart-note">{{ t('cart.checkout.note') }}</p>
+<label class="cart-email-label" for="{{ input_id }}">{{ t('cart.checkout.email_label') }}</label>
 <input class="cart-email" id="{{ input_id }}" data-checkout-email type="email"
-       name="email" autocomplete="email" placeholder="tu@email.com" required>
+       name="email" autocomplete="email" placeholder="{{ t('cart.checkout.email_placeholder') }}" required>
 <button class="btn btn-dark cart-checkout" data-cart-checkout
-        data-umami-event="iniciar-checkout">Finalizar compra</button>
+        data-umami-event="iniciar-checkout">{{ t('cart.checkout.button') }}</button>
 <p class="cart-feedback" data-cart-feedback hidden></p>
 {% endmacro %}

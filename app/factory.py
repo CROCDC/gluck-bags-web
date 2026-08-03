@@ -55,6 +55,7 @@ def _initialize_schema(data_dir: str, seed_fn: "object") -> None:
         except OperationalError:
             db.session.rollback()  # another worker won the race; tables already exist
         seed_fn()
+        _add_missing_columns()
         # Self-heal media that predates the og.jpg/AVIF variants (e.g. products
         # seeded on an older build): regenerate them in place so a deploy needs no
         # manual reprocess on the server. Idempotent + behind this same lock; a
@@ -74,6 +75,28 @@ def _initialize_schema(data_dir: str, seed_fn: "object") -> None:
             except Exception:  # noqa: BLE001
                 pass
             lock_fh.close()
+
+
+def _add_missing_columns() -> None:
+    """Add columns this build expects but an older DB file does not have.
+
+    The project has no migration tool: db.create_all() creates missing TABLES but
+    never alters an existing one, so a column added to a shipped model would raise
+    OperationalError on every read. Idempotent, and a failure here must never block
+    boot — the column is additive and nullable.
+    """
+    from sqlalchemy import text
+
+    wanted = {("site_texts", "previous_value"): "TEXT"}
+    for (table, column), column_type in wanted.items():
+        try:
+            rows = db.session.execute(text(f"PRAGMA table_info({table})")).fetchall()
+            if not rows or any(row[1] == column for row in rows):
+                continue
+            db.session.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"))
+            db.session.commit()
+        except Exception:  # noqa: BLE001 — non-sqlite backends / races
+            db.session.rollback()
 
 
 def _resolve_secret_key(data_dir: str) -> str:
@@ -285,11 +308,15 @@ def create_app() -> Flask:
             cart_count = cart_service.count()
         except Exception:  # noqa: BLE001 — the badge is cosmetic; degrade to 0
             cart_count = 0
+        from app import content
+
         return {
             "current_year": datetime.now().year,
-            "brand": "GLÜCK",
-            "tagline": "Bolsos minimalistas de cuero vegano",
-            "instagram_url": "https://www.instagram.com/gluck_bags/",
+            # Editable from the admin (app/content/registry.py); these three are
+            # referenced all over the templates, so they stay plain names.
+            "brand": content.brand(),
+            "tagline": content.tagline(),
+            "instagram_url": content.instagram_url(),
             # Public/canonical origin for absolute OG, Twitter and canonical URLs.
             "site_url": app.config["SITE_URL"],
             # Bare host (no scheme), for the Umami data-domains scope.
@@ -303,14 +330,19 @@ def create_app() -> Flask:
         # Importing these registers the Product/Media models with db.metadata
         # (admin/routes/seed all import app.models), so create_all sees them.
         from app.admin import register_admin
+        from app.admin_content import register_admin_content
         from app.cart import register_cart
+        from app.content import register_content
         from app.routes import register_routes
         from app.seed import seed_initial_products
 
         _initialize_schema(data_dir, seed_initial_products)
 
+        # Editable copy first: every template below renders through `t()`.
+        register_content(app)
         register_routes(app)
         register_admin(app)
+        register_admin_content(app)
         register_cart(app)
 
         # Tienda Nube wiring (webhook receiver, /tn/callback, `flask sync-tn` + the

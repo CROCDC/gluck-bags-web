@@ -166,8 +166,11 @@ def test_admin_reorder_redirects_and_does_not_reorder(
     a = _create_product(app, title="A")
     b = _create_product(app, title="B")
     r = client.post(REORDER_URL, json={"order": [b, a]})
-    assert r.status_code == 302
-    assert LOGIN_URL in r.headers.get("Location", "")
+    # A JSON POST gets JSON back, not a redirect to the login PAGE: this endpoint is
+    # only ever called from fetch(), and following that redirect made an expired
+    # session surface as an HTML-parsed-as-JSON error (see app/auth.py).
+    assert r.status_code == 401
+    assert r.get_json()["reason"] == "auth"
     # Positions must be untouched (created in order -> a before b).
     with app.app_context():
         from app.repositories import ProductRepository

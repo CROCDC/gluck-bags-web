@@ -1,0 +1,101 @@
+{% extends "admin/base.html" %}
+{% set section = 'content' %}
+{% block title %}{{ group.title }} · Textos · {{ brand }} Admin{% endblock %}
+
+{% block head %}{{ inline_css('css/admin-content.css') }}{% endblock %}
+
+{% block content %}
+<a class="adm-back" href="{{ url_for('admin_content.index') }}">← Todos los textos</a>
+
+<div class="ct-head">
+    <div>
+        <h1 class="adm-title">{{ group.title }}</h1>
+        <p class="ct-lead">{{ group.description }}</p>
+    </div>
+    <a class="btn btn-ghost" href="{{ url_for('admin_content.group_preview', group_key=group.key) }}">
+        Previsualizar
+    </a>
+</div>
+
+{% if pending %}
+<div class="ct-pending-inline">
+    {{ pending }} {{ 'cambio' if pending == 1 else 'cambios' }} sin publicar en esta sección.
+</div>
+{% endif %}
+
+{# Filter box: with a couple of hundred strings, finding one by scrolling is the
+   slowest part of the job. Progressive enhancement — without JS the list is intact. #}
+<div class="ct-filter" hidden data-ct-filter-wrap>
+    <label class="visually-hidden" for="ctFilter">Buscar un texto</label>
+    <input type="search" id="ctFilter" data-ct-filter placeholder="Buscar un texto…" autocomplete="off">
+    <button type="button" class="ct-filter-clear" data-ct-filter-clear aria-label="Limpiar búsqueda">×</button>
+</div>
+
+<form method="post" action="{{ url_for('admin_content.group_save', group_key=group.key) }}"
+      class="adm-form ct-form" id="contentForm">
+    {% for sec in group.sections %}
+    <section class="ct-section" data-ct-section>
+        <h2 class="ct-section-title">{{ sec.title }}</h2>
+        {% if sec.note %}<p class="ct-section-note">{{ sec.note }}</p>{% endif %}
+
+        {% for f in sec.fields %}
+        {% set st = states[f.key] %}
+        <div class="ct-field{% if st.has_draft %} is-draft{% elif st.is_overridden %} is-edited{% endif %}"
+             data-ct-item
+             data-ct-search="{{ st.search_text }}"
+             data-ct-default="{{ f.default }}">
+            <div class="ct-field-head">
+                <label for="fld-{{ loop.index0 }}-{{ sec.key }}">{{ f.label }}</label>
+                <span class="ct-field-flags">
+                    {% if st.has_draft %}<span class="adm-tag ct-tag-draft">sin publicar</span>
+                    {% elif st.is_overridden %}<span class="adm-tag ct-tag-edited">editado</span>{% endif %}
+                </span>
+            </div>
+            {% if f.hint %}<p class="hint">{{ f.hint }}</p>{% endif %}
+
+            {% if f.is_multiline %}
+            <textarea id="fld-{{ loop.index0 }}-{{ sec.key }}" name="{{ f.key }}"
+                      rows="{{ 8 if f.type == 'rich' else 3 }}"
+                      maxlength="{{ f.max_length }}"
+                      data-ct-input
+                      class="ct-input ct-input-{{ f.type }}">{{ st.value }}</textarea>
+            {% else %}
+            <input type="{{ 'url' if f.type == 'url' else 'text' }}"
+                   id="fld-{{ loop.index0 }}-{{ sec.key }}" name="{{ f.key }}"
+                   value="{{ st.value }}" maxlength="{{ f.max_length }}"
+                   data-ct-input class="ct-input">
+            {% endif %}
+
+            <div class="ct-field-foot">
+                <span class="ct-counter" data-ct-counter data-max="{{ f.max_length }}"></span>
+                {% if st.value != f.default %}
+                {# No-JS safe: this submit posts the whole form and tells the server
+                   which field to reset, so nothing typed elsewhere is lost. #}
+                <button type="submit" name="restore" value="{{ f.key }}" class="ct-restore">
+                    Restaurar original
+                </button>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </section>
+    {% endfor %}
+
+    <p class="ct-empty-filter" hidden data-ct-no-results>Ningún texto coincide con la búsqueda.</p>
+
+    <div class="ct-actions">
+        <button type="submit" name="action" value="save" class="btn btn-ghost btn-lg">Guardar borrador</button>
+        <button type="submit" name="action" value="publish" class="btn btn-primary btn-lg">Publicar esta sección</button>
+        {% if pending %}
+        <button type="submit" name="action" value="discard" class="btn btn-danger" formnovalidate
+                data-ct-confirm="¿Descartar los cambios sin publicar de esta sección? No se puede deshacer.">
+            Descartar borrador
+        </button>
+        {% endif %}
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script defer src="{{ url_for('static', filename='js/admin-content.js') }}"></script>
+{% endblock %}

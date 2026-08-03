@@ -2,6 +2,7 @@ from typing import Any
 
 from flask import Flask, Response, abort, redirect, render_template, url_for
 
+from app import content
 from app.services import catalog
 from app.seo import (
     absolute_url,
@@ -15,87 +16,31 @@ from app.seo import (
 from app.utils import slugify
 
 # --- Static site content (the non-product sections of the landing page) -------
+#
+# The COPY of these sections is editable from the admin (app/content/registry.py);
+# what stays here is the structure that copy hangs off: which categories exist,
+# which image each card uses, and which URL each editorial page answers on.
+#
+# A category's `name` is its identity — it is the URL slug AND the value stored on
+# every product — so it is deliberately not editable. Its on-screen label comes
+# from `content.category_label()`.
 
 CATEGORIES: list[dict[str, str]] = [
-    {
-        "name": "Tote",
-        "tagline": "Para todos los días",
-        "image": "img/productos/tote-cognac-01",
-    },
-    {
-        "name": "Mini Bag",
-        "tagline": "Lo esencial, en pequeño",
-        "image": "img/productos/crossbody-rosa",
-    },
-    {
-        "name": "Bucket Bag",
-        "tagline": "Volumen y carácter",
-        "image": "img/video-posters/bucket-bag-reveal",
-    },
-    {
-        "name": "Clutch",
-        "tagline": "Lo justo y necesario",
-        "image": "img/productos/clutch-rosa-sobre",
-    },
+    {"name": "Tote", "image": "img/productos/tote-cognac-01"},
+    {"name": "Mini Bag", "image": "img/productos/crossbody-rosa"},
+    {"name": "Bucket Bag", "image": "img/video-posters/bucket-bag-reveal"},
+    {"name": "Clutch", "image": "img/productos/clutch-rosa-sobre"},
 ]
 
-# Editorial trust pages (E-E-A-T). Each renders templates/pages/<template> and is
-# listed in the sitemap.
-STATIC_PAGES: dict[str, dict[str, str]] = {
-    "nosotras": {
-        "template": "nosotras.html",
-        "title": "Nosotras",
-        "description": "Quiénes somos: GLÜCK, bolsos de cuero vegano hechos a mano en Argentina, con diseño minimalista y atemporal.",
-    },
-    "contacto": {
-        "template": "contacto.html",
-        "title": "Contacto",
-        "description": "Escribinos por Instagram y te ayudamos a elegir tu bolso GLÜCK. Las compras se hacen online en la tienda del sitio.",
-    },
-    "envios": {
-        "template": "envios.html",
-        "title": "Envíos",
-        "description": "Hacemos envíos a todo el país. Conocé tiempos, costos y cómo se despacha tu pedido GLÜCK.",
-    },
-    "cambios-y-devoluciones": {
-        "template": "cambios.html",
-        "title": "Cambios y devoluciones",
-        "description": "Política de cambios y devoluciones de GLÜCK: plazos, condiciones y cómo gestionarlos.",
-    },
-    "terminos": {
-        "template": "terminos.html",
-        "title": "Términos y condiciones",
-        "description": "Términos y condiciones de uso y de compra del sitio de GLÜCK: cómo comprar online, medios de pago, envíos y las condiciones generales del servicio.",
-    },
-    "privacidad": {
-        "template": "privacidad.html",
-        "title": "Política de privacidad",
-        "description": "Cómo GLÜCK trata tus datos personales y qué herramientas de medición usa el sitio.",
-    },
-}
-
-
-# Short intro copy per category — gives each (otherwise thin) category page unique,
-# indexable text above the product grid. Keyed by category name.
-CATEGORY_INTRO: dict[str, str] = {
-    "Tote": (
-        "El bolso de todos los días: amplio, de líneas rectas y hecho de una sola "
-        "pieza de cuero vegano. Pensado para que entre todo sin perder la silueta "
-        "minimalista y atemporal que define a GLÜCK."
-    ),
-    "Mini Bag": (
-        "Lo esencial, en formato pequeño. Bandoleras y crossbody de cuero vegano "
-        "para llevar lo justo con las manos libres, sin resignar diseño ni "
-        "carácter."
-    ),
-    "Bucket Bag": (
-        "Volumen y carácter en una silueta tipo balde. Cuero vegano plegado a mano, "
-        "espacioso y con una caída suave que la vuelve inconfundible."
-    ),
-    "Clutch": (
-        "Lo justo y necesario para una salida. Sobres y clutches de cuero vegano, "
-        "mínimos y elegantes, hechos a mano y sin crueldad animal."
-    ),
+# Editorial trust pages (E-E-A-T). Each is rendered by the shared page shell from
+# its `page.<key>.*` registry entries, and is listed in the sitemap.
+STATIC_PAGES: dict[str, str] = {
+    "nosotras": "about",
+    "contacto": "contact",
+    "envios": "shipping",
+    "cambios-y-devoluciones": "returns",
+    "terminos": "terms",
+    "privacidad": "privacy",
 }
 
 
@@ -103,6 +48,19 @@ CATEGORY_INTRO: dict[str, str] = {
 # history, kept indexable and sitemap-listed even while empty (their editorial
 # intro carries the page until the TN catalogue fills them).
 CURATED_SLUGS: list[str] = [slugify(c["name"]) for c in CATEGORIES]
+
+
+def _category_cards() -> list[dict[str, str]]:
+    """The home grid cards with their editable label/tagline resolved."""
+    return [
+        {
+            "name": card["name"],
+            "image": card["image"],
+            "label": content.category_label_editable(card["name"]),
+            "tagline": content.category_tagline_editable(card["name"]),
+        }
+        for card in CATEGORIES
+    ]
 
 
 def _category_name_for_slug(slug: str) -> str | None:
@@ -129,14 +87,25 @@ def register_routes(app: Flask) -> None:
     @app.route("/")
     def index() -> str:
         site_url = app.config["SITE_URL"]
-        jsonld = dump_jsonld([organization_jsonld(site_url), website_jsonld(site_url)])
+        brand = content.brand()
+        jsonld = dump_jsonld(
+            [
+                organization_jsonld(
+                    site_url,
+                    brand=brand,
+                    instagram=content.instagram_url(),
+                    description=str(content.t("seo.organization.description")),
+                ),
+                website_jsonld(site_url, brand=brand),
+            ]
+        )
         # Categories that actually have published products, so the home grid can
         # avoid linking an empty (noindex) category as if it were shoppable. Keyed by
         # slug (not raw name) so an off-casing product category (admin input is
         # free-text, e.g. "tote") still matches the curated card ("Tote").
         published_cats = {slugify(c) for c in catalog.published_categories()}
         context: dict[str, Any] = {
-            "categories": CATEGORIES,
+            "categories": _category_cards(),
             "published_cats": published_cats,
             "products": catalog.get_published(),
             "jsonld": jsonld,
@@ -163,8 +132,25 @@ def register_routes(app: Flask) -> None:
                         return redirect(url_for("category_page", slug=slug), code=301)
             abort(404)
         site_url = app.config["SITE_URL"]
+        # The JSON-LD has to say exactly what the page says, so it reads the same
+        # editable labels the template renders.
+        label = content.category_label(product.category) if product.category else None
+        home_label = str(content.t("product.breadcrumb_home"))
         jsonld = dump_jsonld(
-            [product_jsonld(product, site_url), breadcrumb_jsonld(product, site_url)]
+            [
+                product_jsonld(
+                    product,
+                    site_url,
+                    brand=content.brand(),
+                    description_fallback=str(
+                        content.t("seo.product.description_fallback", title=product.title)
+                    ),
+                    category_label=label,
+                ),
+                breadcrumb_jsonld(
+                    product, site_url, home_label=home_label, category_label=label
+                ),
+            ]
         )
         return render_template(
             "product_detail.html",
@@ -184,28 +170,41 @@ def register_routes(app: Flask) -> None:
         return render_template(
             "category.html",
             category=name,
+            category_display=content.category_label(name),
             products=products,
-            intro=CATEGORY_INTRO.get(name),
+            intro=content.category_intro_editable(name),
             # Sibling categories (non-empty) for the inter-category nav chips.
             nav_categories=catalog.published_categories(),
-            jsonld=dump_jsonld(category_breadcrumb_jsonld(name, site_url)),
+            jsonld=dump_jsonld(
+                category_breadcrumb_jsonld(
+                    name,
+                    site_url,
+                    home_label=str(content.t("product.breadcrumb_home")),
+                    label=content.category_label(name),
+                )
+            ),
             # Curated categories stay indexable even while empty (see CURATED_SLUGS);
             # only ad-hoc empty categories (free-text admin input) leave the index.
             noindex=not products and slug not in CURATED_SLUGS,
         )
 
-    # Register the editorial trust pages from STATIC_PAGES (one thin view each).
-    def _make_static_view(slug: str, meta: dict[str, str]) -> Any:
+    # Register the editorial trust pages from STATIC_PAGES. They all render the same
+    # shell; the heading, the meta description and the body come from the registry,
+    # so editing one is a save in the admin, not a deploy.
+    def _make_static_view(slug: str, page_key: str) -> Any:
         def view() -> str:
             return render_template(
-                f"pages/{meta['template']}", page_title=meta["title"], page_description=meta["description"]
+                "pages/_page_base.html",
+                page_key=page_key,
+                page_title=content.t(f"page.{page_key}.title"),
+                page_description=content.t(f"page.{page_key}.meta_description"),
             )
 
         view.__name__ = f"page_{slug.replace('-', '_')}"
         return view
 
-    for _slug, _meta in STATIC_PAGES.items():
-        _view = _make_static_view(_slug, _meta)
+    for _slug, _page_key in STATIC_PAGES.items():
+        _view = _make_static_view(_slug, _page_key)
         app.add_url_rule(f"/{_slug}", endpoint=_view.__name__, view_func=_view)
 
     @app.route("/media/<path:filename>")

@@ -3,8 +3,8 @@
 
 {% block body_class %}solid-header{% endblock %}
 
-{% block title %}{{ category }} · Carteras de cuero vegano | {{ brand }}{% endblock %}
-{% block description %}{{ category }}: carteras y bolsos de cuero vegano hechos a mano de {{ brand }}. Diseño minimalista y atemporal.{% endblock %}
+{% block title %}{{ t('category.meta.title', category=category_display) }}{% endblock %}
+{% block description %}{{ t('category.meta.description', category=category_display) }}{% endblock %}
 
 {% block head_extra %}
     {# Only ad-hoc empty categories are noindexed; the curated ones stay indexable
@@ -15,27 +15,27 @@
 
 {% block body %}
     <main class="section shop" id="top">
-        {{ breadcrumb([("Inicio", url_for('index')), (category, None)]) }}
+        {{ breadcrumb([(t('product.breadcrumb_home'), url_for('index')), (category_label(category), None)]) }}
 
         <div class="section-head">
-            <p class="eyebrow">La colección</p>
-            <h1 class="section-title">{{ category }}</h1>
+            <p class="eyebrow">{{ t('category.eyebrow') }}</p>
+            <h1 class="section-title">{{ category_label(category) }}</h1>
             {% if intro %}<p class="section-intro">{{ intro }}</p>{% endif %}
         </div>
 
         {{ category_nav(nav_categories, current=category) }}
 
         {% if products %}
-        <h2 class="sr-only">Modelos de {{ category }}</h2>
+        <h2 class="sr-only">{{ t('category.heading_models', category=category_display) }}</h2>
         <div class="shop-grid">
             {% for product in products %}{{ product_card(product, priority=loop.first) }}{% endfor %}
         </div>
         {% else %}
-        <p class="shop-empty">Muy pronto vas a ver acá nuestros {{ category | lower }}.</p>
+        <p class="shop-empty">{{ t('category.empty', category_lower=category_display|lower) }}</p>
         {% endif %}
 
         <p style="text-align: center; margin-top: 2.5rem;">
-            <a href="{{ url_for('index') }}#shop" class="pdp-back">← Ver todos los bolsos</a>
+            <a href="{{ url_for('index') }}#shop" class="pdp-back">{{ t('category.back_link') }}</a>
         </p>
     </main>
 {% endblock %}

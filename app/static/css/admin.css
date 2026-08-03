@@ -4,7 +4,8 @@
 :root {
     --adm-ink: #1a1714;
     --adm-soft: #5a534b;
-    --adm-faint: #8a8076;
+    /* 8a8076 measured 3.87:1 on white — below the 4.5:1 floor for body text. */
+    --adm-faint: #6b635a;
     --adm-paper: #f4efe9;
     --adm-card: #ffffff;
     --adm-line: rgba(26, 23, 20, 0.14);
@@ -13,6 +14,7 @@
     --adm-ok: #2e7d52;
     --adm-err: #c0392b;
     --adm-radius: 12px;
+    --adm-header-h: 56px;
     --adm-sans: "Jost", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
@@ -36,21 +38,87 @@ body.admin {
 a { color: inherit; }
 img { display: block; max-width: 100%; }
 
-/* ---------- header ---------- */
+/* ---------- header ----------
+   A grid, not a flex row: the section nav gets the middle and stays on ONE line at
+   every width. As a flex row it was the widest thing in the admin — 129px of
+   horizontal overflow at 195px, and a third line of header on a small phone. */
 .adm-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
     align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 0.9rem clamp(1rem, 4vw, 2rem);
+    gap: clamp(0.5rem, 2vw, 1.2rem);
+    min-height: var(--adm-header-h);
+    padding: 0.5rem clamp(0.7rem, 3vw, 2rem);
     background: var(--adm-ink);
     color: #fff;
     position: sticky;
     top: 0;
-    z-index: 20;
+    z-index: 40;
 }
-.adm-brand { font-weight: 500; letter-spacing: 0.12em; text-decoration: none; font-size: 1.05rem; }
+.adm-brand {
+    display: inline-flex; align-items: baseline; gap: 0.5rem;
+    text-decoration: none; min-width: 0;
+}
+.adm-brand-mark { font-weight: 500; letter-spacing: 0.12em; font-size: 1.02rem; white-space: nowrap; }
+.adm-brand-tag {
+    font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.62);
+}
 .adm-header form { margin: 0; }
+
+/* ---------- section nav ---------- */
+.adm-sections {
+    display: flex; gap: 0.25rem; justify-self: center;
+    padding: 3px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+}
+.adm-section-link {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    /* 44px is the touch floor; it fits the 60px bar exactly. */
+    min-height: 44px; padding: 0 0.85rem;
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.78);
+    text-decoration: none; font-size: 0.92rem; white-space: nowrap;
+    transition: background 0.18s, color 0.18s;
+}
+.adm-section-link:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+.adm-section-link.is-current {
+    color: var(--adm-ink);
+    background: #fff;
+    /* Not colour alone: the label goes medium so the current section survives a
+       greyscale screenshot or a colour-blind reader. */
+    font-weight: 500;
+}
+.adm-section-link svg { flex: none; opacity: 0.85; }
+
+/* ---------- exit ---------- */
+.adm-exit {
+    display: inline-flex; align-items: center; gap: 0.45rem;
+    min-height: 44px; min-width: 44px; padding: 0 0.7rem;
+    background: none; border: 1px solid rgba(255, 255, 255, 0.22); border-radius: 999px;
+    color: rgba(255, 255, 255, 0.82);
+    font-family: inherit; font-size: 0.88rem; cursor: pointer;
+    transition: border-color 0.18s, color 0.18s;
+}
+.adm-exit:hover { border-color: rgba(255, 255, 255, 0.55); color: #fff; }
+.adm-exit svg { flex: none; }
+
+@media (max-width: 560px) {
+    /* The word "Salir" and the "Admin" tag are what pushed the header onto a third
+       line at 326px. The icon keeps its accessible name via aria-label. */
+    .adm-exit-text, .adm-brand-tag { display: none; }
+    .adm-exit { padding: 0; justify-content: center; width: 44px; min-height: 44px; }
+    .adm-section-link { padding: 0 0.6rem; font-size: 0.88rem; }
+}
+
+@media (max-width: 380px) {
+    .adm-brand-mark { font-size: 0.92rem; letter-spacing: 0.08em; }
+    .adm-section-link span {
+        /* Icons only, but the label stays in the accessible name. */
+        position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);
+    }
+    .adm-section-link { padding: 0; min-width: 44px; justify-content: center; }
+}
 
 .adm-main {
     max-width: 880px;

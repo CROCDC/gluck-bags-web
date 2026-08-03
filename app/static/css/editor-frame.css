@@ -1,0 +1,134 @@
+/* Injected into the PUBLIC page when a logged-in admin opens it with ?edit=1.
+   It only adds editing affordances — no layout rules — so what you edit looks
+   exactly like what visitors get. */
+
+ct-t {
+    /* Inline, like the text node it replaced, so wrapping a string can't change
+       the layout of the page being edited. */
+    display: inline;
+    cursor: text;
+    border-radius: 3px;
+    transition: background-color 0.12s, box-shadow 0.12s;
+}
+ct-t:hover,
+ct-t:focus-visible {
+    background-color: rgba(255, 255, 255, 0.92);
+    color: #1a1714;
+    /* An opaque inner white stroke + an opaque cognac ring, so the affordance keeps
+       its contrast over ANY background — the old 35%-alpha shadow measured 1.02:1
+       over the hero photo, i.e. invisible exactly where the copy lives. */
+    box-shadow: 0 0 0 1px #fff, 0 0 0 3px #9a5730;
+    outline: none;
+}
+ct-t[data-ct-editing] {
+    background-color: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 0 0 2px #b56a3a;
+    outline: none;
+    color: #1a1714;
+    cursor: text;
+    /* A raw value can carry {tokens} and line breaks; show them literally. */
+    white-space: pre-wrap;
+}
+ct-t[data-ct-dirty] { background-color: rgba(181, 106, 58, 0.12); }
+
+/* A rich body is a page of <p>/<h2>. Inside an inline host, select-all + type makes
+   the browser reparent the typed text out of the element and drop everything — the
+   original copy AND the replacement. It needs its own block formatting context. */
+ct-t[data-t="rich"] { display: block; }
+
+/* A field the server rejected on save. */
+ct-t[data-ct-invalid] {
+    background-color: rgba(192, 57, 43, 0.18);
+    box-shadow: 0 0 0 2px #c0392b;
+}
+
+/* Emptied text collapses to a 0x0 box, which leaves nothing left to click and no
+   way back without reloading. Keep a target (and say what it is). */
+ct-t:empty {
+    display: inline-block;
+    min-width: 7ch;
+    min-height: 1.4em;
+    vertical-align: middle;
+    /* Opaque, not a tint: over the hero photo the tinted version measured 1.16:1. */
+    background: #c0392b;
+    box-shadow: 0 0 0 1px #fff;
+}
+ct-t:empty:not([data-ct-editing])::before {
+    content: "vacío";
+    display: inline-block;
+    padding: 0 0.5em;
+    font: 500 12px/1.6 system-ui, sans-serif;
+    letter-spacing: 0;
+    text-transform: none;
+    color: #fff;
+}
+
+/* Elements whose ATTRIBUTES came from editable copy (alt, aria-label, meta…).
+   They have no visible text to click, so they get a corner badge instead. */
+[data-ct-keys] { position: relative; }
+[data-ct-keys]::after {
+    content: "✎";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    z-index: 2147483000;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #b56a3a;
+    color: #fff;
+    font: 15px/32px system-ui, sans-serif;
+    text-align: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.12s;
+}
+[data-ct-keys]:hover::after,
+[data-ct-keys]:focus::after,
+[data-ct-keys]:focus-within::after { opacity: 0.95; }
+
+/* An <img> or <input> is a replaced element: it generates no ::after box at all, so
+   the badge simply never existed on exactly the case it was built for (image alt
+   text). An outline works on replaced elements and, unlike a badge parked in the
+   corner, never covers the thing it is annotating. */
+img[data-ct-keys], input[data-ct-keys], video[data-ct-keys] {
+    outline: 2px dashed rgba(154, 87, 48, 0.85);
+    outline-offset: -2px;
+}
+img[data-ct-keys]:hover, img[data-ct-keys]:focus,
+input[data-ct-keys]:hover, input[data-ct-keys]:focus,
+video[data-ct-keys]:hover, video[data-ct-keys]:focus {
+    outline-color: #9a5730;
+    outline-style: solid;
+}
+
+/* A touch device never hovers. Show the affordance as an outline rather than a badge
+   parked over the content — at 32px it covered the cart count and the wordmark's
+   last letter. */
+@media (hover: none) {
+    [data-ct-keys]:not(img):not(input):not(video) {
+        outline: 2px dashed rgba(154, 87, 48, 0.7);
+        outline-offset: -2px;
+    }
+}
+/* Inline/void elements can't host the badge; their keys are still in the panel. */
+head [data-ct-keys]::after, meta[data-ct-keys]::after, link[data-ct-keys]::after { content: none; }
+
+/* ---------- hint bubble ---------- */
+.ct-tip {
+    position: absolute;
+    z-index: 2147483600;
+    max-width: 260px;
+    padding: 6px 9px;
+    border-radius: 8px;
+    background: #1a1714;
+    color: #fff;
+    font: 12px/1.45 system-ui, sans-serif;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    pointer-events: none;
+}
+.ct-tip.is-over { background: #c0392b; }
+
+/* The site's own scroll-reveal animation starts sections at opacity 0; in the
+   editor everything must be visible and clickable from the start. */
+.reveal { opacity: 1 !important; transform: none !important; }

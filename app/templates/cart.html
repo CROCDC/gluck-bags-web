@@ -4,8 +4,8 @@
 {# Solid header (no dark hero behind it) so the fixed header text stays legible. #}
 {% block body_class %}solid-header{% endblock %}
 
-{% block title %}Tu carrito · {{ brand }}{% endblock %}
-{% block description %}Revisá los bolsos que agregaste a tu carrito en {{ brand }} y finalizá tu compra.{% endblock %}
+{% block title %}{{ t('cart.page.title_tag') }}{% endblock %}
+{% block description %}{{ t('cart.page.meta_description') }}{% endblock %}
 
 {# A cart is private and transient — keep it out of the index. #}
 {% block canonical %}<meta name="robots" content="noindex, follow">{% endblock %}
@@ -13,8 +13,8 @@
 {% block body %}
 <main class="cart-page" id="top">
     <div class="section-head">
-        <p class="eyebrow">Tu selección</p>
-        <h1 class="section-title">Carrito</h1>
+        <p class="eyebrow">{{ t('cart.page.eyebrow') }}</p>
+        <h1 class="section-title">{{ t('cart.page.title') }}</h1>
     </div>
 
     {% if cart['items'] %}
@@ -27,17 +27,17 @@
                 </a>
                 <div class="cart-line-info">
                     <a class="cart-line-title" href="{{ item.url }}">{{ item.title }}</a>
-                    {% if item.category %}<span class="cart-line-cat">{{ item.category }}</span>{% endif %}
+                    {% if item.category %}<span class="cart-line-cat">{{ category_label(item.category) }}</span>{% endif %}
                     <span class="cart-line-price">{{ item.price_formatted }}</span>
                 </div>
                 <div class="cart-line-actions">
                     <div class="qty-stepper" data-qty-stepper>
-                        <button class="qty-btn" data-qty-dec aria-label="Quitar uno">−</button>
+                        <button class="qty-btn" data-qty-dec aria-label="{{ t('cart.line.qty_dec_aria') }}">−</button>
                         <span class="qty-value" data-qty-value>{{ item.qty }}</span>
-                        <button class="qty-btn" data-qty-inc aria-label="Agregar uno">+</button>
+                        <button class="qty-btn" data-qty-inc aria-label="{{ t('cart.line.qty_inc_aria') }}">+</button>
                     </div>
                     <span class="cart-line-total" data-line-total>{{ item.line_total_formatted }}</span>
-                    <button class="cart-line-remove" data-cart-remove aria-label="Quitar {{ item.title }}">Quitar</button>
+                    <button class="cart-line-remove" data-cart-remove aria-label="{{ t('cart.line.remove_aria', title=item.title) }}">{{ t('cart.line.remove') }}</button>
                 </div>
             </li>
             {% endfor %}
@@ -45,17 +45,17 @@
 
         <aside class="cart-summary">
             <div class="cart-subtotal">
-                <span>Subtotal</span>
+                <span>{{ t('cart.subtotal_label') }}</span>
                 <strong data-cart-subtotal>{{ cart['subtotal_formatted'] }}</strong>
             </div>
             {{ cart_checkout_form('cartEmailPage') }}
-            <a class="cart-keep" href="{{ url_for('index') }}#shop">← Seguir mirando</a>
+            <a class="cart-keep" href="{{ url_for('index') }}#shop">{{ t('cart.page.keep_shopping') }}</a>
         </aside>
     </div>
     {% else %}
     <div class="cart-empty" data-cart-empty>
-        <p>Tu carrito está vacío.</p>
-        <a class="btn btn-dark" href="{{ url_for('index') }}#shop">Ver bolsos</a>
+        <p>{{ t('cart.page.empty') }}</p>
+        <a class="btn btn-dark" href="{{ url_for('index') }}#shop">{{ t('cart.page.empty_cta') }}</a>
     </div>
     {% endif %}
 </main>
