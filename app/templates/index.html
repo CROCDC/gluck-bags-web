@@ -71,7 +71,7 @@
                 {% set tag = 'a' if has_products else 'div' %}
                 <{{ tag }} {% if has_products %}href="{{ url_for('category_page', slug=cat.name|slugify) }}"{% endif %}
                    class="cat-card reveal{% if not has_products %} is-soon{% endif %}" style="--i: {{ loop.index0 }}"
-                   {% if not has_products %}aria-label="{{ t('home.categories.soon_aria', category=cat.label) }}"{% endif %}>
+                   >
                     <div class="cat-media">
                         <picture>
                             <source type="image/webp"
@@ -93,6 +93,10 @@
                         </span>
                         {% else %}
                         <span class="cat-soon">{{ t('home.categories.soon') }}</span>
+                        {# On the non-linked card this lived in an aria-label on a
+                           <div>, whose `generic` role prohibits naming — so it was
+                           editable copy no screen reader could ever announce. #}
+                        <span class="sr-only">{{ t('home.categories.soon_aria', category=cat.label) }}</span>
                         {% endif %}
                     </div>
                     <div class="cat-info">
@@ -173,7 +177,7 @@
                     <div class="product-info">
                         <div class="product-meta">
                             <h3 class="product-name">{{ product.title }}</h3>
-                            {% if product.category %}<span class="product-cat">{{ product.category }}</span>{% endif %}
+                            {% if product.category %}<span class="product-cat">{{ category_label(product.category) }}</span>{% endif %}
                         </div>
                         <span class="product-price">{{ product.formatted_price or t('product.price_fallback') }}</span>
                     </div>

@@ -247,10 +247,11 @@ def test_admin_login_accessibility(admin_live_server: tuple[str, str], page: Pag
 def test_admin_login_password_field_a11y_state(
     admin_live_server: tuple[str, str], page: Page
 ) -> None:
-    """The login password field is the one known control WITHOUT a programmatic
-    label: it relies on a visible placeholder + autocomplete. We assert that real
-    state (rather than the strict label rule) so this documents the genuine gap
-    and will fail loudly if the field's accessibility ever changes for worse.
+    """The login password field must be named programmatically, not by a placeholder.
+
+    This test used to document the opposite — that the field relied on its
+    placeholder — and told whoever fixed it to tighten the rule. That happened, so
+    the rule is now the strict one.
     """
     base_url, _ = admin_live_server
     _goto(page, base_url, "/admin/login")
@@ -272,12 +273,10 @@ def test_admin_login_password_field_a11y_state(
     assert state is not None, "password input not found on admin login"
     assert state["type"] == "password"
     assert state["required"], "password input should be required"
-    # The genuine (weaker) accessible affordance the template actually ships.
-    assert state["placeholder"], "password field relies on placeholder; it is missing"
     assert state["autocomplete"] == "current-password"
-    # And the documented gap: no real label is wired up.
-    assert not state["hasForLabel"] and not state["wrapped"] and not state["ariaLabel"], (
-        "password field now has a real label — tighten the strict rule to include it"
+    # A placeholder is not an accessible name: it disappears the moment you type.
+    assert state["hasForLabel"] or state["wrapped"] or state["ariaLabel"], (
+        "el campo de contraseña sólo está nombrado por su placeholder"
     )
 
 

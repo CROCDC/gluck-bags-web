@@ -19,13 +19,11 @@
   const pendingBadge = root.querySelector("[data-ed-pending]");
   const hiddenBadge = root.querySelector("[data-ed-hidden-count]");
   const discardBtn = root.querySelector("[data-ed-discard]");
-  const pagePickerEl = root.querySelector("[data-ed-page]");
   const SAVE_URL = root.dataset.saveUrl;
 
   // key -> the value the user has typed but not saved yet.
   const pending = Object.create(null);
   let manifest = { fields: {}, inlineKeys: [], hiddenKeys: [] };
-  let savedPending = parseInt(root.dataset.pending, 10) || 0;
   // Keys with a draft on the server that this page never rendered (staged on another
   // page, or in an earlier session). They still count and they still publish.
   let serverDrafts = [];
@@ -56,7 +54,7 @@
 
   /** Everything that would go live on Publicar: what is typed here plus what is
    *  already drafted on the server. A union, because the same key can be in both —
-   *  the old `dirty + savedPending` counted one pending text as two. */
+   *  adding the two counts instead counted one pending text as two. */
   function pendingKeys() {
     const keys = new Set(Object.keys(pending));
     serverDrafts.forEach((key) => keys.add(key));
@@ -311,10 +309,14 @@
     box.textContent = "";
     const keys = Object.keys(manifest.fields);
     // Pending edits typed on ANOTHER page belong here too: they count towards
-    // Publicar, and if one of them is invalid it blocks every save.
-    Object.keys(extraFields).forEach((key) => {
-      if (keys.indexOf(key) === -1) keys.push(key);
-    });
+    // Publicar, and if one of them is invalid it blocks every save with nothing to
+    // click. `pending` as well as `extraFields`, because an edit that was never
+    // saved has no server-side draft to be listed from.
+    Object.keys(extraFields)
+      .concat(Object.keys(pending))
+      .forEach((key) => {
+        if (keys.indexOf(key) === -1) keys.push(key);
+      });
     keys.forEach((key) => {
       if (!fieldFor(key)) return;
       const item = buildField(key);
@@ -343,6 +345,10 @@
     if (input) input.value = payload.value;
     const field = fieldFor(key);
     if (field) field.raw = payload.value;
+    // The endpoint returns the fresh pending state; ignoring it left the badge and
+    // the panel describing the world as it was before the revert.
+    serverDrafts = payload.pendingKeys || serverDrafts;
+    extraFields = payload.pendingFields || extraFields;
     tellFrame({ type: "set", key: key, value: payload.value });
     setStatus("Listo, volvimos al texto anterior.");
     syncButtons();
@@ -369,7 +375,7 @@
   /* ---------------- change tracking ---------------- */
 
   function stageChange(key, value) {
-    const original = (manifest.fields[key] || {}).raw;
+    const original = (fieldFor(key) || {}).raw;
     if (value === original) delete pending[key];
     else pending[key] = value;
     syncButtons();
@@ -380,8 +386,8 @@
     if (box && box.value !== value) box.value = value;
     root.querySelectorAll('[data-ed-field="' + CSS.escape(key) + '"]').forEach((item) => {
       item.classList.toggle("is-dirty", key in pending);
-      const field = manifest.fields[key] || {};
-      item.dataset.edSearch = (field.label + " " + key + " " + value).toLowerCase();
+      const field = fieldFor(key) || {};
+      item.dataset.edSearch = ((field.label || key) + " " + key + " " + value).toLowerCase();
     });
   }
 
@@ -419,6 +425,14 @@
     }
   }
 
+  function reloadCanvas() {
+    try {
+      iframe.contentWindow.location.reload();
+    } catch (_) {
+      iframe.src = iframe.src;
+    }
+  }
+
   function tellFrame(message) {
     if (!iframe.contentWindow) return;
     iframe.contentWindow.postMessage(
@@ -429,16 +443,21 @@
 
   window.addEventListener("message", (event) => {
     if (event.origin !== window.location.origin) return;
+    // The SENDER has to be our own canvas. Origin alone let any same-origin script
+    // (a nested frame, an extension, a future widget) drive openRich and land its
+    // markup in `innerHTML` inside the admin document, next to the session cookie.
+    if (!iframe.contentWindow || event.source !== iframe.contentWindow) return;
     const data = event.data || {};
-    if (data.source !== "ct-frame") return;
+    if (data.source !== "ct-frame" || typeof data.type !== "string") return;
+    if (data.key !== undefined && typeof data.key !== "string") return;
 
     if (data.type === "ready") {
       manifest = data.manifest || manifest;
       // Follow the canvas: a link clicked inside the site used to strand the picker
       // on the old page, and re-selecting the same option fires no change event.
-      if (pagePickerEl && data.path) {
-        const match = Array.from(pagePickerEl.options).find((o) => o.value === data.path);
-        pagePickerEl.value = match ? data.path : "";
+      if (pagePicker && data.path) {
+        const match = Array.from(pagePicker.options).find((o) => o.value === data.path);
+        pagePicker.value = match ? data.path : "";
       }
       // Re-apply anything edited before navigating to this page.
       Object.keys(pending).forEach((key) => {
@@ -482,6 +501,44 @@
 
   /** What a reader actually sees. The old counter measured the HTML, so an emptied
    *  body reported "7 / 12000" and a paste of markup burned budget invisibly. */
+  // The server sanitizes on save and on render; the editor document needs its own
+  // pass, because what lands here comes over postMessage and goes into innerHTML.
+  const RICH_TAGS = ["P", "BR", "STRONG", "B", "EM", "I", "H2", "H3", "UL", "OL", "LI", "A"];
+
+  function sanitizeRich(html) {
+    const doc = document.implementation.createHTMLDocument("");
+    doc.body.innerHTML = String(html == null ? "" : html);
+    const walk = (node) => {
+      Array.from(node.children).forEach((child) => {
+        if (RICH_TAGS.indexOf(child.tagName) === -1) {
+          child.replaceWith(...child.childNodes);
+          return;
+        }
+        Array.from(child.attributes).forEach((attr) => {
+          const keep =
+            child.tagName === "A" && ["href", "target", "rel"].indexOf(attr.name) !== -1;
+          if (!keep) child.removeAttribute(attr.name);
+        });
+        if (child.tagName === "A" && !safeHref(child.getAttribute("href"))) {
+          child.replaceWith(...child.childNodes);
+          return;
+        }
+        walk(child);
+      });
+    };
+    walk(doc.body);
+    return doc.body.innerHTML;
+  }
+
+  function safeHref(href) {
+    const value = String(href || "").replace(/[\s\u0000-\u001f]/g, "");
+    if (!value || /^(\/\/|\/\\|\\)/.test(value)) return false;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(value)) {
+      return /^(https?|mailto|tel):/i.test(value);
+    }
+    return true;
+  }
+
   function visibleLength(html) {
     const probe = document.createElement("div");
     probe.innerHTML = html;
@@ -498,7 +555,7 @@
       field.section && field.section !== field.groupTitle
         ? field.groupTitle + " · " + field.section
         : field.groupTitle;
-    sheetDoc.innerHTML = value != null ? value : field.raw;
+    sheetDoc.innerHTML = sanitizeRich(value != null ? value : field.raw);
     sheet.hidden = false;
     document.body.classList.add("ed-sheet-open");
     // Belt and braces: `inert` removes the background from the tab order and from
@@ -527,9 +584,12 @@
   function renderSheetCount() {
     const field = sheetKey ? fieldFor(sheetKey) : null;
     if (!field) return;
+    // One quantity, shown and enforced: the counter used to display the visible
+    // length and turn red on the HTML length, so it went red while reading "758".
     const visible = visibleLength(sheetDoc.innerHTML);
-    sheetCount.textContent = visible + " caracteres";
-    sheetCount.classList.toggle("is-over", sheetDoc.innerHTML.length > field.max);
+    const stored = sheetDoc.innerHTML.length;
+    sheetCount.textContent = visible + " caracteres visibles · " + stored + " / " + field.max;
+    sheetCount.classList.toggle("is-over", stored > field.max);
   }
 
   if (sheet) {
@@ -553,7 +613,13 @@
         const cmd = btn.dataset.edCmd;
         if (cmd === "createLink") {
           const href = window.prompt("¿A qué link lleva? (https://…)");
-          if (href) document.execCommand("createLink", false, href);
+          if (href && !safeHref(href)) {
+            // The server drops these silently on save, so the editor showed a link
+            // that simply vanished later with no explanation.
+            window.alert("Ese link no se puede usar. Tiene que empezar con https://");
+          } else if (href) {
+            document.execCommand("createLink", false, href);
+          }
         } else {
           document.execCommand(cmd, false, btn.dataset.edArg || null);
         }
@@ -664,7 +730,6 @@
     });
     serverDrafts = payload.pendingKeys || [];
     extraFields = payload.pendingFields || {};
-    savedPending = payload.pending || 0;
     const leftover = dirtyCount();
     setStatus(
       leftover
@@ -674,9 +739,9 @@
         : "Borrador guardado. Publicá cuando quieras."
     );
     syncButtons();
-    // Reload the canvas so it shows exactly what is stored; anything still pending is
-    // re-applied by the frame's `ready` handshake.
-    iframe.src = iframe.src;
+    // `.src` reflects the ATTRIBUTE, which in-frame navigation never updates, so
+    // re-assigning it threw the editor back to the page it started on.
+    reloadCanvas();
   }
 
   saveBtn.addEventListener("click", () => send("save"));
@@ -704,7 +769,7 @@
       extraFields = {};
       setStatus("Cambios descartados.");
       syncButtons();
-      iframe.src = iframe.src;
+      reloadCanvas();
     });
   }
 

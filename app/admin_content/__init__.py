@@ -29,12 +29,11 @@ from flask import (
     request,
     url_for,
 )
-from werkzeug.wrappers import Response
 
 from app import content
 from app.auth import login_required
 from app.content import registry
-from app.content.sanitizer import safe_href, sanitize, strip_tags
+from app.content.sanitizer import safe_href, sanitize, strip_tags, visible_text
 from app.repositories import SiteTextRepository
 
 content_bp = Blueprint("admin_content", __name__, url_prefix="/admin/content")
@@ -58,6 +57,16 @@ PREVIEW_CARDS: tuple[dict[str, str], ...] = (
 # --- helpers -----------------------------------------------------------------
 
 
+# An authenticated caller could post 20k unknown keys and get ~2 MB of Spanish back.
+MAX_ERRORS = 20
+
+
+def _add_error(errors: list[str], keys: list[str], message: str, key: str) -> None:
+    if len(errors) < MAX_ERRORS:
+        errors.append(message)
+        keys.append(key)
+
+
 def _group_or_404(group_key: str) -> registry.Group:
     group = registry.group_for(group_key)
     if group is None:
@@ -78,7 +87,12 @@ def _normalize(field: registry.TextField, raw: str) -> str:
     Textareas post CRLF; storing that would make a value differ from its identical
     default and show up as a phantom "edited" field forever.
     """
-    value = raw.replace("\r\n", "\n").replace("\r", "\n")
+    # A stored value must never carry the resolver's edit markers: one could forge a
+    # second <ct-t> wrapper pointing at another key, and the private-use codepoints
+    # shipped to public visitors as tofu.
+    from app.content.resolver import _strip_markers
+
+    value = _strip_markers(raw).replace("\r\n", "\n").replace("\r", "\n")
     if field.type in ("line", "url"):
         value = " ".join(value.split())
     else:
@@ -86,18 +100,47 @@ def _normalize(field: registry.TextField, raw: str) -> str:
     return value
 
 
+def _sanitize_loss(original: str, cleaned: str) -> str | None:
+    """Reject a save where sanitizing swallowed most of the visible text.
+
+    An unterminated `<script>`/`<svg>` takes the rest of the value with it, and the
+    result is what gets PERSISTED — so the page silently loses its content and the
+    editor is told everything went fine. Better to refuse and say so.
+    """
+    # visible_text, not strip_tags: the latter sanitizes on the way through, so both
+    # sides measured the same post-sanitize string and the check could never fire.
+    before = len(visible_text(original))
+    after = len(visible_text(cleaned))
+    # Legitimate sanitizing loses almost no VISIBLE text: an unknown tag is dropped
+    # but its text is kept. A real loss means a `<script>`/`<svg>` swallowed copy.
+    if after < before - 20:
+        return (
+            "el formato quedó mal (puede haber una etiqueta sin cerrar) y se perdería "
+            "buena parte del texto. Revisalo y probá de nuevo."
+        )
+    return None
+
+
 def _validate(field: registry.TextField, value: str) -> str | None:
     """Return an error message for `value`, or None when it is acceptable."""
     if len(value) > field.max_length:
         return f"«{field.label}»: máximo {field.max_length} caracteres (escribiste {len(value)})."
-    if not value and field.type in ("line", "url", "rich"):
+    if not value:
+        # Every type. A blank `text` shipped an empty <h1> and an empty meta
+        # description; a blank `lines` emptied the marquee — all in one click, and
+        # the guard existed only for the two types that happened to be tested.
         return f"«{field.label}»: no puede quedar vacío."
     if field.type == "rich" and not strip_tags(value).strip():
         # `<p></p>` and friends: markup with nothing in it reads as a blank page.
         return f"«{field.label}»: quedó sin texto."
     if field.type == "url" and value:
-        if safe_href(value) is None or not value.lower().startswith(("http://", "https://")):
+        cleaned = safe_href(value)
+        if cleaned is None or not cleaned.lower().startswith(("http://", "https://")):
             return f"«{field.label}»: tiene que ser un link que empiece con https://."
+        if cleaned != value:
+            # safe_href strips whitespace to defeat `java\tscript:`; storing the
+            # original meant a pasted URL with a space became a 404 on every page.
+            return f"«{field.label}»: el link tiene espacios o caracteres raros."
     return None
 
 
@@ -118,14 +161,20 @@ def _apply_submission(group: registry.Group, form: Any) -> tuple[list[str], int]
             value = field.default
         else:
             value = _normalize(field, form.get(field.key, ""))
-        error = _validate(field, value)
+        error = None
+        if field.type == "rich":
+            # Sanitize BEFORE validating: it re-escapes &, < and >, so it grows the
+            # string. Validating first let a value be stored over its own cap, after
+            # which the same screen refused to save what it was displaying.
+            cleaned = sanitize(value)
+            loss = _sanitize_loss(value, cleaned)
+            if loss:
+                error = f"«{field.label}»: {loss}"
+            value = cleaned
+        error = error or _validate(field, value)
         if error:
             errors.append(error)
             continue
-        if field.type == "rich":
-            # Sanitize on the way in as well as on the way out, so what the editor
-            # previews is exactly the markup the public page will get.
-            value = sanitize(value)
         state = content.field_state(field.key)
         SiteTextRepository.set_draft(field.key, None if value == state["live"] else value)
         staged += 1
@@ -150,6 +199,31 @@ def _editor_values(group: registry.Group, form: Any | None = None) -> dict[str, 
         state = dict(state, search_text=f"{field.label} {field.key} {haystack}".lower())
         states[field.key] = state
     return states
+
+
+def _safe_start_path(raw: str | None) -> str:
+    """The canvas may only be pointed at a local page of THIS site.
+
+    It used to be rendered straight into the iframe's `src`, so
+    `?path=javascript:alert(1)` executed in the admin's own origin, and
+    `?path=https://evil.test` embedded a foreign origin inside the admin chrome —
+    one link to the shop owner away from acting with her session.
+    """
+    candidate = (raw or "").strip()
+    if not candidate.startswith("/") or candidate.startswith(("//", "/\\")):
+        return "/"
+    path = candidate.split("?", 1)[0].split("#", 1)[0]
+    if any(page["path"] == path for page in editor_pages()):
+        return path
+    # Anything else that resolves to a real GET route on this app is fine too.
+    from flask import current_app
+
+    adapter = current_app.url_map.bind("localhost")
+    try:
+        adapter.match(path, method="GET")
+    except Exception:  # noqa: BLE001 — unknown path, fall back to the home
+        return "/"
+    return path
 
 
 def editor_pages() -> list[dict[str, str]]:
@@ -250,9 +324,8 @@ def editor() -> str:
     return render_template(
         "admin/content/editor.html",
         devices=PREVIEW_DEVICES,
-        cards=PREVIEW_CARDS,
         pages=editor_pages(),
-        start_path=request.args.get("path") or "/",
+        start_path=_safe_start_path(request.args.get("path")),
         pending=content.pending_draft_count(),
         pending_state=pending_payload(),
     )
@@ -301,22 +374,30 @@ def save_changes() -> Any:
     errors: list[str] = []
     error_keys: list[str] = []
     staged = 0
-    for raw_key, raw_value in data["changes"].items():
+    for raw_key, raw_value in list(data["changes"].items())[:MAX_ERRORS * 5]:
         field = registry.field_for(str(raw_key))
         if field is None:
-            errors.append(f"«{raw_key}»: ese texto ya no existe. Recargá el editor.")
-            error_keys.append(str(raw_key))
+            _add_error(errors, error_keys, f"«{raw_key}»: ese texto ya no existe. Recargá el editor.", str(raw_key))
             continue
-        value = _normalize(field, "" if raw_value is None else str(raw_value))
-        error = _validate(field, value)
+        if not isinstance(raw_value, str):
+            # JSON hands us lists, dicts, numbers and booleans; str() turned them into
+            # their Python repr and published `['uno', 'dos']` as the site's <h1>.
+            _add_error(errors, error_keys, f"«{field.label}»: valor inválido.", field.key)
+            continue
+        value = _normalize(field, raw_value)
+        error = None
+        if field.type == "rich":
+            cleaned = sanitize(value)
+            loss = _sanitize_loss(value, cleaned)
+            if loss:
+                error = f"«{field.label}»: {loss}"
+            value = cleaned
+        error = error or _validate(field, value)
         if error:
-            errors.append(error)
             # The editor needs the key, not just the message: it highlights the
             # offending text on the page and scrolls the panel to it.
-            error_keys.append(field.key)
+            _add_error(errors, error_keys, error, field.key)
             continue
-        if field.type == "rich":
-            value = sanitize(value)
         state = content.field_state(field.key)
         SiteTextRepository.set_draft(field.key, None if value == state["live"] else value)
         staged += 1
@@ -331,10 +412,14 @@ def save_changes() -> Any:
         # draft in the database, so a colleague's half-finished text — or something
         # parked days ago — went live with the confirm never naming it.
         requested = data.get("keys")
-        if isinstance(requested, list):
-            scope = [str(key) for key in requested if str(key) in registry.FIELDS]
-        else:
-            scope = list(registry.FIELDS)
+        # Absent or malformed means "nothing", never "everything": the whole point is
+        # that a colleague's parked draft does not ride along. De-duplicated because
+        # the list goes straight into an SQL IN (…), which 500s past ~32k entries.
+        scope = (
+            sorted({str(key) for key in requested if str(key) in registry.FIELDS})
+            if isinstance(requested, list)
+            else []
+        )
         published = SiteTextRepository.publish(scope, registry.DEFAULTS)
     SiteTextRepository.save()
     return {
@@ -359,9 +444,13 @@ def revert() -> Any:
     if not state["has_previous"]:
         return {"ok": False, "errors": ["No hay una versión anterior de este texto."]}, 400
 
-    SiteTextRepository.set_published(key, state["previous"])
+    # A pending draft would silently undo the revert on the next publish, and the
+    # endpoint used to report that draft as the restored value.
+    SiteTextRepository.discard_drafts([key])
+    SiteTextRepository.revert(key)
     SiteTextRepository.save()
-    return {"ok": True, "value": content.field_state(key)["value"], **pending_payload()}
+    fresh = content.field_state(key)
+    return {"ok": True, "value": fresh["live"], **pending_payload()}
 
 
 @content_bp.route("/publish", methods=["POST"])

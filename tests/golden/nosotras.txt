@@ -1,0 +1,74 @@
+[content] width=device-width, initial-scale=1.0
+[content] website
+[content] https://gluckbags.com/nosotras
+[content] Nosotras · GLÜCK
+[content] Quiénes somos: GLÜCK, bolsos de cuero vegano hechos a mano en Argentina, con diseño minimalista y atemporal.
+[content] https://gluckbags.com/static/img/og-image.jpg
+[content] image/jpeg
+[content] 1200
+[content] 630
+[content] Tote de cuero vegano cognac de GLÜCK en la playa
+[content] es_AR
+[content] GLÜCK
+[content] summary_large_image
+[content] Nosotras · GLÜCK
+[content] Quiénes somos: GLÜCK, bolsos de cuero vegano hechos a mano en Argentina, con diseño minimalista y atemporal.
+[content] https://gluckbags.com/static/img/og-image.jpg
+Nosotras · GLÜCK
+[content] Quiénes somos: GLÜCK, bolsos de cuero vegano hechos a mano en Argentina, con diseño minimalista y atemporal.
+[aria-label] GLÜCK inicio
+GLÜCK
+[aria-label] Principal
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+[aria-label] Abrir carrito
+0
+[aria-label] Abrir menú
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+GLÜCK
+Nosotras
+GLÜCK nació de una idea simple: bolsos de líneas puras, hechos para durar, sin pieles de origen animal y sin excesos. Diseñamos cada pieza en Argentina y la producimos de forma artesanal, en series cortas.
+Cómo los hacemos
+Cada bolso sale de una sola pieza de cuero vegano: la diseñamos, la cortamos con láser desde un molde propio y la plegamos a mano. La forma se sostiene con remaches y broches, no con costuras. Por eso cada modelo es limpio, resistente y atemporal.
+Cuero vegano, elegido a mano
+Seleccionamos cada material por su tacto, su color y su durabilidad. Trabajamos con materiales libres de crueldad animal, buscando el mejor equilibrio entre estética y uso diario.
+¿Querés conocer la colección? Escribinos por
+Instagram
+o pasá por la
+tienda
+.
+[aria-label] Tu carrito
+Tu selección
+Carrito
+[aria-label] Cerrar carrito
+Subtotal
+$ 0
+El costo de envío se confirma en el checkout, antes de pagar.
+Email para la confirmación del pedido
+[placeholder] tu@email.com
+Finalizar compra
+¿Te gustó algo?
+Seguinos en Instagram
+GLÜCK
+Bolsos minimalistas de cuero vegano
+[aria-label] Pie de página
+Colección
+Bolsos
+Nosotras
+Contacto
+Envíos
+Cambios
+Instagram
+[aria-label] Legales
+Términos
+Privacidad
+© 2026 GLÜCK. Todos los derechos reservados.
+Volver arriba ↑
+Cuero vegano · Hecho a mano

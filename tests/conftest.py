@@ -45,6 +45,17 @@ os.environ["CATALOG_SOURCE"] = os.environ.get("TEST_CATALOG_SOURCE", "admin")
 from app import app as flask_app
 
 
+def pytest_addoption(parser) -> None:
+    """`--snapshot-update` rewrites the public-copy snapshots (see
+    tests/test_public_copy_golden.py) instead of asserting against them."""
+    parser.addoption(
+        "--snapshot-update",
+        action="store_true",
+        default=False,
+        help="Rewrite the public-copy snapshots in tests/golden/.",
+    )
+
+
 def _free_port() -> int:
     """Returns a free TCP port assigned by the operating system."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:

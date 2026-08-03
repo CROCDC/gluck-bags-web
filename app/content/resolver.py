@@ -23,7 +23,7 @@ from datetime import datetime
 from typing import Any
 
 from flask import Flask, g, has_app_context, has_request_context, request
-from markupsafe import Markup
+from markupsafe import Markup, escape
 
 from app.content import registry
 from app.content.sanitizer import safe_href, sanitize
@@ -41,13 +41,25 @@ _TOKEN_RE = re.compile(r"\{([a-z_][a-z0-9_]*)\}")
 
 
 def _cache() -> dict[str, Any]:
-    """Scratch space for this request (falls back to a throwaway dict off-context).
+    """Scratch space for this REQUEST (falls back to the app context, then to nothing).
 
     The overrides are read once per request rather than cached in the process: the
     app runs several gunicorn workers over one SQLite file, so a process-level cache
     would keep serving stale copy in the other workers after an edit. It is one
     small SELECT against a table with one row per overridden string.
+
+    It hangs off `request`, not off `g`: `g` belongs to the APP context, which can
+    outlive a request (anything that pushes one around several — a CLI command, a
+    test that holds the app). When that happened the second request inherited the
+    first one's answers, so `?edit=1` with a valid session silently rendered as a
+    normal page.
     """
+    if has_request_context():
+        cache = getattr(request, _CACHE_KEY, None)
+        if cache is None:
+            cache = {}
+            setattr(request, _CACHE_KEY, cache)
+        return cache
     if not has_app_context():
         return {}
     cache = getattr(g, _CACHE_KEY, None)
@@ -55,6 +67,20 @@ def _cache() -> dict[str, Any]:
         cache = {}
         setattr(g, _CACHE_KEY, cache)
     return cache
+
+
+def _all_caches() -> list[dict[str, Any]]:
+    """Every scratch space a write could have made stale."""
+    caches: list[dict[str, Any]] = []
+    if has_request_context():
+        cache = getattr(request, _CACHE_KEY, None)
+        if cache is not None:
+            caches.append(cache)
+    if has_app_context():
+        cache = getattr(g, _CACHE_KEY, None)
+        if cache is not None:
+            caches.append(cache)
+    return caches
 
 
 def _overrides() -> dict[str, tuple[str | None, str | None]]:
@@ -72,17 +98,16 @@ def _overrides() -> dict[str, tuple[str | None, str | None]]:
 
 
 def invalidate() -> None:
-    """Drop this context's snapshot of the overrides.
+    """Drop every snapshot of the overrides a write could have made stale.
 
-    Called after every write (see SiteTextRepository.save): `g` lives for the whole
-    app context, so without this an admin request that saves and then re-reads —
-    or a test that does both inside one context — would keep serving the values
-    from before the write.
+    Called after every write (see SiteTextRepository.save): without it an admin
+    request that saves and then re-reads — or a CLI command that does both inside one
+    app context — keeps serving the values from before the write.
     """
-    cache = _cache()
-    cache.pop("overrides", None)
-    cache.pop("tokens", None)
-    cache.pop("previous", None)
+    for cache in _all_caches():
+        cache.pop("overrides", None)
+        cache.pop("tokens", None)
+        cache.pop("previous", None)
 
 
 def _admin_flag(param: str, cache_key: str) -> bool:
@@ -95,7 +120,10 @@ def _admin_flag(param: str, cache_key: str) -> bool:
     if cache_key in cache:
         return cache[cache_key]
     active = False
-    if has_request_context() and request.args.get(param):
+    raw = request.args.get(param, "") if has_request_context() else ""
+    # Truthiness alone meant `?edit=0` and `?preview=false` — links written to turn
+    # the machinery OFF — turned it on.
+    if raw.strip().lower() not in ("", "0", "false", "no", "off"):
         from app import auth
 
         active = auth.is_logged_in()
@@ -191,11 +219,13 @@ def t(key: str, **params: Any) -> str | Markup:
         tokens.update(
             {name: _strip_markers("" if value is None else str(value)) for name, value in params.items()}
         )
-    value = _interpolate(effective(key), tokens)
     if field.type == "rich":
-        # Interpolate BEFORE sanitizing: a token's value is data, so it gets escaped
-        # like any other text instead of being spliced in as live markup.
-        return Markup(sanitize(value))
+        # Escape each token BEFORE splicing. Interpolating first and sanitizing after
+        # made the token's value part of the markup: the sanitizer bounded it to the
+        # allow-list, but `{brand}` could still put an <a> into every legal page.
+        escaped = {name: str(escape(token)) for name, token in tokens.items()}
+        return Markup(sanitize(_interpolate(effective(key), escaped)))
+    value = _interpolate(effective(key), tokens)
     if field.type == "url":
         return _safe_url(value, key)
     return value
@@ -211,6 +241,18 @@ def _safe_url(value: str, key: str) -> str:
     if safe_href(value) and value.lower().startswith(("http://", "https://")):
         return value
     return registry.DEFAULTS.get(key, "")
+
+
+def t_plain(key: str, **params: Any) -> str | Markup:
+    """`t()` for values that are serialized rather than rendered (inline JSON).
+
+    Emits no edit markers — one inside `json.dumps` output survives as a literal
+    escape sequence — but still records the key, so the visual editor's panel lists
+    it. Without that the whole cart drawer was invisible to the editor.
+    """
+    if is_edit_mode():
+        _record_rendered(key)
+    return t(key, **params)
 
 
 def t_lines(key: str, **params: Any) -> list[str]:
@@ -233,10 +275,18 @@ EDIT_END = "\ue002"
 EDIT_MARKERS = (EDIT_START, EDIT_SEP, EDIT_END)
 
 
+_MARKER_HEAD_RE = re.compile(f"{EDIT_START}[^{EDIT_SEP}]*{EDIT_SEP}")
+
+
 def _strip_markers(value: str) -> str:
-    for marker in EDIT_MARKERS:
-        value = value.replace(marker, "")
-    return value
+    """Reduce an already-tagged value back to its plain text.
+
+    Deleting the three marker characters is not enough: the KEY sits between START
+    and SEP, so that left the registry key spliced into the copy ("category.tote.label
+    Tote"). Drop the whole head, then the terminator.
+    """
+    value = _MARKER_HEAD_RE.sub("", value)
+    return value.replace(EDIT_END, "")
 
 
 def _record_rendered(key: str) -> None:
@@ -439,7 +489,7 @@ def register_content(app: Flask) -> None:
     # as literal text.
     app.jinja_env.globals["t"] = editable
     app.jinja_env.globals["t_lines"] = editable_lines
-    app.jinja_env.globals["t_plain"] = t
+    app.jinja_env.globals["t_plain"] = t_plain
     # `category_label` renders (editable); `category_name` is the plain string for
     # logic and for t() params.
     app.jinja_env.globals["category_label"] = category_label_editable

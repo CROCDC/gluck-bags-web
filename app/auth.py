@@ -43,8 +43,13 @@ def _wants_json() -> bool:
     """
     if request.is_json:
         return True
+    if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+        return True
+    # Deliberately NOT `Accept: */*`: an XHR file upload sends that, so inferring from
+    # it turned an expired session on the products form from "go log in again" into a
+    # dead-end alert.
     accept = request.accept_mimetypes
-    return bool(accept["application/json"]) and accept["application/json"] >= accept["text/html"]
+    return bool(accept["application/json"]) and not accept.accept_html
 
 
 def login_required(view: F) -> F:

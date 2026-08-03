@@ -197,7 +197,9 @@ def register_routes(app: Flask) -> None:
                 "pages/_page_base.html",
                 page_key=page_key,
                 page_title=content.t(f"page.{page_key}.title"),
-                page_description=content.t(f"page.{page_key}.meta_description"),
+                # t_plain, not t: it is rendered into an attribute, but it still has
+                # to be registered or the editor's panel never lists it.
+                page_description=content.t_plain(f"page.{page_key}.meta_description"),
             )
 
         view.__name__ = f"page_{slug.replace('-', '_')}"

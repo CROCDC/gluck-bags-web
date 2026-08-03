@@ -34,10 +34,22 @@
     window.parent.postMessage(Object.assign({ source: "ct-frame" }, message), window.origin);
   }
 
-  function interpolate(raw) {
-    return String(raw).replace(/\{([a-z_][a-z0-9_]*)\}/g, (whole, name) =>
-      Object.prototype.hasOwnProperty.call(TOKENS, name) ? TOKENS[name] : whole
-    );
+  function escapeHtml(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  /** `escaped` mirrors the server: inside a rich value a token is DATA, so it is
+   *  escaped before splicing. Substituting raw and then assigning innerHTML made the
+   *  canvas execute what the public page escapes. */
+  function interpolate(raw, escaped) {
+    return String(raw).replace(/\{([a-z_][a-z0-9_]*)\}/g, (whole, name) => {
+      if (!Object.prototype.hasOwnProperty.call(TOKENS, name)) return whole;
+      return escaped ? escapeHtml(TOKENS[name]) : TOKENS[name];
+    });
   }
 
   function parseTarget(node) {
@@ -48,25 +60,35 @@
       : { key: label.slice(0, hash), line: parseInt(label.slice(hash + 1), 10) };
   }
 
-  function nodesFor(label) {
-    return Array.from(document.querySelectorAll('ct-t[data-k="' + CSS.escape(label) + '"]'));
+  /** The text a node should DISPLAY for the current raw value of its field. */
+  /** The lines of a `lines` value, WITHOUT dropping blanks.
+   *  Filtering here shifted every later item up one index while the DOM nodes kept
+   *  their original `key#index`, so emptying one item silently deleted the next. */
+  function linesOf(raw) {
+    return String(raw == null ? "" : raw).split("\n");
   }
 
-  /** The text a node should DISPLAY for the current raw value of its field. */
   function displayFor(target) {
     const raw = CURRENT[target.key];
     if (raw == null) return "";
     if (target.line == null) return interpolate(raw);
-    const lines = String(raw).split("\n").filter((l) => l.trim());
+    const lines = linesOf(raw);
     return interpolate(lines[target.line] != null ? lines[target.line] : "");
   }
 
   /** The text a node should EDIT: the raw value, tokens and all. */
+  /** Same as displayFor, but every token escaped — the value goes to innerHTML. */
+  function displayForRich(target) {
+    const raw = CURRENT[target.key];
+    if (raw == null) return "";
+    return interpolate(target.line == null ? raw : linesOf(raw)[target.line] || "", true);
+  }
+
   function editableFor(target) {
     const raw = CURRENT[target.key];
     if (raw == null) return "";
     if (target.line == null) return raw;
-    const lines = String(raw).split("\n").filter((l) => l.trim());
+    const lines = linesOf(raw);
     return lines[target.line] != null ? lines[target.line] : "";
   }
 
@@ -81,7 +103,7 @@
       CURRENT[target.key] = text;
       return text;
     }
-    const lines = String(CURRENT[target.key]).split("\n").filter((l) => l.trim());
+    const lines = linesOf(CURRENT[target.key]);
     lines[target.line] = text;
     CURRENT[target.key] = lines.join("\n");
     return CURRENT[target.key];
@@ -113,7 +135,7 @@
       const target = parseTarget(node);
       if (target.key !== key) return;
       const field = FIELDS[key] || {};
-      if (field.type === "rich") node.innerHTML = displayFor(target);
+      if (field.type === "rich") node.innerHTML = displayForRich(target);
       else node.textContent = displayFor(target);
       if (CURRENT[key] !== field.raw) node.setAttribute("data-ct-dirty", "");
       else node.removeAttribute("data-ct-dirty");
@@ -123,6 +145,7 @@
   /* ---------------- floating chrome ---------------- */
 
   let tip = null;
+  let tipTimer = null;
   /** Put the caret at `range`, nudged off the whitespace between block elements.
    *  The raw-value swap changes the text length, so the click point can land in the
    *  gap between two paragraphs, where typing goes nowhere useful. */
@@ -136,8 +159,7 @@
         if (walker.currentNode === container) break;
         if (walker.currentNode.textContent.trim()) previous = walker.currentNode;
       }
-      const next = walker.nextNode && walker.currentNode;
-      const target = previous || next;
+      const target = previous || walker.nextNode();
       if (target && target.textContent.trim()) {
         container = target;
         offset = previous ? target.textContent.length : 0;
@@ -180,6 +202,10 @@
   }
 
   function hideTip() {
+    if (tipTimer) {
+      window.clearTimeout(tipTimer);
+      tipTimer = null;
+    }
     if (tip) tip.remove();
     tip = null;
   }
@@ -241,7 +267,10 @@
 
   // Product titles, prices and descriptions come from the catalogue, not from the
   // text registry. Clicking them used to do nothing at all, which reads as broken.
-  const TEXT_TAGS = "H1,H2,H3,H4,H5,H6,P,SPAN,A,LI,STRONG,EM,BUTTON,BLOCKQUOTE,FIGCAPTION,TD,LABEL";
+  // An array, not a comma-joined string: `indexOf` on the string matched "B" inside
+  // "BUTTON", "I" inside "FIGCAPTION", and so on.
+  const TEXT_TAGS = ["H1","H2","H3","H4","H5","H6","P","SPAN","A","LI","STRONG","EM",
+                     "BUTTON","BLOCKQUOTE","FIGCAPTION","TD","LABEL"];
   // Only these are actually catalogue data. Everything else that isn't editable in
   // place is still site copy, and saying "it comes from the catalogue" sent people
   // to a section that has nothing to do with it.
@@ -262,7 +291,7 @@
         ? "Esto sale del catálogo: el título, el precio y las fotos se editan en Productos."
         : "Este texto no se edita tocándolo. Buscalo en «Textos ocultos» o en la lista por sección."
     );
-    window.setTimeout(hideTip, 3600);
+    tipTimer = window.setTimeout(hideTip, 3600);
   }
 
   /* ---------------- editing ---------------- */
@@ -369,9 +398,11 @@
       const node = event.target.closest ? event.target.closest("ct-t") : null;
       if (node) {
         clickPoint = { x: event.clientX, y: event.clientY };
-        // The text is often inside a link or a button; editing must not navigate.
+        // preventDefault stops navigation and form submission. NOT stopPropagation:
+        // the site's own handlers are delegated on `document`, so stopping the event
+        // in the capture phase left the cart button and the checkout button dead —
+        // and their copy only exists once those panels are open.
         event.preventDefault();
-        event.stopPropagation();
         startEditing(node);
         return;
       }
@@ -435,6 +466,7 @@
     (event) => {
       const link = event.target.closest ? event.target.closest("a[href]") : null;
       if (!link || event.defaultPrevented) return;
+      if (event.target.closest("ct-t")) return;  // that click opened an editor
       const url = new URL(link.getAttribute("href"), window.location.href);
       if (url.origin !== window.location.origin) {
         link.setAttribute("target", "_blank");

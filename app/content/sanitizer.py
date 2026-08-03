@@ -64,6 +64,10 @@ def safe_href(raw: str | None) -> str | None:
     value = "".join(ch for ch in raw if ch.isprintable() and not ch.isspace())
     if not value:
         return None
+    # `//host` and `/\host` are NOT root-relative: browsers navigate off-site with
+    # them (URL parsers fold `\` to `/`), which is a stealth link out of the shop.
+    if value.startswith(("//", "/\\", "\\")):
+        return None
     if value.startswith(("/", "#", "?")):
         return value
     head, sep, _rest = value.partition(":")
@@ -83,7 +87,10 @@ class _Sanitizer(HTMLParser):
         # (tag, emitted) — `emitted` is False for tags we swallowed but must still
         # match an end tag for (e.g. an <a> whose href was rejected).
         self._stack: list[tuple[str, bool]] = []
-        self._suppress_depth = 0
+        # The tag that suppressed output, so only ITS end tag re-enables it: any
+        # `</math>` used to close a `<svg>`, and an unterminated one swallowed the
+        # rest of the value — permanently, because this runs on save.
+        self._suppress: list[str] = []
 
     # --- helpers ---
 
@@ -119,12 +126,12 @@ class _Sanitizer(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
-        if self._suppress_depth:
+        if self._suppress:
             if tag in DROP_WITH_CONTENT:
-                self._suppress_depth += 1
+                self._suppress.append(tag)
             return
         if tag in DROP_WITH_CONTENT:
-            self._suppress_depth = 1
+            self._suppress.append(tag)
             return
         if tag not in ALLOWED_TAGS:
             return  # drop the tag, keep the text inside it
@@ -139,7 +146,7 @@ class _Sanitizer(HTMLParser):
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         tag = tag.lower()
-        if self._suppress_depth or tag not in ALLOWED_TAGS:
+        if self._suppress or tag not in ALLOWED_TAGS:
             return
         if tag in VOID_TAGS:
             self._out.append(f"<{tag}>")
@@ -150,9 +157,9 @@ class _Sanitizer(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         tag = tag.lower()
-        if self._suppress_depth:
-            if tag in DROP_WITH_CONTENT:
-                self._suppress_depth -= 1
+        if self._suppress:
+            if self._suppress[-1] == tag:
+                self._suppress.pop()
             return
         if tag in VOID_TAGS or tag not in ALLOWED_TAGS:
             return
@@ -168,7 +175,7 @@ class _Sanitizer(HTMLParser):
             return
 
     def handle_data(self, data: str) -> None:
-        if not self._suppress_depth:
+        if not self._suppress:
             self._out.append(escape(data, quote=False))
 
     def handle_comment(self, data: str) -> None:
@@ -184,6 +191,9 @@ class _Sanitizer(HTMLParser):
         return
 
     def result(self) -> str:
+        # An unterminated drop tag must not silently take the tail of the value with
+        # it: stop suppressing at EOF so the caller can compare lengths.
+        self._suppress.clear()
         for open_tag, emitted in reversed(self._stack):
             if emitted:
                 self._out.append(f"</{open_tag}>")
@@ -197,6 +207,19 @@ def sanitize(value: str) -> str:
     parser.feed(value or "")
     parser.close()
     return parser.result()
+
+
+def visible_text(value: str) -> str:
+    """The text of `value` as written, WITHOUT sanitizing it first.
+
+    `strip_tags` sanitizes on the way through, so comparing the two tells you nothing
+    about what sanitizing dropped — which is exactly what a caller checking for
+    silent content loss needs.
+    """
+    plain = _TagStripper()
+    plain.feed(value or "")
+    plain.close()
+    return " ".join("".join(plain.chunks).split())
 
 
 def strip_tags(value: str) -> str:

@@ -137,13 +137,43 @@ def test_plain_values_are_not_markup_so_jinja_escapes_them(ctx) -> None:
     assert value == "<b>no soy html</b>"
 
 
-def test_a_token_value_cannot_smuggle_markup_into_a_rich_field(ctx) -> None:
-    """Interpolation happens BEFORE sanitizing, so a token is data, not markup."""
-    _publish("global.brand", "<img src=x onerror=alert(1)>")
+def test_a_token_value_is_data_not_markup(ctx) -> None:
+    """A token is escaped before it is spliced into a rich value.
+
+    The old version of this test used `<img onerror>` — a tag the sanitizer drops
+    anyway — so it asserted the sanitizer's behaviour, not the property. An
+    ALLOW-LISTED tag is the case that matters: it used to survive, which let the
+    brand field put a link into every legal page.
+    """
+    _publish("global.brand", '<a href="//evil.test">GLUCK</a>')
     _publish(RICH_KEY, "Marca: {brand}")
-    value = content.t(RICH_KEY)
-    assert "onerror" not in value
-    assert "<img" not in value
+    value = str(content.t(RICH_KEY))
+    # No live element: the tag is escaped, so it reads as text on the page instead of
+    # linking anywhere. ("evil.test" IS present — as visible characters.)
+    assert "<a " not in value
+    assert "&lt;a href=" in value
+    assert "GLUCK" in value
+
+    _publish("global.brand", "<img src=x onerror=alert(1)>")
+    assert "<img" not in str(content.t(RICH_KEY))
+
+
+def test_an_edit_marker_never_survives_as_a_parameter(ctx) -> None:
+    """Stripping only the three marker characters left the KEY between them, so the
+    registry key ended up spliced into the copy the shop shows."""
+    from app import auth
+    from app.content import resolver
+
+    with ctx.test_request_context("/?edit=1"):
+        auth.login()
+        tagged = resolver.editable("category.tote.label")
+        rendered = str(resolver.editable("category.meta.title", category=tagged))
+        assert "category.tote.label" not in rendered
+        assert "Tote · Carteras" in resolver._strip_markers(rendered)
+        # The edit-mode value, once the markers come off, is what a normal render says.
+        assert resolver._strip_markers(rendered) == str(
+            resolver.t("category.meta.title", category="Tote")
+        )
 
 
 def test_lines_fields_split_into_a_list(ctx) -> None:
@@ -278,3 +308,29 @@ def test_the_documented_global_tokens_are_exactly_the_ones_that_resolve(ctx) -> 
     from app.content.resolver import _global_tokens
 
     assert set(_global_tokens()) == set(registry.GLOBAL_TOKENS)
+
+
+def test_two_requests_in_one_app_context_do_not_share_answers(app) -> None:
+    """The per-request cache used to hang off `flask.g`, which belongs to the APP
+    context — and an app context can span several requests (a CLI command, a test
+    holding the app). The second request then inherited the first one's answers, so
+    `?edit=1` with a valid session rendered as a plain page."""
+    from app import auth
+    from app.content import resolver
+
+    with app.app_context():
+        with app.test_request_context("/"):
+            assert resolver.is_edit_mode() is False
+        with app.test_request_context("/?edit=1"):
+            auth.login()
+            assert resolver.is_edit_mode() is True, "heredó la respuesta del request anterior"
+
+
+def test_an_edit_made_between_two_requests_is_visible_to_the_second(app) -> None:
+    with app.app_context():
+        with app.test_request_context("/"):
+            assert content.t(KEY) == registry.FIELDS[KEY].default
+        with app.test_request_context("/"):
+            _publish(KEY, "Nuevo")
+        with app.test_request_context("/"):
+            assert content.t(KEY) == "Nuevo"

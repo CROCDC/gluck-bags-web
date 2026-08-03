@@ -58,13 +58,14 @@ def restore(page: Page, admin_live_server: tuple[str, str]):
     if touched:
         from app.content import registry
 
-        page.request.post(
+        changes = {key: registry.DEFAULTS[key] for key in touched}
+        response = page.request.post(
             f"{base_url}/admin/content/save",
-            data={
-                "changes": {key: registry.DEFAULTS[key] for key in touched},
-                "action": "publish",
-            },
+            # `keys` matters: without it the teardown published every draft in the
+            # database, including ones another test had deliberately parked.
+            data={"changes": changes, "action": "publish", "keys": list(changes)},
         )
+        assert response.ok, f"la limpieza falló: {response.status} {response.text()[:200]}"
 
 
 def _open_editor(page: Page, base_url: str, password: str, path: str = "/") -> None:
@@ -568,9 +569,13 @@ def test_a_long_page_body_opens_its_own_editor(
     labels = page.locator(".ed-sheet-tools .ed-tool").all_inner_texts()
     assert "Negrita" in labels and "Subtítulo" in labels and "Quitar formato" in labels
 
-    # The count is of what a reader sees, not of the HTML.
+    # It shows what a reader sees AND what is stored against the cap — the counter
+    # used to display one number and turn red on the other.
     count = page.locator("[data-ed-sheet-count]").inner_text()
-    assert count.endswith("caracteres") and int(count.split()[0]) > 400
+    visible, stored = re.findall(r"\d+", count)[0], re.findall(r"\d+", count)[1]
+    assert int(visible) > 400
+    assert int(stored) >= int(visible)
+    assert "/" in count
 
 
 def test_the_page_editor_applies_and_cancels(

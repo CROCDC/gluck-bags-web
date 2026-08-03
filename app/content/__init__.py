@@ -25,9 +25,10 @@ from app.content.resolver import (
     register_content,
     t,
     t_lines,
+    t_plain,
     tagline,
 )
-from app.content.sanitizer import sanitize, strip_tags
+from app.content.sanitizer import sanitize, strip_tags, visible_text
 
 __all__ = [
     "brand",
@@ -47,7 +48,9 @@ __all__ = [
     "registry",
     "sanitize",
     "strip_tags",
+    "visible_text",
     "t",
     "t_lines",
+    "t_plain",
     "tagline",
 ]

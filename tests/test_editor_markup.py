@@ -285,3 +285,97 @@ def test_the_drawer_and_menu_copy_is_wrapped_even_though_they_start_closed(
     html = auth_client.get("/?edit=1").get_data(as_text=True)
     for key in ("cart.drawer.title", "cart.subtotal_label", "cart.checkout.button"):
         assert f'<ct-t data-k="{key}"' in html, key
+
+
+# --- scanner robustness, from the code review ---------------------------------
+
+
+def test_a_stray_marker_does_not_swallow_the_rest_of_the_page() -> None:
+    """Unbounded, a single private-use character — an icon-font paste in a Tienda Nube
+    product title — consumed kilobytes of markup as if it were a key."""
+    html, inline, _hidden = transform(
+        f"<h3>Tote{EDIT_START} Negro</h3><span>x</span><h1>{mark('nav.cta', 'Comprar')}</h1>"
+    )
+    assert not any(m in html for m in MARKERS)
+    assert "<h3>Tote Negro</h3><span>x</span>" in html
+    assert inline == ["nav.cta"]
+
+
+def test_an_uppercase_raw_text_close_does_not_disable_the_rest_of_the_page() -> None:
+    """`_tag_name` lowercases, so `</SCRIPT>` never matched and everything after it
+    silently dropped to panel-only."""
+    html, inline, _hidden = transform(
+        f"<SCRIPT>var a=1;</SCRIPT><h1>{mark('nav.cta', 'Comprar')}</h1>"
+    )
+    assert '<ct-t data-k="nav.cta"' in html
+    assert inline == ["nav.cta"]
+
+
+@pytest.mark.parametrize(
+    "document",
+    [
+        "<body><!-- {m} --></body>",
+        "<p>a</p><!-- sin cerrar {m} <p>b</p>",
+        "<div><!--[if IE]>{m}<![endif]--></div>",
+    ],
+)
+def test_a_marker_inside_a_comment_never_reaches_the_browser(document: str) -> None:
+    html, _inline, _hidden = transform(document.format(m=mark("nav.cta", "Comprar")))
+    assert not any(m in html for m in MARKERS)
+    assert "Comprar" in html
+
+
+def test_a_value_landing_in_an_attribute_is_escaped() -> None:
+    """A rich value carries real markup; unescaped, a `"` broke out of the attribute."""
+    html, _inline, hidden = transform(
+        f'<meta content="{mark("home.feature.title", chr(34) + "><script>x</script>")}">'
+    )
+    assert "<script>" not in html
+    assert hidden == ["home.feature.title"]
+    assert html.count("<meta") == 1
+
+
+def test_the_manifest_carries_the_previous_wording(auth_client: FlaskClient) -> None:
+    """Without it the panel's "Volver al texto anterior" could never appear for a key
+    the current page renders — i.e. almost never."""
+    auth_client.post(
+        "/admin/content/save",
+        json={"changes": {"nav.cta": "Uno"}, "action": "publish", "keys": ["nav.cta"]},
+    )
+    auth_client.post(
+        "/admin/content/save",
+        json={"changes": {"nav.cta": "Dos"}, "action": "publish", "keys": ["nav.cta"]},
+    )
+    entry = _manifest(auth_client.get("/?edit=1").get_data(as_text=True))["fields"]["nav.cta"]
+    assert entry["previous"] == "Uno"
+
+
+def test_a_hostile_value_cannot_break_out_of_the_manifest(app, auth_client: FlaskClient) -> None:
+    """The manifest carries RAW values, and `line`/`text` fields are never sanitized."""
+    auth_client.post(
+        "/admin/content/save",
+        json={
+            "changes": {"home.hero.eyebrow": "</script><script>window.x=1</script>"},
+            "action": "publish",
+            "keys": ["home.hero.eyebrow"],
+        },
+    )
+    html = auth_client.get("/?edit=1").get_data(as_text=True)
+    raw = re.search(r'id="ctManifest">(.*?)</script>', html, re.S)
+    assert raw is not None
+    assert "<script" not in raw.group(1)
+    # …and it is still valid JSON carrying the hostile value as data.
+    assert _manifest(html)["fields"]["home.hero.eyebrow"]["raw"].startswith("</script>")
+
+
+def test_the_cart_copy_reaches_the_editors_manifest(auth_client: FlaskClient) -> None:
+    """The drawer's strings ship as JSON for cart.js, so they use the marker-free
+    helper — which used to mean the editor never listed them at all."""
+    manifest = _manifest(auth_client.get("/?edit=1").get_data(as_text=True))
+    for key in ("cart.page.empty", "cart.checkout.error", "cart.line.remove"):
+        assert key in manifest["fields"], key
+
+
+def test_the_editorial_pages_meta_description_is_listed(auth_client: FlaskClient) -> None:
+    manifest = _manifest(auth_client.get("/nosotras?edit=1").get_data(as_text=True))
+    assert "page.about.meta_description" in manifest["fields"]

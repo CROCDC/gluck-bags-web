@@ -34,6 +34,7 @@ from markupsafe import escape
 
 from app.content import registry
 from app.content.resolver import (
+    _strip_markers,
     EDIT_END,
     EDIT_SEP,
     EDIT_START,
@@ -82,8 +83,13 @@ def transform(html: str) -> tuple[str, list[str], list[str]]:
         char = html[i]
 
         if char == EDIT_START:
-            sep = html.find(EDIT_SEP, i)
-            end = html.find(EDIT_END, sep + 1) if sep != -1 else -1
+            # Bound both searches by the NEXT marker start: unbounded, a single
+            # stray private-use character (an icon-font paste in a Tienda Nube
+            # product title) consumed kilobytes of page markup as a "key".
+            limit = html.find(EDIT_START, i + 1)
+            limit = len(html) if limit == -1 else limit
+            sep = html.find(EDIT_SEP, i, limit)
+            end = html.find(EDIT_END, sep + 1, limit) if sep != -1 else -1
             if sep == -1 or end == -1:
                 # Truncated marker (a value cut by a length limit, say): drop the
                 # stray character rather than emitting it into the page.
@@ -93,7 +99,9 @@ def transform(html: str) -> tuple[str, list[str], list[str]]:
             value = html[sep + 1 : end]
             key = label.split("#", 1)[0]
             if tag_buf is not None:
-                tag_buf.append(value)
+                # Escaped: a `rich` value carries real markup, and an unescaped `"`
+                # would break out of the attribute it landed in.
+                tag_buf.append(str(escape(value)))
                 tag_labels.append(label)
                 hidden.append(key)
             elif rawtext is not None:
@@ -110,7 +118,9 @@ def transform(html: str) -> tuple[str, list[str], list[str]]:
             continue
 
         if rawtext is not None:
-            if char == "<" and html.startswith(f"</{rawtext}", i):
+            # `_tag_name` lowercases, so a literal `</SCRIPT>` never matched and the
+            # scanner stayed in raw-text mode for the rest of the document.
+            if char == "<" and html[i : i + len(rawtext) + 2].lower() == f"</{rawtext}":
                 rawtext = None
                 tag_buf = [char]
                 tag_labels = []
@@ -141,7 +151,10 @@ def transform(html: str) -> tuple[str, list[str], list[str]]:
             if html.startswith("<!--", i):
                 close = html.find("-->", i)
                 close = length if close == -1 else close + 3
-                out.append(html[i:close])
+                # Strip markers rather than copying the comment byte for byte: a
+                # marker inside one (or inside an unterminated one, which runs to
+                # EOF) reached the browser as private-use tofu.
+                out.append(_strip_markers(html[i:close]))
                 i = close
                 continue
             tag_buf = [char]
@@ -180,6 +193,9 @@ def build_manifest(path: str, inline: list[str], hidden: list[str]) -> dict[str,
             "hint": field.hint,
             "max": field.max_length,
             "default": field.default,
+            # Without this the panel's "Volver al texto anterior" could never appear
+            # for a key the current page renders — i.e. almost never.
+            "previous": state["previous"],
             "group": registry.FIELD_GROUP[key],
             "groupTitle": registry.GROUPS_BY_KEY[registry.FIELD_GROUP[key]].title,
             "section": registry.FIELD_SECTION.get(key, ""),

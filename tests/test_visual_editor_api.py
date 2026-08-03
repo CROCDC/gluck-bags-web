@@ -24,8 +24,16 @@ def _row(app, key: str):
         return Repo.get(key)
 
 
-def _save(client: FlaskClient, changes: dict, action: str = "save"):
-    return client.post(SAVE, json={"changes": changes, "action": action})
+def _save(client: FlaskClient, changes: dict, action: str = "save", keys=None):
+    """Post the way the editor does: it names the keys it is publishing.
+
+    Publishing with no `keys` deliberately publishes NOTHING now — the endpoint used
+    to fall back to "every draft in the database", which is how a colleague's parked
+    text went live under a confirm that never mentioned it.
+    """
+    payload = {"changes": changes, "action": action}
+    payload["keys"] = list(changes) if keys is None else keys
+    return client.post(SAVE, json=payload)
 
 
 # --- happy path ----------------------------------------------------------------
@@ -56,14 +64,22 @@ def test_several_fields_in_one_request(app, auth_client: FlaskClient) -> None:
     assert _row(app, "home.hero.eyebrow").draft_value == "Tres"
 
 
-def test_publishing_also_publishes_drafts_from_other_screens(
+def test_publishing_without_naming_keys_publishes_nothing(
     app, auth_client: FlaskClient, client: FlaskClient
 ) -> None:
-    """The button says "Publicar <n>" for everything pending, so it must publish it."""
+    """A missing or malformed `keys` must mean "nothing", not "everything".
+
+    This test used to assert the opposite — that publishing swept up every draft in
+    the database — while another test in this file asserted the fix. Two tests, one
+    endpoint, contradictory docstrings.
+    """
     auth_client.post("/admin/content/global", data={"nav.cta": "Desde el form", "action": "save"})
-    _save(auth_client, {KEY: "Desde el editor"}, action="publish")
-    html = client.get("/").get_data(as_text=True)
-    assert "Desde el form" in html and "Desde el editor" in html
+    response = auth_client.post(
+        SAVE, json={"changes": {}, "action": "publish"}  # no `keys`
+    )
+    assert response.get_json()["published"] == 0
+    assert "Desde el form" not in client.get("/").get_data(as_text=True)
+    assert _row(app, "nav.cta").draft_value == "Desde el form"
 
 
 def test_a_value_back_to_the_original_clears_the_draft(app, auth_client: FlaskClient) -> None:
@@ -232,9 +248,7 @@ def test_publishing_only_touches_the_keys_the_editor_holds(app, auth_client: Fla
     auth_client.post(
         "/admin/content/global", data={"footer.cta_eyebrow": "A MEDIO HACER", "action": "save"}
     )
-    auth_client.post(
-        SAVE, json={"changes": {KEY: "Lo mío"}, "action": "publish", "keys": [KEY]}
-    )
+    _save(auth_client, {KEY: "Lo mío"}, action="publish", keys=[KEY])
     html = client.get("/").get_data(as_text=True)
     assert "Lo mío" in html
     assert "A MEDIO HACER" not in html
@@ -289,4 +303,114 @@ def test_a_rich_body_cannot_be_left_blank(app, auth_client: FlaskClient) -> None
         response = _save(auth_client, {RICH_KEY: blank})
         assert response.status_code == 400, blank
         assert RICH_KEY in response.get_json()["errorKeys"], blank
+    assert _row(app, RICH_KEY) is None
+
+
+# --- regressions from the code review -----------------------------------------
+
+
+def test_a_rich_value_is_never_stored_over_its_own_cap(app, auth_client: FlaskClient) -> None:
+    """`sanitize()` re-escapes &, < and >, so it GROWS the value. Validating before it
+    let a value be stored over the cap, after which the same screen refused to save
+    what it was displaying."""
+    field = registry.FIELDS[RICH_KEY]
+    payload = "<p>" + ("&" * (field.max_length - 20)) + "</p>"
+    assert len(payload) <= field.max_length
+
+    response = _save(auth_client, {RICH_KEY: payload})
+    if response.status_code == 200:
+        stored = _row(app, RICH_KEY).draft_value
+        assert len(stored) <= field.max_length, f"guardó {len(stored)} con tope {field.max_length}"
+    else:
+        assert RICH_KEY in response.get_json()["errorKeys"]
+
+
+@pytest.mark.parametrize("value", [["uno", "dos"], {"a": 1}, 12345, True, [{"x": ["y"]}], None])
+def test_a_non_string_value_is_rejected(app, auth_client: FlaskClient, value) -> None:
+    """JSON hands us lists and dicts; `str()` stored their Python repr and published
+    `['uno', 'dos']` as the site's <h1>."""
+    response = _save(auth_client, {KEY: value})
+    assert response.status_code == 400, value
+    assert _row(app, KEY) is None
+
+
+def test_a_huge_key_list_does_not_take_the_endpoint_down(auth_client: FlaskClient) -> None:
+    """The list went straight into an SQL `IN (…)`, which 500s past ~32k entries."""
+    response = auth_client.post(
+        SAVE, json={"changes": {}, "action": "publish", "keys": ["nav.cta"] * 40000}
+    )
+    assert response.status_code == 200
+
+
+def test_only_a_bounded_number_of_errors_comes_back(auth_client: FlaskClient) -> None:
+    response = auth_client.post(
+        SAVE, json={"changes": {f"no.existe.{n}": "x" for n in range(500)}, "action": "save"}
+    )
+    assert response.status_code == 400
+    assert len(response.get_json()["errors"]) <= 20
+
+
+def test_reverting_keeps_the_wording_it_reverted_away_from(
+    app, auth_client: FlaskClient, client: FlaskClient
+) -> None:
+    """Revert used to overwrite `published_value` and leave `previous_value` alone, so
+    a mis-click destroyed the text it was undoing — as unrecoverable as the mistake."""
+    _save(auth_client, {KEY: "Uno"}, action="publish")
+    _save(auth_client, {KEY: "Dos"}, action="publish")
+
+    auth_client.post("/admin/content/revert", json={"key": KEY})
+    assert "Uno" in client.get("/").get_data(as_text=True)
+
+    # …and it can be undone again, back to "Dos".
+    response = auth_client.post("/admin/content/revert", json={"key": KEY})
+    assert response.status_code == 200
+    assert "Dos" in client.get("/").get_data(as_text=True)
+
+
+def test_reverting_drops_a_pending_draft_instead_of_reporting_it(
+    app, auth_client: FlaskClient
+) -> None:
+    """A pending draft would silently undo the revert on the next publish, and the
+    endpoint reported that draft as the value it had restored."""
+    _save(auth_client, {KEY: "Uno"}, action="publish")
+    _save(auth_client, {KEY: "Dos"}, action="publish")
+    _save(auth_client, {KEY: "Borrador pendiente"})
+
+    body = auth_client.post("/admin/content/revert", json={"key": KEY}).get_json()
+    assert body["value"] == "Uno"
+    assert _row(app, KEY).draft_value is None
+
+
+@pytest.mark.parametrize(
+    "path", ["javascript:alert(1)//", "https://evil.example/phish", "//evil.example", "  ", "/no-existe-en-el-sitio"]
+)
+def test_the_canvas_can_only_be_pointed_at_this_site(auth_client: FlaskClient, path: str) -> None:
+    """`?path` went straight into the iframe's src, so a crafted link ran script in
+    the admin's own origin — or embedded a foreign origin inside the admin chrome."""
+    html = auth_client.get(f"/admin/content/?path={path}").get_data(as_text=True)
+    assert 'src="/?edit=1"' in html, path
+    assert "evil.example" not in html and "javascript:" not in html
+
+
+@pytest.mark.parametrize("field_key", ["home.hero.subtitle", "home.marquee.phrases", "seo.home.description"])
+def test_no_field_can_be_published_blank(app, auth_client: FlaskClient, field_key: str) -> None:
+    """An empty `text` shipped an empty <h1> and an empty meta description; an empty
+    `lines` emptied the marquee. The guard only covered the two types that were tested."""
+    assert _save(auth_client, {field_key: "   "}).status_code == 400
+    assert _row(app, field_key) is None
+
+
+def test_a_broken_tag_is_refused_instead_of_silently_eating_the_page(
+    app, auth_client: FlaskClient
+) -> None:
+    """An unterminated <script>/<svg> takes the rest of the value with it, and the
+    result is what gets stored — the page loses its content and the editor is told
+    everything went fine."""
+    response = _save(
+        auth_client,
+        {RICH_KEY: "<p>Un primer párrafo bastante largo para que cuente.</p><svg><p>y todo esto se perdía</p>"},
+    )
+    assert response.status_code == 400
+    assert RICH_KEY in response.get_json()["errorKeys"]
+    assert "sin cerrar" in " ".join(response.get_json()["errors"])
     assert _row(app, RICH_KEY) is None

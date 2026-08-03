@@ -1,0 +1,83 @@
+[content] width=device-width, initial-scale=1.0
+[content] website
+[content] https://gluckbags.com/privacidad
+[content] Política de privacidad · GLÜCK
+[content] Cómo GLÜCK trata tus datos personales y qué herramientas de medición usa el sitio.
+[content] https://gluckbags.com/static/img/og-image.jpg
+[content] image/jpeg
+[content] 1200
+[content] 630
+[content] Tote de cuero vegano cognac de GLÜCK en la playa
+[content] es_AR
+[content] GLÜCK
+[content] summary_large_image
+[content] Política de privacidad · GLÜCK
+[content] Cómo GLÜCK trata tus datos personales y qué herramientas de medición usa el sitio.
+[content] https://gluckbags.com/static/img/og-image.jpg
+Política de privacidad · GLÜCK
+[content] Cómo GLÜCK trata tus datos personales y qué herramientas de medición usa el sitio.
+[aria-label] GLÜCK inicio
+GLÜCK
+[aria-label] Principal
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+[aria-label] Abrir carrito
+0
+[aria-label] Abrir menú
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+GLÜCK
+Política de privacidad
+En GLÜCK cuidamos tus datos. Esta política explica qué información tratamos cuando navegás o nos contactás, y para qué.
+Qué datos tratamos
+Los datos que nos compartís voluntariamente al contactarnos y los necesarios para procesar tu compra: tu email (para enviarte la confirmación del pedido) y, en el checkout, tu nombre, dirección de envío y datos de contacto.
+Carrito y cookies
+El carrito usa una cookie de sesión propia, sólo para recordar los productos que agregaste. No usamos cookies publicitarias ni de seguimiento entre sitios.
+Pagos y Tienda Nube
+La compra se completa en el checkout de
+Tienda Nube
+, que procesa tus datos de pedido y de pago según su propia
+política de privacidad
+. Los datos de tu tarjeta nunca pasan por este sitio.
+Medición del sitio
+Usamos herramientas de analítica web respetuosas de la privacidad para entender, de forma agregada y anónima, cómo se usa el sitio y así mejorarlo. No las usamos para identificarte personalmente.
+Tus derechos
+Podés pedirnos acceder, rectificar o eliminar tus datos en cualquier momento escribiéndonos por
+Instagram
+o desde la página de
+contacto
+.
+[aria-label] Tu carrito
+Tu selección
+Carrito
+[aria-label] Cerrar carrito
+Subtotal
+$ 0
+El costo de envío se confirma en el checkout, antes de pagar.
+Email para la confirmación del pedido
+[placeholder] tu@email.com
+Finalizar compra
+¿Te gustó algo?
+Seguinos en Instagram
+GLÜCK
+Bolsos minimalistas de cuero vegano
+[aria-label] Pie de página
+Colección
+Bolsos
+Nosotras
+Contacto
+Envíos
+Cambios
+Instagram
+[aria-label] Legales
+Términos
+Privacidad
+© 2026 GLÜCK. Todos los derechos reservados.
+Volver arriba ↑
+Cuero vegano · Hecho a mano

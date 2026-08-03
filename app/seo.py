@@ -57,7 +57,9 @@ def organization_jsonld(
         "name": brand or BRAND,
         "url": f"{site_url}/",
         "logo": f"{site_url}{_LOGO}",
-        "description": description or ORGANIZATION_DESCRIPTION,
+        # `or` would resurrect the constant for a description the shop
+        # deliberately cleared, so the markup would assert copy nobody wrote.
+        "description": ORGANIZATION_DESCRIPTION if description is None else description,
         "address": {"@type": "PostalAddress", "addressCountry": "AR"},
         "contactPoint": {
             "@type": "ContactPoint",

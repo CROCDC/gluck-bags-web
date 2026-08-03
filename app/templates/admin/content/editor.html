@@ -7,11 +7,9 @@
 
 {% block content %}
 <div class="ed" data-ed
-     data-start-path="{{ start_path }}"
      data-save-url="{{ url_for('admin_content.save_changes') }}"
      data-revert-url="{{ url_for('admin_content.revert') }}"
      data-discard-url="{{ url_for('admin_content.discard_all') }}"
-     data-site-url="{{ site_url }}"
      data-pending="{{ pending }}">
 
     {# What already has a pending draft, whatever page it was typed on. The panel
@@ -35,7 +33,7 @@
            them a tablist promised arrow-key navigation that never existed. #}
         <div class="ed-bar-group ed-devices" role="group" aria-label="Ancho de pantalla">
             <button type="button" class="ed-device is-current" data-ed-device="fluid"
-                    aria-pressed="true" aria-label="Ancho completo">Auto</button>
+                    aria-pressed="true" aria-label="Auto, ancho completo">Auto</button>
             {% for device in devices %}
             <button type="button" class="ed-device" data-ed-device="{{ device.key }}"
                     data-width="{{ device.width }}" data-height="{{ device.height }}"
@@ -51,8 +49,7 @@
                 Textos ocultos <span class="ed-badge" data-ed-hidden-count>0</span>
             </button>
             <span class="ed-status" id="edStatus" data-ed-status role="status" aria-live="polite"></span>
-            <button type="button" class="ed-btn ed-btn-ghost" data-ed-discard hidden
-                    data-ct-confirm>Descartar</button>
+            <button type="button" class="ed-btn ed-btn-ghost" data-ed-discard hidden>Descartar</button>
             <button type="button" class="ed-btn ed-btn-ghost" data-ed-save disabled>Guardar borrador</button>
             <button type="button" class="ed-btn ed-btn-primary" data-ed-publish
                     {% if not pending %}disabled{% endif %}>

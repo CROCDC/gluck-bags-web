@@ -1,0 +1,73 @@
+[content] width=device-width, initial-scale=1.0
+[content] website
+[content] https://gluckbags.com/contacto
+[content] Contacto · GLÜCK
+[content] Escribinos por Instagram y te ayudamos a elegir tu bolso GLÜCK. Las compras se hacen online en la tienda del sitio.
+[content] https://gluckbags.com/static/img/og-image.jpg
+[content] image/jpeg
+[content] 1200
+[content] 630
+[content] Tote de cuero vegano cognac de GLÜCK en la playa
+[content] es_AR
+[content] GLÜCK
+[content] summary_large_image
+[content] Contacto · GLÜCK
+[content] Escribinos por Instagram y te ayudamos a elegir tu bolso GLÜCK. Las compras se hacen online en la tienda del sitio.
+[content] https://gluckbags.com/static/img/og-image.jpg
+Contacto · GLÜCK
+[content] Escribinos por Instagram y te ayudamos a elegir tu bolso GLÜCK. Las compras se hacen online en la tienda del sitio.
+[aria-label] GLÜCK inicio
+GLÜCK
+[aria-label] Principal
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+[aria-label] Abrir carrito
+0
+[aria-label] Abrir menú
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+GLÜCK
+Contacto
+¿Tenés una consulta sobre un bolso, un envío o un pedido especial? Estamos para ayudarte. Te respondemos lo antes posible.
+Canales
+Instagram:
+@gluck_bags
+— la vía más rápida para consultas y asesoramiento personalizado. Te respondemos por mensaje directo.
+Horarios de atención
+Respondemos de lunes a viernes. Las compras se hacen directamente en la
+tienda online
+; si necesitás ayuda con un pedido, escribinos con tu número de pedido.
+[aria-label] Tu carrito
+Tu selección
+Carrito
+[aria-label] Cerrar carrito
+Subtotal
+$ 0
+El costo de envío se confirma en el checkout, antes de pagar.
+Email para la confirmación del pedido
+[placeholder] tu@email.com
+Finalizar compra
+¿Te gustó algo?
+Seguinos en Instagram
+GLÜCK
+Bolsos minimalistas de cuero vegano
+[aria-label] Pie de página
+Colección
+Bolsos
+Nosotras
+Contacto
+Envíos
+Cambios
+Instagram
+[aria-label] Legales
+Términos
+Privacidad
+© 2026 GLÜCK. Todos los derechos reservados.
+Volver arriba ↑
+Cuero vegano · Hecho a mano

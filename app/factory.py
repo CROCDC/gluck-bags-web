@@ -85,7 +85,11 @@ def _add_missing_columns() -> None:
     OperationalError on every read. Idempotent, and a failure here must never block
     boot — the column is additive and nullable.
     """
+    from flask import current_app
     from sqlalchemy import text
+
+    if db.engine.dialect.name != "sqlite":
+        return  # PRAGMA is SQLite-only; other backends get real migrations
 
     wanted = {("site_texts", "previous_value"): "TEXT"}
     for (table, column), column_type in wanted.items():
@@ -95,8 +99,15 @@ def _add_missing_columns() -> None:
                 continue
             db.session.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"))
             db.session.commit()
-        except Exception:  # noqa: BLE001 — non-sqlite backends / races
+        except Exception:  # noqa: BLE001 — must never block boot
             db.session.rollback()
+            # Silence here is dangerous: the resolver's own guard then swallows the
+            # consequence and the site boots green with every override reverted to
+            # the code defaults, while writes 500. At least say so.
+            current_app.logger.exception(
+                "No se pudo agregar la columna %s.%s; los textos editados no se van "
+                "a leer y guardar va a fallar", table, column
+            )
 
 
 def _resolve_secret_key(data_dir: str) -> str:
