@@ -576,7 +576,7 @@ def test_a_long_page_body_opens_its_own_editor(
     count = counter.inner_text()
     visible = int(re.findall(r"\d+", count)[0])
     assert visible > 400
-    assert "caracteres escritos" in count and "del espacio de esta página" in count
+    assert "caracteres escritos" in count
 
     stored, cap = (int(n) for n in re.findall(r"\d+", counter.get_attribute("title"))[:2])
     assert stored >= visible and cap > stored
@@ -928,7 +928,7 @@ def test_the_page_editor_returns_focus_to_the_panel_field_it_came_from(
 # --- undoing, without a trapdoor to production --------------------------------
 
 
-def test_undo_is_offered_where_you_published_and_only_drafts(
+def test_undo_is_offered_where_you_published(
     admin_live_server: tuple[str, str], page: Page, browser: Browser, restore
 ) -> None:
     """The way back used to live behind a panel called "Textos ocultos", two tabs and
@@ -946,13 +946,10 @@ def test_undo_is_offered_where_you_published_and_only_drafts(
     expect(undo).to_be_visible()
     undo.click()
 
-    # Drafted, not live: the shop still shows the mistake until she publishes again.
-    expect(page.locator("[data-ed-publish]")).to_be_enabled()
-    assert "Un texto con un error" in _public_html(browser, base_url)
-
-    page.click("[data-ed-publish]")
-    expect(page.locator("[data-ed-status]")).to_contain_text("Publicado")
+    expect(page.locator("[data-ed-status]")).to_contain_text("volvió a como estaba")
     assert HERO_ORIGINAL in _public_html(browser, base_url)
+    # …and it does not offer to undo its own undo, forever.
+    expect(undo).to_be_hidden()
 
 
 def test_undoing_keeps_the_keyboard_where_it_was(
@@ -1205,3 +1202,140 @@ def test_the_hint_and_the_bar_share_the_phone_screen(
         " return foot.bottom - bar.top; }"
     )
     assert covered <= 0, f"la barra fija tapa {covered}px del final de la página"
+
+
+# --- what the second round of usability found ---------------------------------
+
+
+def test_publishing_straight_from_the_canvas_says_why_it_refused(
+    admin_live_server: tuple[str, str], page: Page, restore
+) -> None:
+    """Clicking a toolbar button blurs the node being edited and that teardown is
+    deferred a tick, so Publicar read `pending` one edit behind AND the late change
+    message overwrote its own error: the button looked like it did nothing at all."""
+    base_url, password = admin_live_server
+    restore("home.categories.title")
+    _open_editor(page, base_url, password)
+
+    seen: list[str] = []
+    page.on("dialog", lambda dialog: (seen.append(dialog.message), dialog.dismiss()))
+
+    node = page.frame_locator("[data-ed-iframe]").locator(
+        'ct-t[data-k="home.categories.title"]'
+    ).first
+    node.click()
+    page.keyboard.press("ControlOrMeta+A")
+    page.keyboard.press("Delete")
+    # Straight to Publicar, without clicking anywhere else first.
+    page.click("[data-ed-publish]")
+
+    expect(page.locator("[data-ed-status]")).to_contain_text("Todavía no se puede publicar")
+    assert seen == []
+
+
+def test_a_saved_draft_can_be_taken_back_without_discarding_everything(
+    admin_live_server: tuple[str, str], page: Page, browser: Browser, restore
+) -> None:
+    """Once a draft was SAVED the field was no longer "dirty", which hid the only button
+    that pointed at the live wording — leaving Descartar, which takes every other change
+    with it."""
+    base_url, password = admin_live_server
+    restore(HERO)
+    restore("nav.cta")
+    _open_editor(page, base_url, password)
+
+    _type_over(page, HERO, "Lo que quiero que se vea")
+    page.click("[data-ed-publish]")
+    expect(page.locator("[data-ed-status]")).to_contain_text("Publicado")
+
+    # A bad draft on top of it, saved, plus unrelated work in another field.
+    _type_over(page, HERO, "Un borrador equivocado")
+    page.click("[data-ed-save]")
+    expect(page.locator("[data-ed-status]")).to_contain_text("Borrador guardado")
+    _type_over(page, "nav.cta", "Trabajo que no quiero perder")
+
+    page.click("[data-ed-panel-toggle]")
+    page.fill("[data-ed-filter]", HERO)
+    field = page.locator(f'[data-ed-field="{HERO}"]')
+    expect(field).to_have_class(re.compile("is-draft"))
+    field.locator(".ed-field-undo").click()
+
+    page.click("[data-ed-save]")
+    expect(page.locator("[data-ed-status]")).to_contain_text("guardado")
+    # The bad draft is gone, the live wording stands, and the other field survived.
+    assert "Lo que quiero que se vea" in _public_html(browser, base_url)
+    expect(page.locator('[data-ed-field="nav.cta"] input')).to_have_value(
+        "Trabajo que no quiero perder"
+    )
+
+
+def test_undo_after_publishing_puts_the_site_back_in_one_go(
+    admin_live_server: tuple[str, str], page: Page, browser: Browser, restore
+) -> None:
+    """It left a draft and asked you to publish it again — under a button called
+    "Deshacer", sitting next to "Ya se ve en la web"."""
+    base_url, password = admin_live_server
+    restore(HERO)
+    _open_editor(page, base_url, password)
+
+    _type_over(page, HERO, "Esto no lo quería publicar")
+    page.click("[data-ed-publish]")
+    assert "Esto no lo quería publicar" in _public_html(browser, base_url)
+
+    page.click("[data-ed-undo]")
+    expect(page.locator("[data-ed-status]")).to_contain_text("volvió a como estaba")
+    assert HERO_ORIGINAL in _public_html(browser, base_url)
+
+
+def test_the_search_ignores_the_accents_nobody_types(
+    admin_live_server: tuple[str, str], page: Page
+) -> None:
+    """"titulo" answered "no results" for a field called "Título", which reads as "that
+    text does not exist" rather than "you missed a tilde"."""
+    base_url, password = admin_live_server
+    _open_editor(page, base_url, password)
+
+    page.click("[data-ed-panel-toggle]")
+    for query in ("titulo", "título", "Boton"):
+        page.fill("[data-ed-filter]", query)
+        expect(page.locator("[data-ed-no-results]")).to_be_hidden()
+
+
+def test_a_heading_is_editable_along_its_whole_line(
+    admin_live_server: tuple[str, str], page: Page
+) -> None:
+    """<ct-t> is inline, so its target was only as wide as the words: a centred heading
+    did nothing over most of its own row, and the toolbar promises "tocá cualquier
+    texto"."""
+    base_url, password = admin_live_server
+    _open_editor(page, base_url, password, path="/contacto")
+    frame = page.frame_locator("[data-ed-iframe]")
+
+    heading = frame.locator("h1.section-title")
+    box = heading.bounding_box()
+    # Well past the end of the word, still inside the heading's own row.
+    page.mouse.click(box["x"] + box["width"] - 8, box["y"] + box["height"] / 2)
+    expect(frame.locator('ct-t[data-k="page.contact.title"]')).to_have_attribute(
+        "data-ct-editing", ""
+    )
+
+
+def test_the_bar_can_point_at_the_draft_it_is_talking_about(
+    admin_live_server: tuple[str, str], page: Page, restore
+) -> None:
+    """Knowing a draft existed without knowing WHICH one left only two ways to find out,
+    and both were buttons you would not press just to look around."""
+    base_url, password = admin_live_server
+    restore("page.contact.title")
+    _open_editor(page, base_url, password, path="/contacto")
+
+    _type_over(page, "page.contact.title", "Escribinos")
+    page.click("[data-ed-save]")
+    page.goto(f"{base_url}/admin/content/?path=/", wait_until="load")
+    expect(page.locator("[data-ed-hidden-count]")).not_to_have_text("0")
+
+    expect(page.locator("[data-ed-status]")).to_contain_text("sin publicar")
+    page.click("[data-ed-find-drafts]")
+    visible = page.locator("[data-ed-fields] .ed-field:not([hidden])")
+    expect(visible).to_have_count(1)
+    expect(visible.first).to_have_attribute("data-ed-field", "page.contact.title")

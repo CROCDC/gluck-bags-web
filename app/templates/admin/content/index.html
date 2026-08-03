@@ -23,7 +23,10 @@
         {{ 'texto sin publicar' if pending_total == 1 else 'textos sin publicar' }}.
     </p>
     <div class="ct-pending-actions">
-        <form method="post" action="{{ url_for('admin_content.publish_all') }}">
+        {# The editor's own Publicar always confirms; this one is broader and did not,
+           which is exactly backwards. #}
+        <form method="post" action="{{ url_for('admin_content.publish_all') }}"
+              onsubmit="return confirm('Se van a publicar {{ pending_total }} {{ 'texto' if pending_total == 1 else 'textos' }} de todo el sitio.\n\n{{ 'Se ve' if pending_total == 1 else 'Se ven' }} en la web enseguida.');">
             <button type="submit" class="btn btn-primary">Publicar todo el sitio</button>
         </form>
         <form method="post" action="{{ url_for('admin_content.discard_all') }}"

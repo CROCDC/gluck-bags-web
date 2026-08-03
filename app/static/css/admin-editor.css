@@ -148,6 +148,20 @@
     cursor: pointer; background: var(--adm-card); border-style: dashed;
 }
 .ed-field.is-dirty { border-left: 3px solid var(--adm-cognac); padding-left: 0.6rem; margin-left: -0.6rem; }
+/* Saved, but the shop still shows the old wording. Dashed, so it reads as "parked"
+   next to the solid bar of an edit that has not been saved at all. */
+.ed-field.is-draft { border-left: 3px dashed var(--adm-cognac); padding-left: 0.6rem; margin-left: -0.6rem; }
+.ed-field.is-draft > label::after {
+    content: "sin publicar";
+    margin-left: 0.5rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(181, 106, 58, 0.14);
+    color: var(--adm-cognac-dk);
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
 .ed-field.is-invalid { border-left: 3px solid var(--adm-err); padding-left: 0.6rem; margin-left: -0.6rem; }
 .ed-field.is-invalid input, .ed-field.is-invalid textarea { border-color: var(--adm-err); }
 .ed-field-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.9rem; flex-wrap: wrap; margin-top: 0.25rem; }

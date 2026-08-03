@@ -196,6 +196,8 @@ def build_manifest(path: str, inline: list[str], hidden: list[str]) -> dict[str,
             # Without this the panel's "Volver al texto anterior" could never appear
             # for a key the current page renders — i.e. almost never.
             "previous": state["previous"],
+            # What the shop currently shows: `raw` is the draft once there is one.
+            "live": state["live"],
             "group": registry.FIELD_GROUP[key],
             "groupTitle": registry.GROUPS_BY_KEY[registry.FIELD_GROUP[key]].title,
             "section": registry.FIELD_SECTION.get(key, ""),

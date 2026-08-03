@@ -46,12 +46,13 @@
         <div class="ed-bar-group ed-actions">
             <button type="button" class="ed-btn ed-btn-ghost" data-ed-panel-toggle
                     aria-expanded="false" aria-controls="edPanel">
-                Ver todos los textos
+                Ver la lista de textos
             </button>
             <span class="ed-status" id="edStatus" data-ed-status role="status" aria-live="polite"></span>
             {# Outside the live region on purpose: a button inside role="status" gets
                re-announced with every message and is a strange place to park focus. #}
             <button type="button" class="ed-btn ed-btn-ghost" data-ed-undo hidden>Deshacer</button>
+            <button type="button" class="ed-btn ed-btn-ghost" data-ed-find-drafts hidden>Ver cuál</button>
             <button type="button" class="ed-btn ed-btn-ghost" data-ed-discard hidden>Descartar</button>
             <button type="button" class="ed-btn ed-btn-ghost" data-ed-save disabled>Guardar borrador</button>
             <button type="button" class="ed-btn ed-btn-primary" data-ed-publish

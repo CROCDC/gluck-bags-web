@@ -43,6 +43,20 @@
             </a>
         </nav>
 
+        {# One grid cell for both: the header is a 3-column grid, so a fourth child
+           would drop onto a second row. #}
+        <div class="adm-header-end">
+        {# The only way to check what customers actually see used to be typing the shop's
+           address into another tab from memory. #}
+        <a href="{{ url_for('index') }}" target="_blank" rel="noopener"
+           class="adm-pill adm-visit" aria-label="Ver la web, se abre en otra pestaña">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/>
+            </svg>
+            <span class="adm-exit-text">Ver la web</span>
+        </a>
+
         <form method="post" action="{{ url_for('admin.logout') }}" class="adm-exit-form">
             {# Icon-only on a narrow screen: the word is what used to wrap the header
                onto a third line and push the content 300px down on a small phone. #}
@@ -54,6 +68,7 @@
                 <span class="adm-exit-text">Salir</span>
             </button>
         </form>
+        </div>
         {% endif %}
     </header>
 

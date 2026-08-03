@@ -321,6 +321,9 @@ def field_payload(key: str) -> dict[str, Any]:
         "max": field.max_length,
         "default": field.default,
         "previous": state["previous"],
+        # What the shop currently shows. `raw` is the draft once there is one, so without
+        # this the panel had no way back to live except the factory text.
+        "live": state["live"],
         "group": group.key,
         "groupTitle": group.title,
         "section": registry.FIELD_SECTION.get(key, ""),

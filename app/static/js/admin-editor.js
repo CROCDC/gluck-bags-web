@@ -20,6 +20,7 @@
   const hiddenBadge = root.querySelector("[data-ed-hidden-count]");
   const discardBtn = root.querySelector("[data-ed-discard]");
   const undoBtn = root.querySelector("[data-ed-undo]");
+  const findDraftsBtn = root.querySelector("[data-ed-find-drafts]");
   const SAVE_URL = root.dataset.saveUrl;
 
   // key -> the value the user has typed but not saved yet.
@@ -61,6 +62,7 @@
       }
       undoBtn.hidden = true;
     }
+    if (findDraftsBtn && !serverDrafts.length) findDraftsBtn.hidden = true;
     // An error now names the field AND the screen it lives on, which wraps the toolbar
     // onto a second line. The panel is positioned off the toolbar's height.
     syncBarHeight();
@@ -104,10 +106,29 @@
    *  number on the Publicar button. */
   function draftNotice() {
     if (!serverDrafts.length) return "";
+    if (findDraftsBtn) findDraftsBtn.hidden = false;
     return serverDrafts.length === 1
       ? "Tenés 1 texto guardado sin publicar: lo ves acá, pero tus clientes todavía no."
       : "Tenés " + serverDrafts.length +
         " textos guardados sin publicar: los ves acá, pero tus clientes todavía no.";
+  }
+
+  if (findDraftsBtn) {
+    // Knowing a draft exists without knowing WHICH one left only two ways to find out,
+    // and both of them were buttons you would not press just to look around.
+    findDraftsBtn.addEventListener("click", () => {
+      setPanel(true, false);
+      if (filter) filter.value = "";
+      // selectTab ends in applyFilter(), which un-hides everything the tab allows —
+      // so the draft-only pass below has to come after it, not before.
+      selectTab("all");
+      root.querySelectorAll("[data-ed-fields] .ed-field").forEach((item) => {
+        if (!hasDraft(item.dataset.edField)) item.hidden = true;
+      });
+      if (noResults) noResults.hidden = true;
+      const first = root.querySelector("[data-ed-fields] .ed-field:not([hidden])");
+      if (first) first.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
   }
 
   window.addEventListener("beforeunload", (event) => {
@@ -288,6 +309,11 @@
     return manifest.fields[key] || extraFields[key];
   }
 
+  /** Saved, but the shop still shows the old wording. */
+  function hasDraft(key) {
+    return serverDrafts.indexOf(key) !== -1;
+  }
+
   function valueOf(key) {
     return key in pending ? pending[key] : (fieldFor(key) || {}).raw || "";
   }
@@ -297,7 +323,7 @@
     const wrap = document.createElement("div");
     wrap.className = "ed-field";
     wrap.dataset.edField = key;
-    wrap.dataset.edSearch = (field.label + " " + key + " " + valueOf(key)).toLowerCase();
+    wrap.dataset.edSearch = searchable(field.label + " " + key + " " + valueOf(key));
 
     const label = document.createElement("label");
     label.className = "ed-field-label";
@@ -331,15 +357,23 @@
     const count = document.createElement("span");
     count.className = "ed-field-count";
     // Undoing one bad edit used to mean Descartar, which throws away every other change
-    // too. This goes back to what the field said when the editor opened it — the other
-    // two buttons below both go somewhere else.
+    // too. It targets what the SHOP currently shows — not what the editor loaded, which
+    // IS the bad draft once it has been saved, and not the factory text, which is a
+    // different place entirely.
     const undo = document.createElement("button");
     undo.type = "button";
     undo.className = "ed-field-restore ed-field-undo";
-    undo.textContent = "Deshacer este cambio";
+    undo.textContent = "Volver a lo que se ve en la web";
+    undo.title = "El texto que tus clientes están viendo ahora";
     undo.addEventListener("click", () => {
-      input.value = field.raw;
-      stageChange(key, field.raw);
+      const live = field.live != null ? field.live : field.raw;
+      input.value = live;
+      stageChange(key, live);
+      setStatus(
+        hasDraft(key)
+          ? "Listo. Tocá «Guardar borrador» o «Publicar cambios» para confirmarlo."
+          : "Listo, volvió a lo que se ve en la web."
+      );
     });
     const restore = document.createElement("button");
     restore.type = "button";
@@ -374,7 +408,13 @@
       count.classList.toggle("is-over", input.value.length > field.max);
       const dirty = key in pending;
       wrap.classList.toggle("is-dirty", dirty);
-      undo.hidden = !dirty;
+      // The older form screen has flagged this since day one; with 91 fields in the
+      // panel, "which ones did I leave saved?" was a memory game.
+      wrap.classList.toggle("is-draft", !dirty && hasDraft(key));
+      // Not `!dirty`: a draft that was already saved is not "dirty", and that was the
+      // one state with no way back to the live wording at all.
+      const live = field.live != null ? field.live : field.raw;
+      undo.hidden = input.value === live;
       restore.hidden = input.value === field.default;
     }
 
@@ -460,7 +500,7 @@
           : "No pudimos recuperar el texto anterior.",
         true
       );
-      return;
+      return false;
     }
     // Before staging: a key drafted from another page only becomes renderable once
     // its metadata is here, and stageChange looks it up.
@@ -476,17 +516,39 @@
     }
     setStatus("Listo. Tocá «Publicar cambios» para que se vea en la web.");
     syncButtons();
+    return true;
   }
 
   if (undoBtn) {
-    undoBtn.addEventListener("click", () => revertKey(undoKeys.slice()));
+    undoBtn.addEventListener("click", async () => {
+      const keys = undoKeys.slice();
+      // The confirm IS the deliberate act that lets this reach the public site in one
+      // step: the rule is that nothing goes live unattended, not that undoing has to
+      // take two visits. Naming it "Deshacer" and then leaving a draft was a promise
+      // the button did not keep.
+      if (!window.confirm("¿Volvemos a como estaba antes de publicar?\n\nSe ve en la web enseguida.")) {
+        return;
+      }
+      if (!(await revertKey(keys))) return;
+      await send("publish", { undone: true });
+      if (!dirtyCount()) setStatus("Listo, la web volvió a como estaba.");
+    });
   }
 
   const filter = root.querySelector("[data-ed-filter]");
   const noResults = root.querySelector("[data-ed-no-results]");
 
+  /** Lower-cased and stripped of accents. "titulo" used to find nothing at all, which
+   *  reads as "that text does not exist" rather than "you missed a tilde". */
+  function searchable(text) {
+    return String(text)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "");
+  }
+
   function applyFilter() {
-    const query = (filter.value || "").trim().toLowerCase();
+    const query = searchable((filter.value || "").trim());
     let shown = 0;
     root.querySelectorAll("[data-ed-fields] .ed-field").forEach((item) => {
       const matchesTab = currentTab !== "hidden" || item.dataset.edHidden === "1";
@@ -515,7 +577,7 @@
     root.querySelectorAll('[data-ed-field="' + CSS.escape(key) + '"]').forEach((item) => {
       item.classList.toggle("is-dirty", key in pending);
       const field = fieldFor(key) || {};
-      item.dataset.edSearch = ((field.label || key) + " " + key + " " + value).toLowerCase();
+      item.dataset.edSearch = searchable((field.label || key) + " " + key + " " + value);
     });
     if (renderers[key]) renderers[key]();
   }
@@ -562,6 +624,36 @@
     }
   }
 
+  let flushToken = 0;
+  const flushWaiters = Object.create(null);
+
+  /** Commit whatever is being typed on the canvas, and only then act.
+   *
+   *  A toolbar click blurs the node being edited, and the frame defers that teardown a
+   *  tick so the browser can settle focus first. Every button that reads `pending` was
+   *  therefore reading it one edit behind — and worse, the late `change` message then
+   *  overwrote whatever the button had just put in the status line, so a refused publish
+   *  looked like a button that did nothing at all.
+   */
+  function flushFrame() {
+    if (!iframe.contentWindow) return Promise.resolve();
+    const token = ++flushToken;
+    return new Promise((resolve) => {
+      // Never hang on it: the canvas may be mid-navigation, and a toolbar that stops
+      // responding is worse than acting on a value one keystroke old.
+      const timer = window.setTimeout(() => {
+        delete flushWaiters[token];
+        resolve();
+      }, 300);
+      flushWaiters[token] = () => {
+        window.clearTimeout(timer);
+        delete flushWaiters[token];
+        resolve();
+      };
+      tellFrame({ type: "flush", token: token });
+    });
+  }
+
   function tellFrame(message) {
     if (!iframe.contentWindow) return;
     iframe.contentWindow.postMessage(
@@ -580,7 +672,10 @@
     if (data.source !== "ct-frame" || typeof data.type !== "string") return;
     if (data.key !== undefined && typeof data.key !== "string") return;
 
-    if (data.type === "ready") {
+    if (data.type === "flushed") {
+      const done = flushWaiters[data.token];
+      if (done) done();
+    } else if (data.type === "ready") {
       manifest = data.manifest || manifest;
       // Follow the canvas: a link clicked inside the site used to strand the picker
       // on the old page, and re-selecting the same option fires no change event.
@@ -761,13 +856,15 @@
     const visible = visibleLength(sheetDoc.innerHTML);
     const stored = sheetDoc.innerHTML.length;
     // Two raw numbers in different units, and the one that decides whether the save goes
-    // through was the unexplained one. Say what was written and how full the page is; the
-    // exact figures stay in the tooltip for whoever needs them.
-    const percent = Math.min(999, Math.round((stored / field.max) * 100));
+    // through was the unexplained one. Only say something about the cap when the cap is
+    // close enough to matter — a percentage nobody can act on is more noise than help.
+    const room = field.max - stored;
     sheetCount.textContent =
       stored > field.max
         ? "Te pasaste del máximo: sacá texto o formato para poder guardar."
-        : visible + " caracteres escritos · " + percent + "% del espacio de esta página";
+        : room < field.max * 0.15
+        ? visible + " caracteres escritos · te queda poco lugar en esta página"
+        : visible + " caracteres escritos";
     sheetCount.title =
       stored + " de " + field.max + " caracteres guardados (el formato también ocupa lugar).";
     sheetCount.classList.toggle("is-over", stored > field.max);
@@ -880,7 +977,10 @@
 
   /* ---------------- saving ---------------- */
 
-  async function send(action) {
+  /** `options.undone` marks the publish that a Deshacer is finishing: it must not arm
+   *  another Deshacer for itself, and it says so in its own words. */
+  async function send(action, options) {
+    const undone = Boolean(options && options.undone);
     const changes = Object.assign({}, pending);
     // Captured once: it is what goes live, and what a Deshacer would have to take back.
     const scope = pendingKeys();
@@ -955,7 +1055,7 @@
     // called "Textos ocultos", two tabs and a search away. Only on a clean publish:
     // with leftovers the status is about something else, and on a phone .ed-actions is
     // a fixed bar whose reserved height fits exactly one row.
-    if (undoBtn && action === "publish" && scope.length && !leftover) {
+    if (undoBtn && action === "publish" && scope.length && !leftover && !undone) {
       undoKeys = scope;
       undoBtn.hidden = false;
     }
@@ -965,7 +1065,10 @@
     reloadCanvas();
   }
 
-  saveBtn.addEventListener("click", () => send("save"));
+  saveBtn.addEventListener("click", async () => {
+    await flushFrame();
+    send("save");
+  });
 
   /** The two rules the panel already draws on screen — empty, and past the cap. The
    *  server is still the real gate; this only stops us from asking "¿publicamos?" about
@@ -982,7 +1085,8 @@
     });
   }
 
-  publishBtn.addEventListener("click", () => {
+  publishBtn.addEventListener("click", async () => {
+    await flushFrame();
     const keys = pendingKeys();
     const bad = localErrors(keys);
     if (bad.length) {

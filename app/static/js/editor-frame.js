@@ -331,7 +331,7 @@
       el,
       el.closest(CATALOG_SCOPES)
         ? "Esto sale del catálogo: el título, el precio y las fotos se editan en Productos."
-        : "Este texto no se edita tocándolo. Buscalo en «Ver todos los textos» o en la lista por sección."
+        : "Este texto no se edita tocándolo. Buscalo en «Ver la lista de textos» o en la lista por sección."
     );
     tipTimer = window.setTimeout(hideTip, 3600);
   }
@@ -374,6 +374,20 @@
   function releaseHeight() {
     if (lockedBlock) lockedBlock.style.minHeight = "";
     lockedBlock = null;
+  }
+
+  /** The single `ct-t` inside the nearest text block, when there is exactly one and the
+   *  click did not land on something interactive. Anything else stays ambiguous and is
+   *  left alone. */
+  function loneEditableIn(target) {
+    if (!target || !target.closest || isInteractive(target)) return null;
+    const block = target.closest("h1, h2, h3, h4, p, li, figcaption, blockquote, dd, dt, td, th");
+    if (!block || block.closest("ct-t")) return null;
+    const inside = block.querySelectorAll("ct-t");
+    if (inside.length !== 1) return null;
+    // A block that also holds a link or a button is not "just this text".
+    if (block.querySelector("a[href], button, input, select, textarea")) return null;
+    return inside[0];
   }
 
   function startEditing(node) {
@@ -474,6 +488,17 @@
         startEditing(node);
         return;
       }
+      // A <ct-t> is inline, so its target is only as wide as the words. A centred
+      // heading in a full-width <h1> therefore did nothing over most of its own row,
+      // and "tocá cualquier texto para editarlo" read as a lie. If the block that WAS
+      // clicked holds exactly one editable string, that is unambiguously the one meant.
+      const lone = loneEditableIn(event.target);
+      if (lone) {
+        clickPoint = { x: event.clientX, y: event.clientY };
+        event.preventDefault();
+        startEditing(lone);
+        return;
+      }
       const owner = event.target.closest ? event.target.closest("[data-ct-keys]") : null;
       // An element that only carries copy in its ATTRIBUTES (an image alt, a button's
       // aria-label) opens that copy in the panel — unless it is interactive, because
@@ -566,7 +591,18 @@
     if (event.origin !== window.location.origin) return;
     const data = event.data || {};
     if (data.source !== "ct-shell") return;
-    if (data.type === "set") {
+    if (data.type === "flush") {
+      // Clicking a toolbar button blurs the node being edited, and that teardown is
+      // deferred a tick so the browser can settle focus first — so the shell used to
+      // read `pending` BEFORE the edit landed in it, and its answer was then overwritten
+      // by the change message arriving late. Committing on demand removes the race
+      // instead of racing it back.
+      if (editing) stopEditing();
+      window.parent.postMessage(
+        { source: "ct-frame", type: "flushed", token: data.token },
+        window.location.origin
+      );
+    } else if (data.type === "set") {
       CURRENT[data.key] = data.value;
       refresh(data.key);
       refreshDependents(data.key);
