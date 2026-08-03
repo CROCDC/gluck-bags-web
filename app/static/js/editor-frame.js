@@ -120,20 +120,46 @@
     "global.instagram_handle": "instagram_handle",
   };
 
+  let tokenDependents = null;
+
   function refreshDependents(key) {
     const token = TOKEN_FIELDS[key];
     if (!token) return;
     TOKENS[token] = String(CURRENT[key] || "");
-    Object.keys(CURRENT).forEach((other) => {
-      if (other !== key && /\{[a-z_]+\}/.test(String(CURRENT[other]))) refresh(other);
+    if (tokenDependents === null) {
+      tokenDependents = Object.keys(CURRENT).filter((other) =>
+        /\{[a-z_]+\}/.test(String(FIELDS[other] ? FIELDS[other].raw : CURRENT[other]))
+      );
+    }
+    tokenDependents.forEach((other) => {
+      if (other !== key) refresh(other);
     });
   }
 
-  function refresh(key) {
+  // key -> the nodes that render it. Built once; `refresh` used to sweep every
+  // <ct-t> on the page for every key, and editing a token field re-runs that for
+  // each of the ~80 strings that mention it — 28 full-document scans per keystroke.
+  let nodeIndex = null;
+
+  function indexNodes() {
+    nodeIndex = new Map();
     document.querySelectorAll("ct-t").forEach((node) => {
+      const key = parseTarget(node).key;
+      const bucket = nodeIndex.get(key);
+      if (bucket) bucket.push(node);
+      else nodeIndex.set(key, [node]);
+    });
+  }
+
+  function nodesForKey(key) {
+    if (nodeIndex === null) indexNodes();
+    return nodeIndex.get(key) || [];
+  }
+
+  function refresh(key) {
+    nodesForKey(key).forEach((node) => {
       if (node.hasAttribute("data-ct-editing")) return;
       const target = parseTarget(node);
-      if (target.key !== key) return;
       const field = FIELDS[key] || {};
       if (field.type === "rich") node.innerHTML = displayForRich(target);
       else node.textContent = displayFor(target);
@@ -512,6 +538,7 @@
 
   /** Make every editable string reachable without a mouse, and give it a name. */
   function makeReachable() {
+    indexNodes();
     document.querySelectorAll("ct-t").forEach((node) => {
       const field = FIELDS[parseTarget(node).key];
       if (!field) return;
