@@ -19,14 +19,20 @@
   const pendingBadge = root.querySelector("[data-ed-pending]");
   const hiddenBadge = root.querySelector("[data-ed-hidden-count]");
   const discardBtn = root.querySelector("[data-ed-discard]");
+  const undoBtn = root.querySelector("[data-ed-undo]");
   const SAVE_URL = root.dataset.saveUrl;
 
   // key -> the value the user has typed but not saved yet.
   const pending = Object.create(null);
   let manifest = { fields: {}, inlineKeys: [], hiddenKeys: [] };
+  // key -> the field's own render(), so a change made anywhere (canvas, undo)
+  // refreshes its counter. It used to only run on the textarea's own `input`.
+  const renderers = Object.create(null);
   // Keys with a draft on the server that this page never rendered (staged on another
   // page, or in an earlier session). They still count and they still publish.
   let serverDrafts = [];
+  // What the last Publicar put live, so it can be taken back from the same bar.
+  let undoKeys = [];
   let inFlight = false;
   // Metadata for pending keys the current page does not render, so the panel can
   // still show (and fix) them.
@@ -46,6 +52,18 @@
   function setStatus(text, isError) {
     statusEl.textContent = text || "";
     statusEl.classList.toggle("is-error", Boolean(isError));
+    // Focus moves out before hiding: taking away the element the keyboard is standing
+    // on drops focus to <body>, the same way a disabled Publicar used to.
+    if (undoBtn && !undoBtn.hidden) {
+      if (document.activeElement === undoBtn) {
+        statusEl.setAttribute("tabindex", "-1");
+        statusEl.focus();
+      }
+      undoBtn.hidden = true;
+    }
+    // An error now names the field AND the screen it lives on, which wraps the toolbar
+    // onto a second line. The panel is positioned off the toolbar's height.
+    syncBarHeight();
   }
 
   function dirtyCount() {
@@ -68,7 +86,28 @@
     publishBtn.disabled = inFlight || total === 0;
     pendingBadge.textContent = String(total);
     pendingBadge.hidden = total === 0;
-    if (discardBtn) discardBtn.hidden = total === 0;
+    if (discardBtn) {
+      // Its space is RESERVED (see .ed-btn.is-off), because a button appearing here
+      // re-wrapped the whole toolbar: Guardar and Publicar jumped ~630px sideways and
+      // 59px down, out from under the cursor that was going to click them. `hidden`
+      // stays in the markup for the no-JS case and is dropped here.
+      discardBtn.hidden = false;
+      discardBtn.classList.toggle("is-off", total === 0);
+    }
+    // Showing Descartar adds a whole row to the fixed mobile bar, and the page reserves
+    // exactly its height at the bottom.
+    syncBarHeight();
+  }
+
+  /** A draft saved in an earlier session renders on the canvas exactly like the live
+   *  copy, so without this the only clue that customers are not seeing it yet was a
+   *  number on the Publicar button. */
+  function draftNotice() {
+    if (!serverDrafts.length) return "";
+    return serverDrafts.length === 1
+      ? "Tenés 1 texto guardado sin publicar: lo ves acá, pero tus clientes todavía no."
+      : "Tenés " + serverDrafts.length +
+        " textos guardados sin publicar: los ves acá, pero tus clientes todavía no.";
   }
 
   window.addEventListener("beforeunload", (event) => {
@@ -79,17 +118,57 @@
 
   /* ---------------- device frame ---------------- */
 
-  /** The tallest the canvas may be without pushing the admin page into scrolling
-   *  (which would slide the sticky toolbar over the panel's header). */
-  /** Publish the toolbar's real height so the panel can sit below it. Hard-coding it
-   *  is what put the panel's close button underneath the bar. */
+  let barSyncQueued = false;
+
+  /** Publish the toolbar's real height so the panel can sit below it, and the height of
+   *  the mobile action bar so the page can reserve exactly that much. Hard-coding either
+   *  is what put the panel's close button under the toolbar, and the field being edited
+   *  under the action bar.
+   *
+   *  Coalesced to one measurement per frame: the callers sit on the per-keystroke path
+   *  and each read below forces a synchronous reflow. */
   function syncBarHeight() {
-    const bar = root.querySelector(".ed-bar");
-    if (bar) root.style.setProperty("--ed-bar-h", Math.round(bar.offsetHeight) + "px");
+    if (barSyncQueued) return;
+    barSyncQueued = true;
+    window.requestAnimationFrame(() => {
+      barSyncQueued = false;
+      const bar = root.querySelector(".ed-bar");
+      if (bar) root.style.setProperty("--ed-bar-h", Math.round(bar.offsetHeight) + "px");
+      const actions = root.querySelector(".ed-actions");
+      if (!actions) return;
+      // Only below the breakpoint do the actions detach into a fixed bottom bar, and
+      // its height changes with how many buttons are showing.
+      const floating = window.getComputedStyle(actions).position === "fixed";
+      root.style.setProperty(
+        "--ed-actions-h",
+        floating ? Math.round(actions.offsetHeight) + "px" : "0px"
+      );
+    });
   }
 
+  /** The tallest the canvas may be without pushing the admin page into scrolling
+   *  (which would slide the sticky toolbar over the panel's header). */
+  /** The tallest the canvas may be without pushing the admin page into scrolling
+   *  (which slides the sticky toolbar over the panel's header — its close button
+   *  included; the panel cannot dodge it, because it is as tall as its own containing
+   *  block and `sticky` has nowhere to move it to).
+   *  Measured, not the old constant 210: that was the chrome of a ONE-ROW toolbar, and
+   *  the bar grows a second row as soon as there is something to publish. */
   function viewportHeight() {
-    return Math.max(420, window.innerHeight - 210);
+    // Where the toolbar does NOT float over the content (a phone: static bar, panel
+    // under the canvas) the page is meant to scroll, and a taller canvas is the point.
+    const bar = root.querySelector(".ed-bar");
+    if (!bar || window.getComputedStyle(bar).position !== "sticky") {
+      return Math.max(420, window.innerHeight - 210);
+    }
+    // Only what sits ABOVE the canvas is measured, and only that: it is the part that
+    // grew (the toolbar now holds a second row open). Deriving the space BELOW from the
+    // page height is self-referential — it moves with the canvas, so each call shrank it
+    // a little further and the canvas collapsed to its 420px floor.
+    const above = stage.getBoundingClientRect().top + window.scrollY;
+    const footnote = root.querySelector(".ed-footnote");
+    const below = footnote ? Math.ceil(footnote.getBoundingClientRect().height) + 24 : 56;
+    return Math.max(420, window.innerHeight - above - below);
   }
 
   function fitDevice(button) {
@@ -169,7 +248,10 @@
   panelToggle.addEventListener("click", () => setPanel(panel.hidden));
   panelClose.addEventListener("click", () => setPanel(false));
 
-  let currentTab = "hidden";
+  // "Todos", not "No visibles": applyFilter() filters by TAB before it filters by query,
+  // so opening on the narrow tab made the search answer "no results" for a text that is
+  // right there on the page. The badge on the "No visibles" tab still sells it.
+  let currentTab = "all";
 
   function selectTab(name) {
     currentTab = name;
@@ -248,18 +330,40 @@
     foot.className = "ed-field-foot";
     const count = document.createElement("span");
     count.className = "ed-field-count";
+    // Undoing one bad edit used to mean Descartar, which throws away every other change
+    // too. This goes back to what the field said when the editor opened it — the other
+    // two buttons below both go somewhere else.
+    const undo = document.createElement("button");
+    undo.type = "button";
+    undo.className = "ed-field-restore ed-field-undo";
+    undo.textContent = "Deshacer este cambio";
+    undo.addEventListener("click", () => {
+      input.value = field.raw;
+      stageChange(key, field.raw);
+    });
     const restore = document.createElement("button");
     restore.type = "button";
     restore.className = "ed-field-restore";
-    restore.textContent = "Restaurar original";
+    restore.textContent = "Volver al texto original";
+    restore.title = "El texto con el que vino la web";
     foot.appendChild(count);
-    // A way back to yesterday's wording, not just to the factory text.
+    foot.appendChild(undo);
+    // Both links only DRAFT now, so looking alike stopped being a trap: what tells
+    // them apart is where they land, which is why the destination is in the title.
+    // Still gated on `previous`: with none, the wording this replaced WAS the factory
+    // text and the link beside it already goes there.
     if (field.previous) {
       const revert = document.createElement("button");
       revert.type = "button";
       revert.className = "ed-field-restore";
-      revert.textContent = "Volver al texto anterior";
-      revert.addEventListener("click", () => revertKey(key, input));
+      revert.textContent = "Volver a lo que decía antes";
+      // Tag-free and trimmed: a `rich` field's previous value is a page of HTML.
+      revert.title = field.previous
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 120);
+      revert.addEventListener("click", () => revertKey([key]));
       foot.appendChild(revert);
     }
     foot.appendChild(restore);
@@ -270,6 +374,7 @@
       count.classList.toggle("is-over", input.value.length > field.max);
       const dirty = key in pending;
       wrap.classList.toggle("is-dirty", dirty);
+      undo.hidden = !dirty;
       restore.hidden = input.value === field.default;
     }
 
@@ -298,6 +403,7 @@
     });
 
     render();
+    renderers[key] = render;
     return wrap;
   }
 
@@ -307,6 +413,7 @@
 
     const box = root.querySelector("[data-ed-fields]");
     box.textContent = "";
+    Object.keys(renderers).forEach((key) => delete renderers[key]);
     const keys = Object.keys(manifest.fields);
     // Pending edits typed on ANOTHER page belong here too: they count towards
     // Publicar, and if one of them is invalid it blocks every save with nothing to
@@ -330,28 +437,49 @@
     applyFilter();
   }
 
-  async function revertKey(key, input) {
+  /** Bring back the wording that was live before the last publish — as a DRAFT.
+   *
+   *  It used to publish on the spot: one underlined link in the panel was the only
+   *  control in the whole editor that changed the public site without going through
+   *  "Publicar cambios", and it sat beside an identical-looking link that did not. A
+   *  second click swapped straight back, so a double click published and unpublished
+   *  the live site. The server decides WHAT the previous wording is, because the
+   *  manifest this page loaded goes stale the moment a colleague publishes.
+   */
+  async function revertKey(keys) {
     const response = await fetch(root.dataset.revertUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ key: key }),
+      body: JSON.stringify({ keys: keys }),
     }).catch(() => null);
     const payload = response ? await response.json().catch(() => null) : null;
     if (!payload || !payload.ok) {
-      setStatus("No pudimos volver al texto anterior.", true);
+      setStatus(
+        payload && payload.errors && payload.errors.length
+          ? payload.errors.join(" ")
+          : "No pudimos recuperar el texto anterior.",
+        true
+      );
       return;
     }
-    delete pending[key];
-    if (input) input.value = payload.value;
-    const field = fieldFor(key);
-    if (field) field.raw = payload.value;
-    // The endpoint returns the fresh pending state; ignoring it left the badge and
-    // the panel describing the world as it was before the revert.
+    // Before staging: a key drafted from another page only becomes renderable once
+    // its metadata is here, and stageChange looks it up.
     serverDrafts = payload.pendingKeys || serverDrafts;
     extraFields = payload.pendingFields || extraFields;
-    tellFrame({ type: "set", key: key, value: payload.value });
-    setStatus("Listo, volvimos al texto anterior.");
+    const values = payload.values || {};
+    const names = Object.keys(values);
+    // stageChange, so the canvas, the panel input, the dirty badge and the counter
+    // all end up saying the same thing.
+    names.forEach((key) => stageChange(key, values[key]));
+    if (names.some((key) => !root.querySelector('[data-ed-field="' + CSS.escape(key) + '"]'))) {
+      renderFields();
+    }
+    setStatus("Listo. Tocá «Publicar cambios» para que se vea en la web.");
     syncButtons();
+  }
+
+  if (undoBtn) {
+    undoBtn.addEventListener("click", () => revertKey(undoKeys.slice()));
   }
 
   const filter = root.querySelector("[data-ed-filter]");
@@ -379,7 +507,7 @@
     if (value === original) delete pending[key];
     else pending[key] = value;
     syncButtons();
-    setStatus(dirtyCount() ? "Cambios sin guardar" : "");
+    setStatus(dirtyCount() ? "Cambios sin guardar" : draftNotice());
     // Keep the page and the panel showing the same thing.
     tellFrame({ type: "set", key: key, value: value });
     const box = root.querySelector('[data-ed-field="' + CSS.escape(key) + '"] input, [data-ed-field="' + CSS.escape(key) + '"] textarea');
@@ -389,6 +517,7 @@
       const field = fieldFor(key) || {};
       item.dataset.edSearch = ((field.label || key) + " " + key + " " + value).toLowerCase();
     });
+    if (renderers[key]) renderers[key]();
   }
 
   function markInvalid(keys) {
@@ -504,22 +633,39 @@
   // The server sanitizes on save and on render; the editor document needs its own
   // pass, because what lands here comes over postMessage and goes into innerHTML.
   const RICH_TAGS = ["P", "BR", "STRONG", "B", "EM", "I", "H2", "H3", "UL", "OL", "LI", "A"];
+  // Dropped WITH their contents, exactly like the server does: unwrapping a <style>
+  // keeps its CSS as visible copy, so a paste from a word processor poured a stylesheet
+  // into the page as text.
+  const DROP_WITH_CONTENT = [
+    "SCRIPT", "STYLE", "IFRAME", "OBJECT", "EMBED", "TEMPLATE", "SVG", "MATH", "NOSCRIPT",
+  ];
 
   function sanitizeRich(html) {
     const doc = document.implementation.createHTMLDocument("");
     doc.body.innerHTML = String(html == null ? "" : html);
     const walk = (node) => {
+      // `children` skips comment nodes, so Word's <!--[if gte mso 9]><xml>…<![endif]-->
+      // used to survive into the document — invisible, counted against the field's cap,
+      // and dropped by the server on save. The server has handle_comment() for this.
+      Array.from(node.childNodes).forEach((child) => {
+        if (child.nodeType === Node.COMMENT_NODE) child.remove();
+      });
       Array.from(node.children).forEach((child) => {
-        if (RICH_TAGS.indexOf(child.tagName) === -1) {
+        // SVG and MathML elements report a lower-case tagName; normalize before matching.
+        const tag = child.tagName.toUpperCase();
+        if (DROP_WITH_CONTENT.indexOf(tag) !== -1) {
+          child.remove();
+          return;
+        }
+        if (RICH_TAGS.indexOf(tag) === -1) {
           child.replaceWith(...child.childNodes);
           return;
         }
         Array.from(child.attributes).forEach((attr) => {
-          const keep =
-            child.tagName === "A" && ["href", "target", "rel"].indexOf(attr.name) !== -1;
+          const keep = tag === "A" && ["href", "target", "rel"].indexOf(attr.name) !== -1;
           if (!keep) child.removeAttribute(attr.name);
         });
-        if (child.tagName === "A" && !safeHref(child.getAttribute("href"))) {
+        if (tag === "A" && !safeHref(child.getAttribute("href"))) {
           child.replaceWith(...child.childNodes);
           return;
         }
@@ -545,6 +691,26 @@
     return (probe.textContent || "").replace(/\s+/g, " ").trim().length;
   }
 
+  /** What the braces in this value stand for, in words.
+   *  The sheet shows the RAW text ("el uso del sitio de {brand}"), so without this the
+   *  only reasonable reading is that the shop's name is missing — and the fix anyone
+   *  would try is to type it in, which kills the placeholder for good. */
+  function tokenNote(value) {
+    const known = manifest.tokens || {};
+    const names = [];
+    String(value == null ? "" : value).replace(/\{([a-z_][a-z0-9_]*)\}/g, (whole, name) => {
+      if (names.indexOf(name) === -1 && Object.prototype.hasOwnProperty.call(known, name)) {
+        names.push(name);
+      }
+      return whole;
+    });
+    if (!names.length) return "";
+    return (
+      "Dejá tal cual los textos entre llaves: se completan solos al publicar. " +
+      names.map((name) => "{" + name + "} = " + known[name]).join(" · ")
+    );
+  }
+
   function openSheet(key, value) {
     const field = fieldFor(key);
     if (!field) return;
@@ -555,6 +721,11 @@
       field.section && field.section !== field.groupTitle
         ? field.groupTitle + " · " + field.section
         : field.groupTitle;
+    // textContent, never innerHTML: a token's value comes from site_texts, so it is
+    // user-controlled content being printed inside the admin origin.
+    const tokens = root.querySelector("[data-ed-sheet-tokens]");
+    tokens.textContent = tokenNote(value != null ? value : field.raw);
+    tokens.hidden = !tokens.textContent;
     sheetDoc.innerHTML = sanitizeRich(value != null ? value : field.raw);
     sheet.hidden = false;
     document.body.classList.add("ed-sheet-open");
@@ -571,6 +742,7 @@
 
   function closeSheet() {
     sheet.hidden = true;
+    showSheetNote("");
     document.body.classList.remove("ed-sheet-open");
     if ("inert" in HTMLElement.prototype) {
       Array.from(root.children).forEach((child) => {
@@ -588,12 +760,51 @@
     // length and turn red on the HTML length, so it went red while reading "758".
     const visible = visibleLength(sheetDoc.innerHTML);
     const stored = sheetDoc.innerHTML.length;
-    sheetCount.textContent = visible + " caracteres visibles · " + stored + " / " + field.max;
+    // Two raw numbers in different units, and the one that decides whether the save goes
+    // through was the unexplained one. Say what was written and how full the page is; the
+    // exact figures stay in the tooltip for whoever needs them.
+    const percent = Math.min(999, Math.round((stored / field.max) * 100));
+    sheetCount.textContent =
+      stored > field.max
+        ? "Te pasaste del máximo: sacá texto o formato para poder guardar."
+        : visible + " caracteres escritos · " + percent + "% del espacio de esta página";
+    sheetCount.title =
+      stored + " de " + field.max + " caracteres guardados (el formato también ocupa lugar).";
     sheetCount.classList.toggle("is-over", stored > field.max);
+  }
+
+  let sheetNoteTimer = null;
+
+  /** A line under the toolbar saying what the editor just did to a paste. */
+  function showSheetNote(text) {
+    const note = root.querySelector("[data-ed-sheet-note]");
+    if (!note) return;
+    note.textContent = text || "";
+    note.hidden = !text;
+    window.clearTimeout(sheetNoteTimer);
+    if (text) sheetNoteTimer = window.setTimeout(() => { note.hidden = true; }, 9000);
   }
 
   if (sheet) {
     sheetDoc.addEventListener("input", renderSheetCount);
+    // What you see has to be what you keep: the server strips the colours, fonts and
+    // <o:p> a word processor pastes in, so showing them until the next save is a promise
+    // the save quietly breaks. Same allow-list the server uses, reused.
+    sheetDoc.addEventListener("paste", (event) => {
+      const data = event.clipboardData;
+      if (!data) return;
+      const html = data.getData("text/html");
+      if (!html) return; // plain text: the browser inserts it clean already
+      event.preventDefault();
+      document.execCommand("insertHTML", false, sanitizeRich(html));
+      renderSheetCount();
+      if (/\sstyle=|\sclass=|<font\b|mso-/i.test(html)) {
+        showSheetNote(
+          "Pegamos el texto sin los colores ni las tipografías que traía. " +
+            "Se mantienen la negrita, la cursiva, los subtítulos, las listas y los links."
+        );
+      }
+    });
     root.querySelectorAll("[data-ed-sheet-cancel]").forEach((btn) =>
       btn.addEventListener("click", closeSheet)
     );
@@ -671,6 +882,8 @@
 
   async function send(action) {
     const changes = Object.assign({}, pending);
+    // Captured once: it is what goes live, and what a Deshacer would have to take back.
+    const scope = pendingKeys();
     // Capture this BEFORE syncButtons() disables the button under the user's fingers:
     // a disabled element drops focus to <body>, which is where a keyboard user lost
     // their place at the most important moment of the flow.
@@ -693,7 +906,7 @@
       const response = await fetch(SAVE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ changes: changes, action: action, keys: pendingKeys() }),
+        body: JSON.stringify({ changes: changes, action: action, keys: scope }),
         signal: abort.signal,
       });
       payload = await response.json().catch(() => null);
@@ -738,6 +951,14 @@
         ? "Publicado. Ya se ve en la web."
         : "Borrador guardado. Publicá cuando quieras."
     );
+    // The way back belongs here, at the moment it is needed, instead of behind a panel
+    // called "Textos ocultos", two tabs and a search away. Only on a clean publish:
+    // with leftovers the status is about something else, and on a phone .ed-actions is
+    // a fixed bar whose reserved height fits exactly one row.
+    if (undoBtn && action === "publish" && scope.length && !leftover) {
+      undoKeys = scope;
+      undoBtn.hidden = false;
+    }
     syncButtons();
     // `.src` reflects the ATTRIBUTE, which in-frame navigation never updates, so
     // re-assigning it threw the editor back to the page it started on.
@@ -746,23 +967,63 @@
 
   saveBtn.addEventListener("click", () => send("save"));
 
+  /** The two rules the panel already draws on screen — empty, and past the cap. The
+   *  server is still the real gate; this only stops us from asking "¿publicamos?" about
+   *  something that was already condemned. */
+  function localErrors(keys) {
+    return keys.filter((key) => {
+      const field = fieldFor(key);
+      if (!field) return false;
+      const value = String(valueOf(key));
+      // Rich values are markup: what counts as empty is the text a reader would see, and
+      // the server measures the SANITIZED string, which is never shorter.
+      const written = field.type === "rich" ? visibleLength(value) : value.trim().length;
+      return written === 0 || value.length > field.max;
+    });
+  }
+
   publishBtn.addEventListener("click", () => {
     const keys = pendingKeys();
+    const bad = localErrors(keys);
+    if (bad.length) {
+      const names = bad.map((key) => "«" + ((fieldFor(key) || {}).label || key) + "»").join(", ");
+      setStatus(
+        "Todavía no se puede publicar. Revisá " + names +
+          ": un texto no puede quedar vacío ni pasarse del largo máximo.",
+        true
+      );
+      markInvalid(bad);
+      return;
+    }
     // Name what is about to go live. "¿Publicar los cambios?" gave no way to notice
     // that something parked days ago was riding along.
     const names = keys.map((key) => "· " + ((fieldFor(key) || {}).label || key));
     const shown = names.slice(0, 8).join("\n");
     const rest = names.length > 8 ? "\n… y " + (names.length - 8) + " más" : "";
+    const one = keys.length === 1;
     const message =
-      "Se van a publicar " + keys.length + (keys.length === 1 ? " texto:" : " textos:") +
-      "\n\n" + shown + rest + "\n\nSe ven en la web enseguida.";
+      (one ? "Se va a publicar 1 texto:" : "Se van a publicar " + keys.length + " textos:") +
+      "\n\n" + shown + rest +
+      "\n\n" + (one ? "Se ve en la web enseguida." : "Se ven en la web enseguida.");
     if (window.confirm(message)) send("publish");
   });
 
   if (discardBtn) {
     discardBtn.addEventListener("click", async () => {
       const keys = pendingKeys();
-      if (!window.confirm("¿Descartar " + keys.length + " cambio(s) sin publicar? No se puede deshacer.")) return;
+      // The most destructive button in the editor was the only one that didn't say what
+      // it was about to take with it.
+      const names = keys.map((key) => "· " + ((fieldFor(key) || {}).label || key));
+      const shown = names.slice(0, 8).join("\n");
+      const rest = names.length > 8 ? "\n… y " + (names.length - 8) + " más" : "";
+      const one = keys.length === 1;
+      const message =
+        (one
+          ? "Vas a descartar este cambio sin publicar:"
+          : "Vas a descartar los " + keys.length + " cambios sin publicar:") +
+        "\n\n" + shown + rest +
+        "\n\n" + (one ? "No se puede recuperar." : "No se pueden recuperar.");
+      if (!window.confirm(message)) return;
       Object.keys(pending).forEach((key) => delete pending[key]);
       await fetch(root.dataset.discardUrl, { method: "POST" }).catch(() => null);
       serverDrafts = [];
@@ -841,4 +1102,5 @@
   const initial = root.querySelector("[data-ed-device].is-current");
   if (initial) fitDevice(initial);
   syncButtons();
+  setStatus(draftNotice());
 })();

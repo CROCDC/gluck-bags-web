@@ -18,6 +18,7 @@ from app.content.resolver import (
     category_tagline_editable,
     field_state,
     group_states,
+    has_stray_brace,
     instagram_url,
     is_preview,
     override_count,
@@ -27,6 +28,7 @@ from app.content.resolver import (
     t_lines,
     t_plain,
     tagline,
+    unknown_tokens,
 )
 from app.content.sanitizer import sanitize, strip_tags, visible_text
 
@@ -40,6 +42,7 @@ __all__ = [
     "category_tagline_editable",
     "field_state",
     "group_states",
+    "has_stray_brace",
     "instagram_url",
     "is_preview",
     "override_count",
@@ -53,4 +56,5 @@ __all__ = [
     "t_lines",
     "t_plain",
     "tagline",
+    "unknown_tokens",
 ]

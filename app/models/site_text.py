@@ -29,8 +29,8 @@ class SiteText(db.Model):
     published_value = db.Column(db.Text, nullable=True)
     draft_value = db.Column(db.Text, nullable=True)
     # What was live before the last publish. Publishing used to overwrite the live
-    # copy with nowhere to go back to: "Restaurar original" returns the factory text,
-    # not the wording the shop had yesterday.
+    # copy with nowhere to go back to: "Volver al texto original" returns the factory
+    # text, not the wording the shop had yesterday.
     previous_value = db.Column(db.Text, nullable=True)
     updated_at = db.Column(db.DateTime, nullable=False, default=_utcnow, onupdate=_utcnow)
 

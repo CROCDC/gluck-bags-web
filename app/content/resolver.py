@@ -169,6 +169,30 @@ def _interpolate(value: str, tokens: dict[str, str]) -> str:
     return _TOKEN_RE.sub(lambda m: tokens.get(m.group(1), m.group(0)), value)
 
 
+def unknown_tokens(key: str, value: str) -> list[str]:
+    """The `{tokens}` in `value` that nothing will ever fill, in first-seen order.
+
+    Lives here, against the same regex the interpolation uses, so the admin can only
+    ever reject what a render would have left on the page as a literal brace.
+    """
+    allowed = registry.allowed_tokens(key)
+    seen: dict[str, None] = {}
+    for name in _TOKEN_RE.findall(value):
+        if name not in allowed:
+            seen.setdefault(name, None)
+    return list(seen)
+
+
+def has_stray_brace(value: str) -> bool:
+    """True when a brace survives removing every well-formed `{token}`.
+
+    `{tagline` is not an unknown token — it is not a token at all to the regex above,
+    so it reaches the page verbatim without any lookup ever failing.
+    """
+    leftover = _TOKEN_RE.sub("", value)
+    return "{" in leftover or "}" in leftover
+
+
 def _global_tokens() -> dict[str, str]:
     """The tokens available to every string ({brand}, {tagline}, {year}, …).
 

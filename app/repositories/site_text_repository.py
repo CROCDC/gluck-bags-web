@@ -90,21 +90,6 @@ class SiteTextRepository:
         return changed
 
     @staticmethod
-    def revert(key: str) -> bool:
-        """Swap the live value with the one it replaced.
-
-        `set_published(key, previous)` overwrote `published_value` and left
-        `previous_value` alone, so the wording being reverted AWAY from was destroyed
-        and a second revert had nowhere to go — a mis-click was as unrecoverable as
-        the mistake this exists to undo.
-        """
-        row = db.session.get(SiteText, key)
-        if row is None or row.previous_value is None:
-            return False
-        row.published_value, row.previous_value = row.previous_value, row.published_value
-        return True
-
-    @staticmethod
     def discard_drafts(keys: list[str]) -> int:
         """Drop the pending edits for `keys`. Returns how many were dropped."""
         dropped = 0

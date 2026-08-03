@@ -71,8 +71,9 @@
                 {% if st.value != f.default %}
                 {# No-JS safe: this submit posts the whole form and tells the server
                    which field to reset, so nothing typed elsewhere is lost. #}
-                <button type="submit" name="restore" value="{{ f.key }}" class="ct-restore">
-                    Restaurar original
+                <button type="submit" name="restore" value="{{ f.key }}" class="ct-restore"
+                        title="El texto con el que vino la web">
+                    Volver al texto original
                 </button>
                 {% endif %}
             </div>

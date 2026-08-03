@@ -178,15 +178,26 @@ a marker inside `json.dumps` output would survive as literal `\uXXXX` text.
 Guardar borrador   writes draft_value; the live site does not change
 Previsualizar      opens the REAL page with ?preview=1, drafts applied
 Guardar y publicar promotes drafts to published_value
-Restaurar original drafts the registry default (publish it to remove the override)
+Volver al texto original    drafts the registry default (publish it to remove the override)
+Volver a lo que decía antes drafts `previous_value` (publish it to make it live)
+Deshacer                    drafts the step back for everything the last publish put live
 ```
 
 A saved value equal to what is already live clears the draft instead of storing a
 no-op, so the "sin publicar" counter only ever counts real pending changes.
 
 Publishing records the wording it replaced (`previous_value`), so a published mistake
-has a way back that is not "retype what you remember": the panel offers **Volver al
-texto anterior** next to **Restaurar original** (the factory text).
+has a way back that is not "retype what you remember": the panel offers **Volver a lo
+que decía antes** next to **Volver al texto original** (the factory text), and the
+toolbar offers a single **Deshacer** for everything the last Publicar put live.
+
+Both of them only ever leave a DRAFT. Nothing in the editor changes the public site
+except "Publicar cambios" — the panel's undo used to be the one exception, from a
+link that looked exactly like the one beside it, and clicking it twice published and
+unpublished the live site.
+
+`previous_value IS NULL` on an overridden key does not mean "no way back": it means
+what this replaced was the factory text, so the step back is the registry default.
 
 One consequence worth knowing: a key that has ever been published keeps its row even
 after it goes back to the default, because that row is now the history. "Not

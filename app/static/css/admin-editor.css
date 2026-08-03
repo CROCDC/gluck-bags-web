@@ -58,7 +58,11 @@
     background: rgba(26, 23, 20, 0.55); font-size: 0.75rem;
 }
 .ed-btn-ghost .ed-badge { background: rgba(26, 23, 20, 0.1); }
-.ed-status { font-size: 0.85rem; color: var(--adm-soft); min-width: 0; }
+/* Reserved, not fitted: the bar's row count used to depend on whether there were
+   pending changes, so the first edit re-wrapped it and moved Guardar/Publicar. */
+.ed-status { flex: 1 1 12rem; min-width: 12rem; font-size: 0.85rem; color: var(--adm-soft); }
+/* Same idea for Descartar: it holds its box instead of appearing out of nowhere. */
+.ed-actions .ed-btn.is-off { visibility: hidden; }
 .ed-status.is-error { color: var(--adm-err); }
 
 /* ---------- canvas + panel ---------- */
@@ -117,6 +121,7 @@
     padding: 0.5rem 0.3rem; cursor: pointer; min-height: 44px;
 }
 .ed-tab.is-current { color: var(--adm-ink); border-bottom-color: var(--adm-cognac); }
+.ed-tab .ed-badge { background: rgba(26, 23, 20, 0.1); }
 
 .ed-panel-body { flex: 1 1 auto; min-height: 0; padding: 0.8rem 0.9rem 1.2rem; overflow-y: auto; }
 .ed-panel-note { font-size: 0.82rem; color: var(--adm-soft); margin: 0 0 0.9rem; }
@@ -155,6 +160,8 @@
     font-family: inherit; font-size: 0.8rem; color: var(--adm-soft); text-decoration: underline;
 }
 .ed-field-restore:hover { color: var(--adm-cognac); }
+/* The everyday escape hatch, next to two buttons that go much further back. */
+.ed-field-undo { color: var(--adm-cognac-dk); }
 .ed-panel-empty { color: var(--adm-soft); font-size: 0.88rem; padding: 1rem 0; }
 
 .ed-card-kind {
@@ -181,7 +188,10 @@
    none. What matters here is the height. */
 @media (max-width: 720px), (max-height: 560px) {
     .ed-bar { position: static; }
-    .ed-hint { display: none; }
+    /* The one sentence that explains the editor, on the devices with neither hover
+       nor a text cursor to hint with. Its own row, so it never competes with the
+       page picker for width. */
+    .ed-hint { flex: 1 0 100%; font-size: 0.8rem; }
     /* A 1280px preview scaled to fit a phone renders 16px body text at 8px. */
     .ed-devices { display: none; }
 
@@ -194,9 +204,22 @@
         background: var(--adm-card); border-top: 1px solid var(--adm-line);
         box-shadow: 0 -6px 20px rgba(26, 23, 20, 0.12);
     }
-    .ed-actions .ed-btn { flex: 1 1 auto; justify-content: center; }
-    /* …and reserve the space it now floats over. */
-    .ed { padding-bottom: 76px; }
+    /* The cap is the whole fix: a button left alone on the last row stretched to the
+       full width, so the biggest, lowest, easiest target on the screen belonged to the
+       one action that is irreversible and public. Capping beats forcing two columns —
+       this block also matches a landscape phone (~840px wide), where fixed 50% columns
+       render 400px buttons. */
+    .ed-actions .ed-btn { flex: 1 1 auto; justify-content: center; max-width: calc(50% - 0.25rem); }
+    /* Its own row: an error message names the field AND the screen it lives on now,
+       which does not fit beside four buttons. */
+    .ed-actions .ed-status { flex: 1 0 100%; order: -1; min-width: 0; }
+    .ed-actions .ed-status:empty { display: none; }
+    /* Nothing to reserve on a phone: the bar is fixed to the bottom and 390px wide, so a
+       held-open slot would just squeeze the two buttons that matter. */
+    .ed-actions .ed-btn.is-off { display: none; }
+    /* …and reserve the space it now floats over: 117px, or 169px once Descartar shows
+       up. The flat 76px left the field being edited underneath the bar. */
+    .ed { padding-bottom: var(--ed-actions-h, 180px); }
 }
 
 @media (max-width: 380px) {
@@ -240,6 +263,13 @@ body.ed-sheet-open { overflow: hidden; }
 }
 .ed-sheet-close:hover { color: var(--adm-ink); }
 
+.ed-sheet-tokens {
+    margin: 0; padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--adm-line);
+    font-size: 0.8rem; line-height: 1.45; color: var(--adm-soft);
+}
+.ed-sheet-tokens[hidden] { display: none; }
+
 .ed-sheet-tools {
     display: flex; flex-wrap: wrap; gap: 0.35rem;
     padding: 0.6rem 1rem; border-bottom: 1px solid var(--adm-line);
@@ -274,6 +304,7 @@ body.ed-sheet-open { overflow: hidden; }
 }
 .ed-sheet-count { font-size: 0.8rem; color: var(--adm-soft); }
 .ed-sheet-count.is-over { color: var(--adm-err); font-weight: 500; }
+.ed-sheet-note { flex: 1 0 100%; margin: 0 0 0.4rem; font-size: 0.8rem; color: var(--adm-cognac-dk); }
 .ed-sheet-actions { display: flex; gap: 0.5rem; }
 
 @media (max-width: 720px) {

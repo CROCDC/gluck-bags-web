@@ -46,9 +46,12 @@
         <div class="ed-bar-group ed-actions">
             <button type="button" class="ed-btn ed-btn-ghost" data-ed-panel-toggle
                     aria-expanded="false" aria-controls="edPanel">
-                Textos ocultos <span class="ed-badge" data-ed-hidden-count>0</span>
+                Ver todos los textos
             </button>
             <span class="ed-status" id="edStatus" data-ed-status role="status" aria-live="polite"></span>
+            {# Outside the live region on purpose: a button inside role="status" gets
+               re-announced with every message and is a strange place to park focus. #}
+            <button type="button" class="ed-btn ed-btn-ghost" data-ed-undo hidden>Deshacer</button>
             <button type="button" class="ed-btn ed-btn-ghost" data-ed-discard hidden>Descartar</button>
             <button type="button" class="ed-btn ed-btn-ghost" data-ed-save disabled>Guardar borrador</button>
             <button type="button" class="ed-btn ed-btn-primary" data-ed-publish
@@ -78,11 +81,11 @@
             </div>
 
             <div class="ed-panel-tabs" role="tablist">
-                <button type="button" role="tab" id="edTabHidden" class="ed-tab is-current"
-                        data-ed-tab="hidden" aria-selected="true"
-                        aria-controls="edPanelFields">No visibles</button>
-                <button type="button" role="tab" id="edTabAll" class="ed-tab" data-ed-tab="all"
-                        aria-selected="false" tabindex="-1"
+                <button type="button" role="tab" id="edTabHidden" class="ed-tab"
+                        data-ed-tab="hidden" aria-selected="false" tabindex="-1"
+                        aria-controls="edPanelFields">No visibles <span class="ed-badge" data-ed-hidden-count>0</span></button>
+                <button type="button" role="tab" id="edTabAll" class="ed-tab is-current"
+                        data-ed-tab="all" aria-selected="true"
                         aria-controls="edPanelFields">Todos</button>
                 <button type="button" role="tab" id="edTabCards" class="ed-tab" data-ed-tab="cards"
                         aria-selected="false" tabindex="-1"
@@ -92,8 +95,10 @@
             {# One list for both field tabs: the tabs filter it. Rendering it twice
                would duplicate every input id, which breaks the labels. #}
             <div class="ed-panel-body" id="edPanelFields" role="tabpanel"
-                 aria-labelledby="edTabHidden" data-ed-tabpanel="fields">
-                <p class="ed-panel-note" data-ed-note>
+                 aria-labelledby="edTabAll" data-ed-tabpanel="fields">
+                {# Hidden until the "No visibles" tab is picked: the panel now opens on
+                   "Todos", and setTab() is what shows it. #}
+                <p class="ed-panel-note" data-ed-note hidden>
                     Textos que no se ven en la página pero que igual importan: lo que lee
                     Google, las descripciones de las fotos y las etiquetas para lectores de
                     pantalla.
@@ -170,6 +175,11 @@
                         aria-label="Cerrar sin guardar">×</button>
             </header>
 
+            {# The braces inside a long text are machinery, not copy. The inline editor
+               has always said so in its bubble; this one showed a raw "{brand}"
+               mid-sentence and left the reader to guess. #}
+            <p class="ed-sheet-tokens" data-ed-sheet-tokens hidden></p>
+
             <div class="ed-sheet-tools" role="group" aria-label="Formato">
                 <button type="button" class="ed-tool" data-ed-cmd="bold"><b>Negrita</b></button>
                 <button type="button" class="ed-tool" data-ed-cmd="italic"><i>Cursiva</i></button>
@@ -188,6 +198,7 @@
             </div>
 
             <footer class="ed-sheet-foot">
+                <p class="ed-sheet-note" data-ed-sheet-note role="status" aria-live="polite" hidden></p>
                 <span class="ed-sheet-count" data-ed-sheet-count></span>
                 <span class="ed-sheet-actions">
                     <button type="button" class="ed-btn ed-btn-ghost" data-ed-sheet-cancel>Cancelar</button>

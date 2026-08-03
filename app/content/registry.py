@@ -92,6 +92,41 @@ GLOBAL_TOKENS: tuple[str, ...] = (
     "instagram_handle",
 )
 
+# The extra placeholders a SINGLE field may embed, because its one call site passes
+# them (`t("category.meta.title", category=…)`). They exist nowhere else, so a
+# validator that only knew GLOBAL_TOKENS would reject the copy that ships in this
+# very file. Two tests hold this map to the real call sites in both directions.
+FIELD_TOKENS: dict[str, tuple[str, ...]] = {
+    "cart.line.remove_aria": ("title",),
+    "category.empty": ("category_lower",),
+    "category.heading_models": ("category",),
+    "category.meta.description": ("category",),
+    "category.meta.title": ("category",),
+    "home.categories.soon_aria": ("category",),
+    "product.gallery.thumb_aria": ("index", "total"),
+    "product.meta.category_clause": ("category",),
+    "product.meta.description": ("title", "category_clause", "price_clause"),
+    "product.meta.price_clause": ("price",),
+    "product.meta.title": ("title", "category"),
+    "product.og.description": ("title", "price_clause"),
+    "product.og.image_alt": ("title",),
+    "product.og.price_clause": ("price",),
+    "product.og.title": ("title",),
+    "product.twitter.category_clause": ("category",),
+    "product.twitter.description": ("title", "category_clause"),
+    "seo.page_title_format": ("title",),
+    "seo.product.description_fallback": ("title",),
+}
+
+
+def allowed_tokens(key: str) -> tuple[str, ...]:
+    """Every `{token}` this field may embed — its own first, then the site-wide ones.
+
+    Field-first because that order is also what the admin reads back to the shop owner
+    when she invents one, and `{title}` is the answer she is looking for.
+    """
+    return FIELD_TOKENS.get(key, ()) + GLOBAL_TOKENS
+
 
 # --- groups -------------------------------------------------------------------
 
@@ -982,6 +1017,7 @@ __all__ = [
     "FIELDS",
     "FIELD_GROUP",
     "FIELD_SECTION",
+    "FIELD_TOKENS",
     "GLOBAL_TOKENS",
     "TOKEN_FIELDS",
     "GROUPS",
@@ -989,6 +1025,7 @@ __all__ = [
     "Group",
     "Section",
     "TextField",
+    "allowed_tokens",
     "field_for",
     "group_for",
     "groups_by_category",

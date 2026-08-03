@@ -272,16 +272,67 @@ def test_publishing_remembers_the_wording_it_replaced(app, auth_client: FlaskCli
     assert _row(app, KEY).previous_value == "Primera versión"
 
 
-def test_reverting_puts_the_previous_wording_back(app, auth_client: FlaskClient, client: FlaskClient) -> None:
-    """"Restaurar original" goes to the factory text; this goes back one step, which
-    is what someone who just published a typo actually wants."""
+def test_reverting_only_drafts_the_previous_wording(
+    app, auth_client: FlaskClient, client: FlaskClient
+) -> None:
+    """It used to publish on the spot, from a link that looked exactly like the one
+    beside it. Nothing changes the public site except Publicar."""
     _save(auth_client, {KEY: "La que me gustaba"}, action="publish")
     _save(auth_client, {KEY: "El error"}, action="publish")
     assert "El error" in client.get("/").get_data(as_text=True)
 
     response = auth_client.post("/admin/content/revert", json={"key": KEY})
     assert response.status_code == 200 and response.get_json()["ok"] is True
+    assert response.get_json()["values"] == {KEY: "La que me gustaba"}
+    # Drafted, not live.
+    assert "El error" in client.get("/").get_data(as_text=True)
+    assert _row(app, KEY).draft_value == "La que me gustaba"
+    assert KEY in response.get_json()["pendingKeys"]
+
+    _save(auth_client, {}, action="publish", keys=[KEY])
     assert "La que me gustaba" in client.get("/").get_data(as_text=True)
+
+
+def test_undoing_a_first_publish_goes_back_to_the_factory_text(
+    app, auth_client: FlaskClient, client: FlaskClient
+) -> None:
+    """`previous_value` is NULL after a first publish. The step back existed — it was
+    called "Volver al texto original" — but no single Deshacer could find it, so the
+    endpoint spells the rule out: what an override replaced was the factory text."""
+    _save(auth_client, {KEY: "Publicado por primera vez"}, action="publish")
+    assert _row(app, KEY).previous_value is None
+
+    response = auth_client.post("/admin/content/revert", json={"key": KEY})
+    assert response.status_code == 200
+    assert response.get_json()["values"] == {KEY: registry.DEFAULTS[KEY]}
+
+    _save(auth_client, {}, action="publish", keys=[KEY])
+    assert registry.DEFAULTS[KEY] in client.get("/").get_data(as_text=True)
+    # And the mistake is still one step away, so it can be brought back.
+    assert _row(app, KEY).previous_value == "Publicado por primera vez"
+
+
+def test_a_whole_publish_can_be_undone_at_once(app, auth_client: FlaskClient) -> None:
+    """The Deshacer in the toolbar takes back everything that Publicar put live."""
+    _save(auth_client, {KEY: "Uno", "nav.cta": "Dos"}, action="publish")
+    response = auth_client.post(
+        "/admin/content/revert", json={"keys": [KEY, "nav.cta", "no.existe"]}
+    )
+    assert response.status_code == 200
+    assert set(response.get_json()["values"]) == {KEY, "nav.cta"}
+    assert _row(app, KEY).draft_value == registry.DEFAULTS[KEY]
+    assert _row(app, "nav.cta").draft_value == registry.DEFAULTS["nav.cta"]
+
+
+def test_undoing_twice_leaves_the_same_draft(app, auth_client: FlaskClient, client: FlaskClient) -> None:
+    """The old swap made a double click publish and unpublish the live site."""
+    _save(auth_client, {KEY: "Uno"}, action="publish")
+    _save(auth_client, {KEY: "Dos"}, action="publish")
+
+    for _ in range(2):
+        assert auth_client.post("/admin/content/revert", json={"key": KEY}).status_code == 200
+        assert _row(app, KEY).draft_value == "Uno"
+    assert "Dos" in client.get("/").get_data(as_text=True)
 
 
 def test_reverting_needs_something_to_revert_to(auth_client: FlaskClient) -> None:
@@ -350,35 +401,32 @@ def test_only_a_bounded_number_of_errors_comes_back(auth_client: FlaskClient) ->
     assert len(response.get_json()["errors"]) <= 20
 
 
-def test_reverting_keeps_the_wording_it_reverted_away_from(
-    app, auth_client: FlaskClient, client: FlaskClient
-) -> None:
-    """Revert used to overwrite `published_value` and leave `previous_value` alone, so
-    a mis-click destroyed the text it was undoing — as unrecoverable as the mistake."""
+def test_undoing_an_undo_still_works(app, auth_client: FlaskClient, client: FlaskClient) -> None:
+    """Going back is not a one-way door either: publishing the drafted previous wording
+    records the one it replaced, so the trip can be made in both directions."""
     _save(auth_client, {KEY: "Uno"}, action="publish")
     _save(auth_client, {KEY: "Dos"}, action="publish")
 
     auth_client.post("/admin/content/revert", json={"key": KEY})
+    _save(auth_client, {}, action="publish", keys=[KEY])
     assert "Uno" in client.get("/").get_data(as_text=True)
+    assert _row(app, KEY).previous_value == "Dos"
 
-    # …and it can be undone again, back to "Dos".
-    response = auth_client.post("/admin/content/revert", json={"key": KEY})
-    assert response.status_code == 200
+    auth_client.post("/admin/content/revert", json={"key": KEY})
+    _save(auth_client, {}, action="publish", keys=[KEY])
     assert "Dos" in client.get("/").get_data(as_text=True)
 
 
-def test_reverting_drops_a_pending_draft_instead_of_reporting_it(
-    app, auth_client: FlaskClient
-) -> None:
-    """A pending draft would silently undo the revert on the next publish, and the
-    endpoint reported that draft as the value it had restored."""
+def test_reverting_replaces_a_pending_draft(app, auth_client: FlaskClient) -> None:
+    """The undo IS the draft now, so whatever was parked there loses: leaving both
+    would mean the next Publicar quietly ignores the undo."""
     _save(auth_client, {KEY: "Uno"}, action="publish")
     _save(auth_client, {KEY: "Dos"}, action="publish")
     _save(auth_client, {KEY: "Borrador pendiente"})
 
     body = auth_client.post("/admin/content/revert", json={"key": KEY}).get_json()
-    assert body["value"] == "Uno"
-    assert _row(app, KEY).draft_value is None
+    assert body["values"] == {KEY: "Uno"}
+    assert _row(app, KEY).draft_value == "Uno"
 
 
 @pytest.mark.parametrize(

@@ -254,6 +254,22 @@
     return String(text).replace(/\u00a0/g, " ").trim();
   }
 
+  /** A `rich` node is contenteditable="true", so a paste from a word processor lands its
+   *  <span style> soup straight into the staged value — and worse, its <p> tags make
+   *  isBlockRich() true on the next load, so a heading silently stops being editable in
+   *  place. These four fields are short headings, so take the words and drop the styling
+   *  here, where it can still be seen. (`plaintext-only` fields never get here: the
+   *  browser already does this.) */
+  function onPaste(event) {
+    const node = event.currentTarget;
+    const field = FIELDS[parseTarget(node).key] || {};
+    if (field.type !== "rich") return;
+    const data = event.clipboardData;
+    if (!data) return;
+    event.preventDefault();
+    document.execCommand("insertText", false, data.getData("text/plain"));
+  }
+
   function onInput(event) {
     const node = event.currentTarget;
     const target = parseTarget(node);
@@ -315,7 +331,7 @@
       el,
       el.closest(CATALOG_SCOPES)
         ? "Esto sale del catálogo: el título, el precio y las fotos se editan en Productos."
-        : "Este texto no se edita tocándolo. Buscalo en «Textos ocultos» o en la lista por sección."
+        : "Este texto no se edita tocándolo. Buscalo en «Ver todos los textos» o en la lista por sección."
     );
     tipTimer = window.setTimeout(hideTip, 3600);
   }
@@ -338,6 +354,28 @@
     return field.type === "rich" && /<(p|h2|h3|ul|ol|li)\b/i.test(String(raw || ""));
   }
 
+  /** Swapping the rendered text for the RAW value changes how many lines the copy takes:
+   *  the hero title renders as three lines and its raw value is "{tagline}", one line.
+   *  Clicking the most important text on the site therefore pulled the hero 98px out from
+   *  under the cursor before the caret even landed. Hold the block at the height it had
+   *  while the edit lasts; it can still grow. */
+  let lockedBlock = null;
+
+  function lockHeight(node) {
+    let block = node.parentElement;
+    while (block && window.getComputedStyle(block).display === "inline") {
+      block = block.parentElement;
+    }
+    if (!block) return;
+    lockedBlock = block;
+    block.style.minHeight = block.getBoundingClientRect().height + "px";
+  }
+
+  function releaseHeight() {
+    if (lockedBlock) lockedBlock.style.minHeight = "";
+    lockedBlock = null;
+  }
+
   function startEditing(node) {
     if (editing === node) return;
     if (editing) stopEditing();
@@ -353,6 +391,7 @@
 
     editing = node;
     editStartValue = CURRENT[target.key];
+    lockHeight(node);
     node.setAttribute("data-ct-editing", "");
     node.setAttribute("contenteditable", field.type === "rich" ? "true" : "plaintext-only");
     node.setAttribute("spellcheck", "true");
@@ -389,6 +428,7 @@
     keepVisible(node);
     showHint(node, field);
     node.addEventListener("input", onInput);
+    node.addEventListener("paste", onPaste);
 
     post({ type: "focus", key: target.key });
   }
@@ -400,7 +440,9 @@
     const field = FIELDS[target.key] || {};
 
     editing = null;
+    releaseHeight();
     node.removeEventListener("input", onInput);
+    node.removeEventListener("paste", onPaste);
     node.removeAttribute("contenteditable");
     node.removeAttribute("data-ct-editing");
     hideTip();
@@ -467,7 +509,19 @@
     }
     if (event.key === "Enter" && field.type !== "rich") {
       event.preventDefault();
+      const node = editing;
       stopEditing();
+      // Closing in silence read as the editor swallowing the keystroke. `text` and
+      // `lines` values DO hold newlines, but only the panel can add one, so say where to
+      // go instead of just eating the Enter.
+      const multiline = field.type === "text" || field.type === "lines";
+      showTip(
+        node,
+        multiline
+          ? "Listo. Acá Enter cierra la edición; para separar en renglones, editá este texto en el panel de la derecha."
+          : "Listo. Enter cierra la edición: este texto va en una sola línea."
+      );
+      tipTimer = window.setTimeout(hideTip, 3600);
       return;
     }
 
@@ -546,8 +600,18 @@
       // A control that OPENS an editor — not a textbox. It only becomes one while
       // `contenteditable` is on, and then the browser reports the right role itself.
       node.setAttribute("role", "button");
+      // Saved but not published: on the canvas a draft looks exactly like the live copy,
+      // so nothing here said "your customers are not seeing this yet". The manifest is
+      // rebuilt on every load, so this is right on a cold start AND after navigating to
+      // another page inside the frame.
+      if (field.hasDraft) node.setAttribute("data-ct-draft", "");
       const block = isBlockRich(field, CURRENT[parseTarget(node).key]);
-      node.setAttribute("aria-label", (block ? "Editar el texto de esta página: " : "Editar: ") + field.label);
+      node.setAttribute(
+        "aria-label",
+        (block ? "Editar el texto de esta página: " : "Editar: ") +
+          field.label +
+          (field.hasDraft ? " (guardado, sin publicar)" : "")
+      );
       if (block) node.setAttribute("data-ct-block", "");
       else node.setAttribute("aria-describedby", "ctTipLive");
     });

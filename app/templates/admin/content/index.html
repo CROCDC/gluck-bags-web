@@ -48,7 +48,7 @@
                 <span class="ct-card-meta">
                     <span class="ct-count">{{ stat.total }} textos</span>
                     {% if stat.pending %}<span class="adm-tag ct-tag-draft">{{ stat.pending }} sin publicar</span>{% endif %}
-                    {% if stat.overridden %}<span class="adm-tag ct-tag-edited">{{ stat.overridden }} {{ 'distinto del original' if stat.overridden == 1 else 'distintos del original' }}</span>{% endif %}
+                    {% if stat.overridden %}<span class="adm-tag ct-tag-edited">{{ stat.overridden }} {{ 'editado' if stat.overridden == 1 else 'editados' }}</span>{% endif %}
                 </span>
             </span>
         </a>

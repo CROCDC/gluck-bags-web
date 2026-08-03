@@ -2,44 +2,109 @@
    It only adds editing affordances — no layout rules — so what you edit looks
    exactly like what visitors get. */
 
+/* Registered so the affordance can still FADE in: a plain custom property is a token
+   the browser can't interpolate, so a gradient built from one would snap. */
+@property --ct-fill { syntax: "<color>"; inherits: false; initial-value: transparent; }
+@property --ct-edge { syntax: "<color>"; inherits: false; initial-value: transparent; }
+
 ct-t {
     /* Inline, like the text node it replaced, so wrapping a string can't change
        the layout of the page being edited. */
     display: inline;
     cursor: text;
     border-radius: 3px;
-    transition: background-color 0.12s, box-shadow 0.12s;
+    transition: --ct-fill 0.12s, --ct-edge 0.12s;
+
+    /* How TALL the affordance is painted. It is NOT the inline box: a background on
+       an inline box fills the font's content area (ascent + descent ≈ 1.33em for the
+       serif), so on the H1 — line-height 1.02 — every line's box reached 30px into
+       the line above it and the H1 hovered as three overlapping white rectangles.
+       Capping at the line box makes a line's band exactly its own line, so consecutive
+       lines can never collide; the em ceiling keeps the band tight around the copy
+       when the line-height is generous (body text at 1.7). */
+    --ct-band: min(1.45em, calc(1lh - 2px));
+    --ct-fill: transparent;
+    --ct-edge: transparent;
+    --ct-edge-w: 0px;
+    /* Two gradients instead of background-color + box-shadow: those two paint the whole
+       inline box and there is no way to shorten them. A background CAN be shorter than
+       its box — and, unlike a box-shadow, it always paints BEHIND the glyphs, so a frame
+       line can never sit on top of a letter. */
+    background-image: linear-gradient(var(--ct-fill), var(--ct-fill)),
+                      linear-gradient(var(--ct-edge), var(--ct-edge));
+    background-size: calc(100% - var(--ct-edge-w) * 2) calc(var(--ct-band) - var(--ct-edge-w) * 2),
+                     100% var(--ct-band);
+    background-position: center, center;
+    background-repeat: no-repeat;
+    /* Without `clone` the two gradients are laid out over one hypothetical unwrapped box
+       and then sliced, so a wrapped string gets ONE band cut across every line instead
+       of a band per line. */
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+    /* The site's own header is sticky and 76px tall, so anything scrolled to the top of
+       the canvas lands UNDERNEATH it and the click hits the header instead. Both
+       keepVisible() and the browser's own scrollIntoView honour this. */
+    scroll-margin-top: calc(var(--header-h, 76px) + 1rem);
+    scroll-margin-bottom: 1rem;
 }
-ct-t:hover,
 ct-t:focus-visible {
-    background-color: rgba(255, 255, 255, 0.92);
+    /* An opaque white fill inside an opaque cognac frame, so the affordance keeps its
+       contrast over ANY background — the old 35%-alpha shadow measured 1.02:1 over the
+       hero photo, i.e. invisible exactly where the copy lives. */
+    --ct-fill: #fff;
+    --ct-edge: #9a5730;
+    --ct-edge-w: 2px;
     color: #1a1714;
-    /* An opaque inner white stroke + an opaque cognac ring, so the affordance keeps
-       its contrast over ANY background — the old 35%-alpha shadow measured 1.02:1
-       over the hero photo, i.e. invisible exactly where the copy lives. */
-    box-shadow: 0 0 0 1px #fff, 0 0 0 3px #9a5730;
+    /* The page's own text-shadow (the H1 carries 0 2px 30px) has nothing to hide against
+       once the fill is behind the text: it reads as a blurred second copy of the line. */
+    text-shadow: none;
     outline: none;
+}
+/* Only where a real pointer exists. A touch browser fakes :hover on tap and holds it
+   until you tap elsewhere, so this used to leave the text you JUST finished editing
+   marked as if it were still under the cursor. Touch gets the standing underline below. */
+@media (hover: hover) {
+    ct-t:hover {
+        --ct-fill: #fff;
+        --ct-edge: #9a5730;
+        --ct-edge-w: 2px;
+        color: #1a1714;
+        text-shadow: none;
+        outline: none;
+    }
 }
 ct-t[data-ct-editing] {
-    background-color: rgba(255, 255, 255, 0.9);
-    box-shadow: 0 0 0 2px #b56a3a;
+    --ct-fill: rgba(255, 255, 255, 0.95);
+    --ct-edge: #b56a3a;
+    --ct-edge-w: 2px;
     outline: none;
     color: #1a1714;
+    text-shadow: none;
     cursor: text;
     /* A raw value can carry {tokens} and line breaks; show them literally. */
     white-space: pre-wrap;
 }
-ct-t[data-ct-dirty] { background-color: rgba(181, 106, 58, 0.12); }
+ct-t[data-ct-dirty] { --ct-fill: rgba(181, 106, 58, 0.16); }
+
+/* Saved, but the site still shows the old wording. The canvas rendered it exactly like
+   live copy, so a draft from yesterday was indistinguishable from what customers see. */
+ct-t[data-ct-draft] {
+    --ct-fill: rgba(181, 106, 58, 0.14);
+    text-decoration: underline dashed 2px #b56a3a;
+    text-underline-offset: 0.22em;
+}
 
 /* A rich body is a page of <p>/<h2>. Inside an inline host, select-all + type makes
    the browser reparent the typed text out of the element and drop everything — the
-   original copy AND the replacement. It needs its own block formatting context. */
-ct-t[data-t="rich"] { display: block; }
+   original copy AND the replacement. It needs its own block formatting context.
+   As a block it has a single box (no line fragments), so the band is the whole box. */
+ct-t[data-t="rich"] { display: block; --ct-band: 100%; }
 
 /* A field the server rejected on save. */
 ct-t[data-ct-invalid] {
-    background-color: rgba(192, 57, 43, 0.18);
-    box-shadow: 0 0 0 2px #c0392b;
+    --ct-fill: rgba(192, 57, 43, 0.18);
+    --ct-edge: #c0392b;
+    --ct-edge-w: 2px;
 }
 
 /* Emptied text collapses to a 0x0 box, which leaves nothing left to click and no
@@ -109,6 +174,13 @@ video[data-ct-keys]:hover, video[data-ct-keys]:focus {
     [data-ct-keys]:not(img):not(input):not(video) {
         outline: 2px dashed rgba(154, 87, 48, 0.7);
         outline-offset: -2px;
+    }
+    /* The affordance had to be standing, not on demand: with no pointer and no text
+       cursor, nothing on a phone said which of these words could be touched — and the
+       one sentence that explained it was hidden at this width too. */
+    ct-t:not([data-ct-editing]):not([data-ct-draft]):not(:empty) {
+        text-decoration: underline dotted 1px rgba(154, 87, 48, 0.85);
+        text-underline-offset: 0.2em;
     }
 }
 /* Inline/void elements can't host the badge; their keys are still in the panel. */

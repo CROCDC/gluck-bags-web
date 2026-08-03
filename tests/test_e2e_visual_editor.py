@@ -569,13 +569,17 @@ def test_a_long_page_body_opens_its_own_editor(
     labels = page.locator(".ed-sheet-tools .ed-tool").all_inner_texts()
     assert "Negrita" in labels and "Subtítulo" in labels and "Quitar formato" in labels
 
-    # It shows what a reader sees AND what is stored against the cap — the counter
-    # used to display one number and turn red on the other.
-    count = page.locator("[data-ed-sheet-count]").inner_text()
-    visible, stored = re.findall(r"\d+", count)[0], re.findall(r"\d+", count)[1]
-    assert int(visible) > 400
-    assert int(stored) >= int(visible)
-    assert "/" in count
+    # It says what a reader sees, in words. The two raw numbers it used to print were
+    # in different units and the one that decides whether the save goes through was the
+    # unexplained one; those live in the tooltip now.
+    counter = page.locator("[data-ed-sheet-count]")
+    count = counter.inner_text()
+    visible = int(re.findall(r"\d+", count)[0])
+    assert visible > 400
+    assert "caracteres escritos" in count and "del espacio de esta página" in count
+
+    stored, cap = (int(n) for n in re.findall(r"\d+", counter.get_attribute("title"))[:2])
+    assert stored >= visible and cap > stored
 
 
 def test_the_page_editor_applies_and_cancels(
@@ -919,3 +923,285 @@ def test_the_page_editor_returns_focus_to_the_panel_field_it_came_from(
     # …and Enter on it opens the sheet again, for keyboard users.
     page.keyboard.press("Enter")
     expect(page.locator("[data-ed-sheet]")).to_be_visible()
+
+
+# --- undoing, without a trapdoor to production --------------------------------
+
+
+def test_undo_is_offered_where_you_published_and_only_drafts(
+    admin_live_server: tuple[str, str], page: Page, browser: Browser, restore
+) -> None:
+    """The way back used to live behind a panel called "Textos ocultos", two tabs and
+    a search away, under a name nobody reads as "undo"."""
+    base_url, password = admin_live_server
+    restore(HERO)
+    _open_editor(page, base_url, password)
+
+    _type_over(page, HERO, "Un texto con un error")
+    page.click("[data-ed-publish]")
+    expect(page.locator("[data-ed-status]")).to_contain_text("Publicado")
+    assert "Un texto con un error" in _public_html(browser, base_url)
+
+    undo = page.locator("[data-ed-undo]")
+    expect(undo).to_be_visible()
+    undo.click()
+
+    # Drafted, not live: the shop still shows the mistake until she publishes again.
+    expect(page.locator("[data-ed-publish]")).to_be_enabled()
+    assert "Un texto con un error" in _public_html(browser, base_url)
+
+    page.click("[data-ed-publish]")
+    expect(page.locator("[data-ed-status]")).to_contain_text("Publicado")
+    assert HERO_ORIGINAL in _public_html(browser, base_url)
+
+
+def test_undoing_keeps_the_keyboard_where_it_was(
+    admin_live_server: tuple[str, str], page: Page, restore
+) -> None:
+    """Hiding the element the keyboard is standing on drops focus to <body> — the same
+    regression a disabled Publicar caused once."""
+    base_url, password = admin_live_server
+    restore(HERO)
+    _open_editor(page, base_url, password)
+
+    _type_over(page, HERO, "Algo para deshacer")
+    page.click("[data-ed-publish]")
+    undo = page.locator("[data-ed-undo]")
+    expect(undo).to_be_visible()
+
+    undo.focus()
+    page.keyboard.press("Enter")
+    expect(undo).to_be_hidden()
+    assert page.evaluate("() => document.activeElement.tagName") != "BODY"
+
+
+def test_neither_field_link_can_reach_the_public_site(
+    admin_live_server: tuple[str, str], page: Page, browser: Browser, restore
+) -> None:
+    """Two identical-looking underlined links used to do opposite things: one drafted,
+    the other published on the spot with no confirmation."""
+    base_url, password = admin_live_server
+    restore("nav.cta")
+    _open_editor(page, base_url, password)
+
+    for text in ("Comprá ya", "Comprá YA"):
+        _type_over(page, "nav.cta", text)
+        page.click("[data-ed-publish]")
+        expect(page.locator("[data-ed-status]")).to_contain_text("Publicado")
+
+    page.click("[data-ed-panel-toggle]")
+    page.click('[data-ed-tab="all"]')
+    page.fill("[data-ed-filter]", "nav.cta")
+    field = page.locator('[data-ed-field="nav.cta"]')
+    for label in ("Volver a lo que decía antes", "Volver al texto original"):
+        field.locator(".ed-field-restore", has_text=label).click()
+        expect(page.locator("[data-ed-publish]")).to_be_enabled()
+        assert "Comprá YA" in _public_html(browser, base_url), label
+
+
+def test_the_counter_follows_a_change_it_did_not_type(
+    admin_live_server: tuple[str, str], page: Page, restore
+) -> None:
+    """It only ever recalculated from the textarea's own `input` listener, so it kept
+    describing the value before an undo — 5 / 300 over 59 characters."""
+    base_url, password = admin_live_server
+    restore(HERO)
+    _open_editor(page, base_url, password)
+
+    for text in ("Un texto bastante más largo que el que viene después", "Corto"):
+        _type_over(page, HERO, text)
+        page.click("[data-ed-publish]")
+        expect(page.locator("[data-ed-status]")).to_contain_text("Publicado")
+
+    page.click("[data-ed-panel-toggle]")
+    page.click('[data-ed-tab="all"]')
+    page.fill("[data-ed-filter]", HERO)
+    field = page.locator('[data-ed-field="' + HERO + '"]')
+    field.locator(".ed-field-restore", has_text="Volver a lo que decía antes").click()
+
+    typed = field.locator("textarea, input").first.input_value()
+    expect(field.locator(".ed-field-count")).to_contain_text(str(len(typed)) + " /")
+
+
+# --- what the editor says about its own state ---------------------------------
+
+
+def test_a_saved_draft_is_marked_on_the_canvas(
+    admin_live_server: tuple[str, str], page: Page, restore
+) -> None:
+    """A draft renders exactly like live copy, so the only clue that customers were not
+    seeing it yet was a number on the Publicar button."""
+    base_url, password = admin_live_server
+    restore(HERO)
+    _open_editor(page, base_url, password)
+
+    _type_over(page, HERO, "Guardado pero no publicado")
+    page.click("[data-ed-save]")
+    expect(page.locator("[data-ed-status]")).to_contain_text("Borrador guardado")
+
+    # Cold start: the mark has to survive a full reload, not just the save.
+    page.reload(wait_until="load")
+    expect(page.locator("[data-ed-hidden-count]")).not_to_have_text("0")
+    node = page.frame_locator("[data-ed-iframe]").locator(f'ct-t[data-k="{HERO}"]').first
+    expect(node).to_have_attribute("data-ct-draft", "")
+    expect(page.locator("[data-ed-status]")).to_contain_text("sin publicar")
+
+
+def test_the_panel_follows_an_edit_made_on_the_page(
+    admin_live_server: tuple[str, str], page: Page, restore
+) -> None:
+    """render() lives in buildField's closure and typing on the canvas never reached it,
+    so the counter and the way-back links froze at their build-time state — for the one
+    flow the whole editor is built around."""
+    base_url, password = admin_live_server
+    restore("nav.cta")
+    _open_editor(page, base_url, password)
+
+    page.click("[data-ed-panel-toggle]")
+    page.fill("[data-ed-filter]", "nav.cta")
+    field = page.locator('[data-ed-field="nav.cta"]')
+    expect(field.locator(".ed-field-count")).not_to_contain_text("6 /")
+
+    _type_over(page, "nav.cta", "Compra")
+    expect(field.locator(".ed-field-count")).to_contain_text("6 /")
+    expect(field.locator(".ed-field-undo")).to_be_visible()
+
+
+def test_undoing_one_field_leaves_the_others_pending(
+    admin_live_server: tuple[str, str], page: Page, restore
+) -> None:
+    """Taking back one bad edit used to mean Descartar, which throws away every other
+    change too."""
+    base_url, password = admin_live_server
+    restore(HERO)
+    restore("nav.cta")
+    _open_editor(page, base_url, password)
+
+    _type_over(page, HERO, "Uno")
+    _type_over(page, "nav.cta", "Dos")
+    expect(page.locator("[data-ed-pending]")).to_have_text("2")
+
+    page.click("[data-ed-panel-toggle]")
+    page.fill("[data-ed-filter]", "nav.cta")
+    page.locator('[data-ed-field="nav.cta"] .ed-field-undo').click()
+
+    expect(page.locator("[data-ed-pending]")).to_have_text("1")
+    expect(page.locator("[data-ed-publish]")).to_be_enabled()
+
+
+def test_the_search_finds_a_text_that_is_on_the_page(
+    admin_live_server: tuple[str, str], page: Page
+) -> None:
+    """applyFilter() filters by TAB before it filters by query, and the panel opened on
+    "No visibles" — so searching for copy that is right there answered "no results"."""
+    base_url, password = admin_live_server
+    _open_editor(page, base_url, password)
+
+    page.click("[data-ed-panel-toggle]")
+    page.fill("[data-ed-filter]", "Ver la colección")
+    expect(page.locator("[data-ed-no-results]")).to_be_hidden()
+    assert page.locator('[data-ed-field]:visible').count() >= 1
+
+
+def test_publishing_an_empty_text_never_asks_for_confirmation(
+    admin_live_server: tuple[str, str], page: Page, restore
+) -> None:
+    """It used to show the confirm and only then fail: you confirmed an action that was
+    already condemned."""
+    base_url, password = admin_live_server
+    restore(HERO)
+    _open_editor(page, base_url, password)
+
+    seen: list[str] = []
+    page.on("dialog", lambda dialog: (seen.append(dialog.message), dialog.dismiss()))
+
+    _type_over(page, HERO, " ")
+    page.click("[data-ed-publish]")
+    expect(page.locator("[data-ed-status]")).to_contain_text("Todavía no se puede publicar")
+    assert seen == []
+
+
+def test_a_rejected_field_says_which_screen_it_is_on(
+    admin_live_server: tuple[str, str], page: Page, restore
+) -> None:
+    """Twelve fields are labelled "Antetítulo": the label alone does not say which one."""
+    base_url, password = admin_live_server
+    restore("home.hero.eyebrow")
+    _open_editor(page, base_url, password)
+
+    _type_over(page, "home.hero.eyebrow", "x" * 400)
+    page.click("[data-ed-save]")
+    status = page.locator("[data-ed-status]")
+    expect(status).to_contain_text("Antetítulo")
+    expect(status).to_contain_text("Portada")
+
+
+def test_the_hover_box_of_a_wrapped_heading_never_reaches_the_line_above(
+    admin_live_server: tuple[str, str], page: Page
+) -> None:
+    """The H1 wraps to three lines at line-height 1.02, and a background on an inline box
+    fills the font's CONTENT AREA (ascent + descent, 1.33em here) — 128px of paint on
+    lines 98px apart, i.e. three white rectangles stacked 30px into each other."""
+    base_url, password = admin_live_server
+    _open_editor(page, base_url, password)
+    node = page.frame_locator("[data-ed-iframe]").locator(
+        'ct-t[data-k="home.hero.title"]'
+    ).first
+    node.hover()
+    painted = node.evaluate(
+        "el => {"
+        " const layers = getComputedStyle(el).backgroundSize.split(',');"
+        " const band = parseFloat(layers[layers.length - 1].trim().split(/\\s+/).pop());"
+        " const rects = [...el.getClientRects()];"
+        " return {band: band || el.getBoundingClientRect().height,"
+        "         gap: rects.length > 1 ? rects[1].top - rects[0].top : null,"
+        "         lines: rects.length}; }"
+    )
+    assert painted["lines"] > 1, f"el titular tiene que envolver: {painted}"
+    assert painted["band"] <= painted["gap"] + 0.5, painted
+
+
+def test_the_toolbar_does_not_move_when_the_first_change_lands(
+    admin_live_server: tuple[str, str], page: Page, restore
+) -> None:
+    """.ed-bar wraps on content, so Guardar and Publicar used to jump ~630px sideways and
+    59px down the moment there was something to save — out from under the cursor that was
+    on its way to click them."""
+    base_url, password = admin_live_server
+    restore(HERO)
+    _open_editor(page, base_url, password)
+
+    def box() -> dict:
+        return page.locator("[data-ed-publish]").bounding_box()
+
+    before = box()
+    _type_over(page, HERO, "Un cambio cualquiera")
+    after = box()
+    assert abs(after["x"] - before["x"]) < 2 and abs(after["y"] - before["y"]) < 2, (before, after)
+
+
+def test_the_hint_and_the_bar_share_the_phone_screen(
+    admin_live_server: tuple[str, str], phone: Page
+) -> None:
+    """Touch has no hover and no text cursor, and the one sentence that explains the
+    editor was display:none exactly there. The bar reserved a flat 76px for itself and
+    covered the field being edited.
+
+    No `restore`: the edit below is staged in the browser and never reaches the server,
+    and that fixture cleans up through the desktop `page`'s unauthenticated context.
+    """
+    base_url, password = admin_live_server
+    _open_editor(phone, base_url, password)
+
+    expect(phone.locator(".ed-hint")).to_be_visible()
+
+    _type_over(phone, HERO, "Un cambio")
+    phone.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+    phone.wait_for_timeout(300)
+    covered = phone.evaluate(
+        "() => {"
+        " const bar = document.querySelector('.ed-actions').getBoundingClientRect();"
+        " const foot = document.querySelector('.ed-footnote').getBoundingClientRect();"
+        " return foot.bottom - bar.top; }"
+    )
+    assert covered <= 0, f"la barra fija tapa {covered}px del final de la página"

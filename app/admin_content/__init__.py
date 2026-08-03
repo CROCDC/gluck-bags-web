@@ -121,26 +121,72 @@ def _sanitize_loss(original: str, cleaned: str) -> str | None:
     return None
 
 
+def _name(field: registry.TextField) -> str:
+    """How to name a field to someone who has to go and fix it.
+
+    Twelve fields are labelled "Antetítulo" and eleven "Descripción en Google", so the
+    label alone does not say WHICH one was rejected. The screen and the card are already
+    known here — the panel prints exactly this under every label.
+    """
+    group = registry.GROUPS_BY_KEY[registry.FIELD_GROUP[field.key]]
+    section = registry.FIELD_SECTION.get(field.key, "")
+    where = f"{group.title} · {section}" if section and section != group.title else group.title
+    return f"«{field.label}», en {where}"
+
+
+def _token_list(key: str) -> str:
+    """The placeholders this field accepts, written the way they are typed."""
+    return ", ".join("{" + name + "}" for name in registry.allowed_tokens(key))
+
+
+def _token_error(field: registry.TextField, value: str) -> str | None:
+    """Reject a placeholder nothing will ever fill.
+
+    The editor TEACHES braces ("dejá los {textos entre llaves} tal cual") and the panel
+    labels the brand field "Marca", so translating `{brand}` to `{marca}` is the natural
+    move — and it used to publish a literal `{marca}` into the <h1>. Nothing downstream
+    can catch it: the resolver leaves an unknown token alone on purpose, so that a stray
+    brace can never raise mid-render.
+    """
+    unknown = content.unknown_tokens(field.key, value)
+    if unknown:
+        names = ", ".join("{" + name + "}" for name in unknown[:3])
+        return (
+            f"{_name(field)}: no conocemos {names}. Los textos entre llaves que "
+            f"podés usar en este campo son: {_token_list(field.key)}."
+        )
+    if content.has_stray_brace(value):
+        return (
+            f"{_name(field)}: las llaves están reservadas para los textos que se "
+            f"completan solos ({_token_list(field.key)}), así que no se pueden usar "
+            f"sueltas. Sacalas y guardá de nuevo."
+        )
+    return None
+
+
 def _validate(field: registry.TextField, value: str) -> str | None:
     """Return an error message for `value`, or None when it is acceptable."""
     if len(value) > field.max_length:
-        return f"«{field.label}»: máximo {field.max_length} caracteres (escribiste {len(value)})."
+        return f"{_name(field)}: máximo {field.max_length} caracteres (escribiste {len(value)})."
     if not value:
         # Every type. A blank `text` shipped an empty <h1> and an empty meta
         # description; a blank `lines` emptied the marquee — all in one click, and
         # the guard existed only for the two types that happened to be tested.
-        return f"«{field.label}»: no puede quedar vacío."
+        return f"{_name(field)}: no puede quedar vacío."
+    token_error = _token_error(field, value)
+    if token_error:
+        return token_error
     if field.type == "rich" and not strip_tags(value).strip():
         # `<p></p>` and friends: markup with nothing in it reads as a blank page.
-        return f"«{field.label}»: quedó sin texto."
+        return f"{_name(field)}: quedó sin texto."
     if field.type == "url" and value:
         cleaned = safe_href(value)
         if cleaned is None or not cleaned.lower().startswith(("http://", "https://")):
-            return f"«{field.label}»: tiene que ser un link que empiece con https://."
+            return f"{_name(field)}: tiene que ser un link que empiece con https://."
         if cleaned != value:
             # safe_href strips whitespace to defeat `java\tscript:`; storing the
             # original meant a pasted URL with a space became a 404 on every page.
-            return f"«{field.label}»: el link tiene espacios o caracteres raros."
+            return f"{_name(field)}: el link tiene espacios o caracteres raros."
     return None
 
 
@@ -169,7 +215,7 @@ def _apply_submission(group: registry.Group, form: Any) -> tuple[list[str], int]
             cleaned = sanitize(value)
             loss = _sanitize_loss(value, cleaned)
             if loss:
-                error = f"«{field.label}»: {loss}"
+                error = f"{_name(field)}: {loss}"
             value = cleaned
         error = error or _validate(field, value)
         if error:
@@ -289,6 +335,29 @@ def pending_payload() -> dict[str, Any]:
     return {"pendingKeys": keys, "pendingFields": {key: field_payload(key) for key in keys}}
 
 
+def _invalid_drafts(keys: list[str]) -> dict[str, str]:
+    """The pending drafts among `keys` that today's rules would refuse.
+
+    Publishing does not re-run the save-time checks, and it publishes drafts this
+    request never wrote: one parked by a colleague, or one that predates a rule.
+    Re-checking is one `_validate` per pending key — there are almost never more than
+    a handful.
+    """
+    wanted = set(keys)
+    problems: dict[str, str] = {}
+    for key in SiteTextRepository.draft_keys():
+        field = registry.field_for(key)
+        if key not in wanted or field is None:
+            continue
+        row = SiteTextRepository.get(key)
+        if row is None or row.draft_value is None:
+            continue
+        error = _validate(field, row.draft_value)
+        if error:
+            problems[key] = error
+    return problems
+
+
 def _preview_path(group: registry.Group) -> str:
     """The public URL the preview shows for this group.
 
@@ -377,12 +446,12 @@ def save_changes() -> Any:
     for raw_key, raw_value in list(data["changes"].items())[:MAX_ERRORS * 5]:
         field = registry.field_for(str(raw_key))
         if field is None:
-            _add_error(errors, error_keys, f"«{raw_key}»: ese texto ya no existe. Recargá el editor.", str(raw_key))
+            _add_error(errors, error_keys, f"Uno de los textos ya no existe ({raw_key}). Recargá el editor.", str(raw_key))
             continue
         if not isinstance(raw_value, str):
             # JSON hands us lists, dicts, numbers and booleans; str() turned them into
             # their Python repr and published `['uno', 'dos']` as the site's <h1>.
-            _add_error(errors, error_keys, f"«{field.label}»: valor inválido.", field.key)
+            _add_error(errors, error_keys, f"{_name(field)}: no pudimos leer ese texto.", field.key)
             continue
         value = _normalize(field, raw_value)
         error = None
@@ -390,7 +459,7 @@ def save_changes() -> Any:
             cleaned = sanitize(value)
             loss = _sanitize_loss(value, cleaned)
             if loss:
-                error = f"«{field.label}»: {loss}"
+                error = f"{_name(field)}: {loss}"
             value = cleaned
         error = error or _validate(field, value)
         if error:
@@ -420,6 +489,16 @@ def save_changes() -> Any:
             if isinstance(requested, list)
             else []
         )
+        # A published key here may be someone else's parked draft, which this request
+        # never validated.
+        problems = _invalid_drafts(scope)
+        if problems:
+            SiteTextRepository.rollback()
+            return {
+                "ok": False,
+                "errors": list(problems.values())[:MAX_ERRORS],
+                "errorKeys": list(problems)[:MAX_ERRORS],
+            }, 400
         published = SiteTextRepository.publish(scope, registry.DEFAULTS)
     SiteTextRepository.save()
     return {
@@ -434,28 +513,59 @@ def save_changes() -> Any:
 @content_bp.route("/revert", methods=["POST"])
 @login_required
 def revert() -> Any:
-    """Put a key back to the wording that was live before the last publish."""
-    data = request.get_json(silent=True) or {}
-    key = str(data.get("key") or "")
-    field = registry.field_for(key)
-    if field is None:
-        return {"ok": False, "errors": ["Ese texto no existe."]}, 400
-    state = content.field_state(key)
-    if not state["has_previous"]:
-        return {"ok": False, "errors": ["No hay una versión anterior de este texto."]}, 400
+    """Stage the wording that was live before the last publish, as a DRAFT.
 
-    # A pending draft would silently undo the revert on the next publish, and the
-    # endpoint used to report that draft as the restored value.
-    SiteTextRepository.discard_drafts([key])
-    SiteTextRepository.revert(key)
+    It used to publish on the spot, which made one underlined link in the panel the
+    only control in the whole editor that changed the public site without going
+    through "Publicar cambios" — sitting next to an identical-looking link that only
+    drafted. Now there is a single rule with no exceptions. It is also idempotent,
+    where the old in-place swap meant a double click published and unpublished.
+
+    Going back a step still works: `publish` records what it replaced, so drafting the
+    previous wording and publishing it leaves exactly the same pair of values the old
+    swap did.
+    """
+    data = request.get_json(silent=True) or {}
+    raw = data.get("keys") if isinstance(data.get("keys"), list) else [data.get("key")]
+    keys = [str(item) for item in raw if str(item) in registry.FIELDS]
+    if not keys:
+        return {"ok": False, "errors": ["Ese texto no existe."]}, 400
+
+    values: dict[str, str] = {}
+    for key in dict.fromkeys(keys):
+        state = content.field_state(key)
+        if state["has_previous"]:
+            target = state["previous"]
+        elif state["previous"] is None and state["is_overridden"]:
+            # `previous_value` is NULL both when a key was never published and when
+            # what it replaced WAS the registry default (publish stores "no override"
+            # as NULL). Either way the step back is the default — which is what
+            # "Volver al texto original" already did under a name nobody reads as
+            # "undo". Spelled out here so one Deshacer covers every key at once.
+            target = registry.FIELDS[key].default
+        else:
+            continue
+        if target is None or target == state["live"]:
+            continue
+        # A draft parked here would quietly win the next publish over the undo.
+        SiteTextRepository.set_draft(key, target)
+        values[key] = target
+
+    if not values:
+        return {"ok": False, "errors": ["No hay una versión anterior de este texto."]}, 400
     SiteTextRepository.save()
-    fresh = content.field_state(key)
-    return {"ok": True, "value": fresh["live"], **pending_payload()}
+    return {"ok": True, "values": values, **pending_payload()}
 
 
 @content_bp.route("/publish", methods=["POST"])
 @login_required
 def publish_all() -> Response:
+    problems = _invalid_drafts(list(registry.FIELDS))
+    if problems:
+        for message in problems.values():
+            flash(message, "error")
+        flash("No publicamos nada: hay borradores con errores.", "error")
+        return redirect(url_for("admin_content.index"))
     changed = SiteTextRepository.publish(list(registry.FIELDS), registry.DEFAULTS)
     SiteTextRepository.save()
     _flash_count(changed, "Se publicó {n} texto.", "Se publicaron {n} textos.")
@@ -517,13 +627,22 @@ def group_save(group_key: str) -> Any:
         )
 
     if action == "publish":
-        SiteTextRepository.publish([f.key for f in group.fields], registry.DEFAULTS)
+        keys = [f.key for f in group.fields]
+        problems = _invalid_drafts(keys)
+        if problems:
+            # Keep what was just typed (it validated); only the publish is refused.
+            SiteTextRepository.save()
+            for message in problems.values():
+                flash(message, "error")
+            flash("No publicamos nada: hay borradores con errores.", "error")
+            return redirect(url_for("admin_content.group_edit", group_key=group.key))
+        SiteTextRepository.publish(keys, registry.DEFAULTS)
         SiteTextRepository.save()
         flash("Cambios publicados. Ya se ven en la web.", "success")
     else:
         SiteTextRepository.save()
         if request.form.get("restore"):
-            flash("Texto restaurado al original. Publicá para que se vea en la web.", "success")
+            flash("Listo, volvió al texto original. Publicá para que se vea en la web.", "success")
         else:
             flash("Borrador guardado. Previsualizá y publicá cuando quieras.", "success")
     return redirect(url_for("admin_content.group_edit", group_key=group.key))
