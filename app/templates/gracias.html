@@ -3,8 +3,8 @@
 {# Solid header (no dark hero behind it) so the fixed header text stays legible. #}
 {% block body_class %}solid-header{% endblock %}
 
-{% block title %}¡Gracias por tu compra! · {{ brand }}{% endblock %}
-{% block description %}Recibimos tu pedido en {{ brand }}. Tu pago se procesa en Tienda Nube y te llega la confirmación y el seguimiento del envío por email.{% endblock %}
+{% block title %}{{ t('thanks.title_tag') }}{% endblock %}
+{% block description %}{{ t('thanks.meta_description') }}{% endblock %}
 
 {# A post-purchase confirmation is transient and personal — keep it out of the index. #}
 {% block canonical %}<meta name="robots" content="noindex, follow">{% endblock %}
@@ -13,18 +13,15 @@
 <main class="cart-page" id="top">
     <div class="cart-empty">
         <div class="section-head">
-            <p class="eyebrow">Pedido confirmado</p>
-            <h1 class="section-title">¡Gracias por tu compra!</h1>
+            <p class="eyebrow">{{ t('thanks.eyebrow') }}</p>
+            <h1 class="section-title">{{ t('thanks.title') }}</h1>
         </div>
-        <p>
-            Tu pago se está procesando en Tienda Nube. Cuando se acredite vas a
-            recibir la confirmación por email con el detalle y el seguimiento del envío.
-        </p>
-        <p>¿Alguna duda con tu pedido? Escribinos y te ayudamos.</p>
+        <p>{{ t('thanks.body') }}</p>
+        <p>{{ t('thanks.help') }}</p>
         <div class="hero-actions" style="justify-content:center">
-            <a class="btn btn-dark" href="{{ url_for('index') }}#shop">Seguir mirando</a>
+            <a class="btn btn-dark" href="{{ url_for('index') }}#shop">{{ t('thanks.cta_primary') }}</a>
             <a class="btn btn-ghost" href="{{ instagram_url }}" target="_blank" rel="noopener"
-               data-umami-event="soporte-postventa" data-umami-event-ubicacion="gracias">Escribinos por Instagram</a>
+               data-umami-event="soporte-postventa" data-umami-event-ubicacion="gracias">{{ t('thanks.cta_secondary') }}</a>
         </div>
     </div>
 </main>

@@ -1,0 +1,16 @@
+{% extends "admin/base.html" %}
+{% set section = 'content' %}
+{% block title %}Sección no encontrada · {{ brand }} Admin{% endblock %}
+
+{% block head %}{{ inline_css('css/admin-content.css') }}{% endblock %}
+
+{% block content %}
+<div class="adm-empty">
+    <h1 class="adm-title">Esa sección de textos no existe</h1>
+    <p>No encontramos <code>{{ group_key }}</code>. Puede que el link esté viejo.</p>
+    <div class="ct-pending-actions" style="justify-content:center">
+        <a class="btn btn-primary btn-lg" href="{{ url_for('admin_content.editor') }}">Ir al editor visual</a>
+        <a class="btn btn-ghost btn-lg" href="{{ url_for('admin_content.index') }}">Ver la lista por sección</a>
+    </div>
+</div>
+{% endblock %}

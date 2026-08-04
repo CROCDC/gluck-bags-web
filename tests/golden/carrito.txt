@@ -1,0 +1,67 @@
+[content] width=device-width, initial-scale=1.0
+[content] website
+[content] https://gluckbags.com/carrito
+[content] Tu carrito · GLÜCK
+[content] Revisá los bolsos que agregaste a tu carrito en GLÜCK y finalizá tu compra.
+[content] https://gluckbags.com/static/img/og-image.jpg
+[content] image/jpeg
+[content] 1200
+[content] 630
+[content] Tote de cuero vegano cognac de GLÜCK en la playa
+[content] es_AR
+[content] GLÜCK
+[content] summary_large_image
+[content] Tu carrito · GLÜCK
+[content] Revisá los bolsos que agregaste a tu carrito en GLÜCK y finalizá tu compra.
+[content] https://gluckbags.com/static/img/og-image.jpg
+Tu carrito · GLÜCK
+[content] Revisá los bolsos que agregaste a tu carrito en GLÜCK y finalizá tu compra.
+[content] noindex, follow
+[aria-label] GLÜCK inicio
+GLÜCK
+[aria-label] Principal
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+[aria-label] Abrir carrito
+0
+[aria-label] Abrir menú
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+Tu selección
+Carrito
+Tu carrito está vacío.
+Ver bolsos
+[aria-label] Tu carrito
+Tu selección
+Carrito
+[aria-label] Cerrar carrito
+Subtotal
+$ 0
+El costo de envío se confirma en el checkout, antes de pagar.
+Email para la confirmación del pedido
+[placeholder] tu@email.com
+Finalizar compra
+¿Te gustó algo?
+Seguinos en Instagram
+GLÜCK
+Bolsos minimalistas de cuero vegano
+[aria-label] Pie de página
+Colección
+Bolsos
+Nosotras
+Contacto
+Envíos
+Cambios
+Instagram
+[aria-label] Legales
+Términos
+Privacidad
+© 2026 GLÜCK. Todos los derechos reservados.
+Volver arriba ↑
+Cuero vegano · Hecho a mano

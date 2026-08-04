@@ -2,6 +2,7 @@
 
 from app.models.media import Media
 from app.models.product import Product
+from app.models.site_text import SiteText
 from app.models.tiendanube import TiendaNubeProduct
 
-__all__ = ["Product", "Media", "TiendaNubeProduct"]
+__all__ = ["Product", "Media", "SiteText", "TiendaNubeProduct"]

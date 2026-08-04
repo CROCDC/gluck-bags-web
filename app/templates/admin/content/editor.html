@@ -1,0 +1,223 @@
+{% extends "admin/base.html" %}
+{% set section = 'content' %}
+{% set full_bleed = true %}
+{% block title %}Editor visual · {{ brand }} Admin{% endblock %}
+
+{% block head %}{{ inline_css('css/admin-content.css') }}{{ inline_css('css/admin-editor.css') }}{% endblock %}
+
+{% block content %}
+<div class="ed" data-ed
+     data-save-url="{{ url_for('admin_content.save_changes') }}"
+     data-revert-url="{{ url_for('admin_content.revert') }}"
+     data-discard-url="{{ url_for('admin_content.discard_all') }}"
+     data-pending="{{ pending }}">
+
+    {# What already has a pending draft, whatever page it was typed on. The panel
+       renders these too, so an edit made elsewhere is never invisible-but-counted. #}
+    <script type="application/json" data-ed-pending-state>{{ pending_state | tojson }}</script>
+
+    <!-- ===================== TOOLBAR ===================== -->
+    <div class="ed-bar">
+        <div class="ed-bar-group">
+            <h1 class="ed-title">Editor visual</h1>
+            <label class="visually-hidden" for="edPage">Página a editar</label>
+            <select class="ed-page" id="edPage" data-ed-page>
+                {% for page in pages %}
+                <option value="{{ page.path }}"{% if page.path == start_path %} selected{% endif %}>{{ page.label }}</option>
+                {% endfor %}
+            </select>
+            <span class="ed-hint">Tocá cualquier texto para editarlo.</span>
+        </div>
+
+        {# Not tabs: these change the canvas WIDTH, they don't switch panels. Calling
+           them a tablist promised arrow-key navigation that never existed. #}
+        <div class="ed-bar-group ed-devices" role="group" aria-label="Ancho de pantalla">
+            <button type="button" class="ed-device is-current" data-ed-device="fluid"
+                    aria-pressed="true" aria-label="Auto, ancho completo">Auto</button>
+            {% for device in devices %}
+            <button type="button" class="ed-device" data-ed-device="{{ device.key }}"
+                    data-width="{{ device.width }}" data-height="{{ device.height }}"
+                    aria-pressed="false" aria-label="{{ device.label }}, {{ device.width }} píxeles">
+                {{ device.label }}
+            </button>
+            {% endfor %}
+        </div>
+
+        <div class="ed-bar-group ed-actions">
+            <button type="button" class="ed-btn ed-btn-ghost" data-ed-panel-toggle
+                    aria-expanded="false" aria-controls="edPanel">
+                Ver la lista de textos
+            </button>
+            <span class="ed-status" id="edStatus" data-ed-status role="status" aria-live="polite"></span>
+            {# Outside the live region on purpose: a button inside role="status" gets
+               re-announced with every message and is a strange place to park focus. #}
+            <button type="button" class="ed-btn ed-btn-ghost" data-ed-undo hidden>Deshacer</button>
+            <button type="button" class="ed-btn ed-btn-ghost" data-ed-find-drafts hidden>Ver cuál</button>
+            <button type="button" class="ed-btn ed-btn-ghost" data-ed-discard hidden>Descartar</button>
+            <button type="button" class="ed-btn ed-btn-ghost" data-ed-save disabled>Guardar borrador</button>
+            <button type="button" class="ed-btn ed-btn-primary" data-ed-publish
+                    {% if not pending %}disabled{% endif %}>
+                Publicar cambios<span class="ed-badge" data-ed-pending{% if not pending %} hidden{% endif %}>{{ pending }}</span>
+            </button>
+        </div>
+    </div>
+
+    <div class="ed-body">
+        {# The canvas is the whole public site: without this, reaching the panel or
+           the Save button by keyboard costs ~34 tab stops. #}
+        <a class="ed-skip" href="#edPanel" data-ed-skip>Saltar el sitio e ir a la lista de textos</a>
+
+        <!-- ===================== CANVAS ===================== -->
+        <div class="ed-stage" data-ed-stage>
+            <div class="ed-frame" data-ed-frame>
+                <iframe title="Sitio en edición" data-ed-iframe src="{{ start_path }}?edit=1"></iframe>
+            </div>
+        </div>
+
+        <!-- ===================== SIDE PANEL ===================== -->
+        <aside class="ed-panel" id="edPanel" data-ed-panel hidden>
+            <div class="ed-panel-head">
+                <h2>Textos de esta página</h2>
+                <button type="button" class="ed-panel-close" data-ed-panel-close aria-label="Cerrar panel">×</button>
+            </div>
+
+            <div class="ed-panel-tabs" role="tablist">
+                <button type="button" role="tab" id="edTabHidden" class="ed-tab"
+                        data-ed-tab="hidden" aria-selected="false" tabindex="-1"
+                        aria-controls="edPanelFields">No visibles <span class="ed-badge" data-ed-hidden-count>0</span></button>
+                <button type="button" role="tab" id="edTabAll" class="ed-tab is-current"
+                        data-ed-tab="all" aria-selected="true"
+                        aria-controls="edPanelFields">Todos</button>
+                <button type="button" role="tab" id="edTabCards" class="ed-tab" data-ed-tab="cards"
+                        aria-selected="false" tabindex="-1"
+                        aria-controls="edPanelCards">Al compartir</button>
+            </div>
+
+            {# One list for both field tabs: the tabs filter it. Rendering it twice
+               would duplicate every input id, which breaks the labels. #}
+            <div class="ed-panel-body" id="edPanelFields" role="tabpanel"
+                 aria-labelledby="edTabAll" data-ed-tabpanel="fields">
+                {# Hidden until the "No visibles" tab is picked: the panel now opens on
+                   "Todos", and setTab() is what shows it. #}
+                <p class="ed-panel-note" data-ed-note hidden>
+                    Textos que no se ven en la página pero que igual importan: lo que lee
+                    Google, las descripciones de las fotos y las etiquetas para lectores de
+                    pantalla.
+                </p>
+                <label class="visually-hidden" for="edFilter">Buscar un texto</label>
+                <input type="search" id="edFilter" class="ed-filter" data-ed-filter
+                       placeholder="Buscar un texto…" autocomplete="off">
+                <div data-ed-fields></div>
+                <p class="ed-panel-empty" data-ed-no-results hidden>
+                    Ningún texto coincide con la búsqueda.
+                </p>
+            </div>
+
+            {# Same three share/search formats as the group preview, built from the
+               edited page's own <title>/meta tags. #}
+            <div class="ed-panel-body" id="edPanelCards" role="tabpanel"
+                 aria-labelledby="edTabCards" data-ed-tabpanel="cards" hidden>
+                <p class="ed-card-kind">Resultado en Google</p>
+                <div class="serp">
+                    <div class="serp-site">
+                        <span class="serp-favicon" aria-hidden="true">{{ brand[:1] }}</span>
+                        <span>
+                            <span class="serp-name">{{ brand }}</span>
+                            <span class="serp-url" data-ct-serp-url></span>
+                        </span>
+                    </div>
+                    <p class="serp-title" data-ct-serp-title></p>
+                    <p class="serp-desc" data-ct-serp-desc></p>
+                </div>
+
+                <p class="ed-card-kind">Link compartido en WhatsApp</p>
+                <div class="wa-bubble">
+                    <div class="wa-preview">
+                        <img class="wa-image" alt="" data-ct-og-image hidden>
+                        <div class="wa-text">
+                            <p class="wa-title" data-ct-og-title></p>
+                            <p class="wa-desc" data-ct-og-desc></p>
+                            <p class="wa-host" data-ct-og-host></p>
+                        </div>
+                    </div>
+                    <p class="wa-link" data-ct-og-url></p>
+                </div>
+
+                <p class="ed-card-kind">Tarjeta en Twitter/X</p>
+                <div class="tw-card">
+                    <img class="tw-image" alt="" data-ct-tw-image hidden>
+                    <div class="tw-text">
+                        <p class="tw-host" data-ct-tw-host></p>
+                        <p class="tw-title" data-ct-tw-title></p>
+                        <p class="tw-desc" data-ct-tw-desc></p>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <p class="ed-footnote">
+        ¿Buscás un texto puntual? Está todo también en
+        <a href="{{ url_for('admin_content.index') }}">la lista completa por sección</a>.
+    </p>
+
+    {# A full editorial page gets its own editor: a readable column, a toolbar in
+       words instead of symbols, and a count of the characters a reader actually
+       sees (not of the HTML). #}
+    <div class="ed-sheet" data-ed-sheet hidden role="dialog" aria-modal="true"
+         aria-labelledby="edSheetTitle">
+        <div class="ed-sheet-panel">
+            <header class="ed-sheet-head">
+                <div>
+                    <h2 id="edSheetTitle" data-ed-sheet-title>Texto de la página</h2>
+                    <p class="ed-sheet-where" data-ed-sheet-where></p>
+                </div>
+                <button type="button" class="ed-sheet-close" data-ed-sheet-cancel
+                        aria-label="Cerrar sin guardar">×</button>
+            </header>
+
+            {# The braces inside a long text are machinery, not copy. The inline editor
+               has always said so in its bubble; this one showed a raw "{brand}"
+               mid-sentence and left the reader to guess. #}
+            <p class="ed-sheet-tokens" data-ed-sheet-tokens hidden></p>
+
+            <div class="ed-sheet-tools" role="group" aria-label="Formato">
+                <button type="button" class="ed-tool" data-ed-cmd="bold"><b>Negrita</b></button>
+                <button type="button" class="ed-tool" data-ed-cmd="italic"><i>Cursiva</i></button>
+                <button type="button" class="ed-tool" data-ed-cmd="formatBlock" data-ed-arg="&lt;h2&gt;">Subtítulo</button>
+                <button type="button" class="ed-tool" data-ed-cmd="formatBlock" data-ed-arg="&lt;p&gt;">Párrafo</button>
+                <button type="button" class="ed-tool" data-ed-cmd="insertUnorderedList">Lista</button>
+                <button type="button" class="ed-tool" data-ed-cmd="createLink">Link</button>
+                <button type="button" class="ed-tool" data-ed-cmd="unlink">Quitar link</button>
+                <button type="button" class="ed-tool" data-ed-cmd="removeFormat">Quitar formato</button>
+            </div>
+
+            <div class="ed-sheet-body">
+                <div class="ed-sheet-doc" data-ed-sheet-doc contenteditable="true"
+                     spellcheck="true" role="textbox" aria-multiline="true"
+                     aria-labelledby="edSheetTitle"></div>
+            </div>
+
+            <footer class="ed-sheet-foot">
+                <p class="ed-sheet-note" data-ed-sheet-note role="status" aria-live="polite" hidden></p>
+                <span class="ed-sheet-count" data-ed-sheet-count></span>
+                <span class="ed-sheet-actions">
+                    <button type="button" class="ed-btn ed-btn-ghost" data-ed-sheet-cancel>Cancelar</button>
+                    <button type="button" class="ed-btn ed-btn-primary" data-ed-sheet-apply>Listo</button>
+                </span>
+            </footer>
+        </div>
+    </div>
+
+    <noscript>
+        <div class="adm-flash adm-flash-notice">
+            El editor visual necesita JavaScript. Podés editar todos los textos desde
+            <a href="{{ url_for('admin_content.index') }}">la lista por sección</a>.
+        </div>
+    </noscript>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script defer src="{{ url_for('static', filename='js/admin-editor.js') }}"></script>
+{% endblock %}

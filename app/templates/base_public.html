@@ -21,7 +21,7 @@
     <meta property="og:image:type"       content="image/jpeg">
     <meta property="og:image:width"      content="1200">
     <meta property="og:image:height"     content="630">
-    <meta property="og:image:alt"        content="Tote de cuero vegano cognac de {{ brand }} en la playa">
+    <meta property="og:image:alt"        content="{{ t('seo.og.image_alt') }}">
     {% endblock %}
     <meta property="og:locale"           content="es_AR">
     <meta property="og:site_name"        content="{{ brand }}">
@@ -33,8 +33,8 @@
     <meta name="twitter:image"       content="{% block twitter_image %}{{ site_url }}/static/img/og-image.jpg{% endblock %}">
     {% endblock %}
 
-    <title>{% block title %}{{ brand }} · {{ tagline }}{% endblock %}</title>
-    <meta name="description" content="{% block description %}{{ brand }} — {{ tagline }}. Carteras y bolsos de cuero vegano, hechos a mano con un diseño minimalista y atemporal.{% endblock %}">
+    <title>{% block title %}{{ t('seo.home.title') }}{% endblock %}</title>
+    <meta name="description" content="{% block description %}{{ t('seo.home.description') }}{% endblock %}">
 
     {# Self-referencing canonical (query string dropped via request.path), so URL
        variants — ?s=, ?utm=, alternate hosts — all collapse to one indexable URL.
@@ -69,18 +69,18 @@
     <!-- ===================== HEADER ===================== -->
     <header class="site-header" id="header">
         <div class="header-inner">
-            <a href="{{ home }}#top" class="wordmark" aria-label="{{ brand }} inicio">{{ brand }}</a>
+            <a href="{{ home }}#top" class="wordmark" aria-label="{{ t('nav.home_aria') }}">{{ t('global.brand') }}</a>
 
             <nav class="nav" aria-label="Principal">
-                <a href="{{ home }}#categorias">Colección</a>
-                <a href="{{ home }}#shop">Bolsos</a>
-                <a href="{{ home }}#materia">Materia</a>
-                <a href="{{ home }}#manifiesto">Nosotras</a>
+                <a href="{{ home }}#categorias">{{ t('nav.collection') }}</a>
+                <a href="{{ home }}#shop">{{ t('nav.bags') }}</a>
+                <a href="{{ home }}#materia">{{ t('nav.material') }}</a>
+                <a href="{{ home }}#manifiesto">{{ t('nav.about') }}</a>
             </nav>
 
-            <a href="{{ home }}#shop" class="header-cta" data-umami-event="ir-al-shop" data-umami-event-ubicacion="header">Comprar</a>
+            <a href="{{ home }}#shop" class="header-cta" data-umami-event="ir-al-shop" data-umami-event-ubicacion="header">{{ t('nav.cta') }}</a>
 
-            <button class="cart-toggle" id="cartToggle" aria-label="Abrir carrito"
+            <button class="cart-toggle" id="cartToggle" aria-label="{{ t('nav.cart_aria') }}"
                     data-umami-event="abrir-carrito"
                     aria-haspopup="dialog" aria-expanded="false" aria-controls="cartDrawer">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
@@ -91,7 +91,7 @@
                 <span class="cart-count" data-cart-count{% if not cart_count %} hidden{% endif %}>{{ cart_count }}</span>
             </button>
 
-            <button class="menu-toggle" id="menuToggle" aria-label="Abrir menú" aria-expanded="false">
+            <button class="menu-toggle" id="menuToggle" aria-label="{{ t('nav.menu_aria') }}" aria-expanded="false">
                 <span></span><span></span>
             </button>
         </div>
@@ -99,11 +99,11 @@
 
     <!-- mobile menu -->
     <div class="mobile-menu" id="mobileMenu" hidden>
-        <a href="{{ home }}#categorias">Colección</a>
-        <a href="{{ home }}#shop">Bolsos</a>
-        <a href="{{ home }}#materia">Materia</a>
-        <a href="{{ home }}#manifiesto">Nosotras</a>
-        <a href="{{ home }}#shop" class="mobile-cta" data-umami-event="ir-al-shop" data-umami-event-ubicacion="menu-mobile">Comprar</a>
+        <a href="{{ home }}#categorias">{{ t('nav.collection') }}</a>
+        <a href="{{ home }}#shop">{{ t('nav.bags') }}</a>
+        <a href="{{ home }}#materia">{{ t('nav.material') }}</a>
+        <a href="{{ home }}#manifiesto">{{ t('nav.about') }}</a>
+        <a href="{{ home }}#shop" class="mobile-cta" data-umami-event="ir-al-shop" data-umami-event-ubicacion="menu-mobile">{{ t('nav.cta') }}</a>
     </div>
 
     {% block body %}{% endblock %}
@@ -114,9 +114,9 @@
         <aside class="cart-panel" role="dialog" aria-modal="true" aria-label="Tu carrito"
                aria-describedby="cartPanelTitle">
             <header class="cart-panel-head">
-                <p class="eyebrow">Tu selección</p>
-                <h2 class="cart-panel-title" id="cartPanelTitle">Carrito</h2>
-                <button class="cart-close" data-cart-close aria-label="Cerrar carrito">
+                <p class="eyebrow">{{ t('cart.drawer.eyebrow') }}</p>
+                <h2 class="cart-panel-title" id="cartPanelTitle">{{ t('cart.drawer.title') }}</h2>
+                <button class="cart-close" data-cart-close aria-label="{{ t('cart.drawer.close_aria') }}">
                     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
                          stroke-width="1.4" stroke-linecap="round" aria-hidden="true">
                         <path d="M6 6l12 12M18 6 6 18"/>
@@ -130,7 +130,7 @@
 
             <footer class="cart-panel-foot" data-cart-foot hidden>
                 <div class="cart-subtotal">
-                    <span>Subtotal</span>
+                    <span>{{ t('cart.subtotal_label') }}</span>
                     <strong data-cart-subtotal>$ 0</strong>
                 </div>
                 {{ cart_checkout_form('cartEmailDrawer') }}
@@ -141,9 +141,9 @@
     <!-- ===================== FOOTER ===================== -->
     <footer class="site-footer">
         <div class="footer-cta reveal">
-            <p class="footer-cta-eyebrow">¿Te gustó algo?</p>
+            <p class="footer-cta-eyebrow">{{ t('footer.cta_eyebrow') }}</p>
             <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="footer-cta-link">
-                Seguinos en Instagram
+                {{ t('footer.cta_link') }}
                 <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="currentColor" stroke-width="1.2">
                     <path d="M7 17 17 7M9 7h8v8"/>
                 </svg>
@@ -152,34 +152,51 @@
 
         <div class="footer-top">
             <div class="footer-brand">
-                <span class="footer-wordmark">{{ brand }}</span>
-                <p>{{ tagline }}</p>
+                <span class="footer-wordmark">{{ t('global.brand') }}</span>
+                <p>{{ t('global.tagline') }}</p>
             </div>
             <nav class="footer-nav" aria-label="Pie de página">
-                <a href="{{ home }}#categorias">Colección</a>
-                <a href="{{ home }}#shop">Bolsos</a>
-                <a href="{{ url_for('page_nosotras') }}">Nosotras</a>
-                <a href="{{ url_for('page_contacto') }}">Contacto</a>
-                <a href="{{ url_for('page_envios') }}">Envíos</a>
-                <a href="{{ url_for('page_cambios_y_devoluciones') }}">Cambios</a>
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener">Instagram</a>
+                <a href="{{ home }}#categorias">{{ t('nav.collection') }}</a>
+                <a href="{{ home }}#shop">{{ t('nav.bags') }}</a>
+                <a href="{{ url_for('page_nosotras') }}">{{ t('footer.link.about') }}</a>
+                <a href="{{ url_for('page_contacto') }}">{{ t('footer.link.contact') }}</a>
+                <a href="{{ url_for('page_envios') }}">{{ t('footer.link.shipping') }}</a>
+                <a href="{{ url_for('page_cambios_y_devoluciones') }}">{{ t('footer.link.returns') }}</a>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener">{{ t('footer.link.instagram') }}</a>
             </nav>
 
             <nav class="footer-legal" aria-label="Legales">
-                <a href="{{ url_for('page_terminos') }}">Términos</a>
-                <a href="{{ url_for('page_privacidad') }}">Privacidad</a>
+                <a href="{{ url_for('page_terminos') }}">{{ t('footer.link.terms') }}</a>
+                <a href="{{ url_for('page_privacidad') }}">{{ t('footer.link.privacy') }}</a>
             </nav>
         </div>
         <div class="footer-bottom">
-            <p>&copy; {{ current_year }} {{ brand }}. Todos los derechos reservados.</p>
-            <a href="{{ home }}#top" class="footer-top-link">Volver arriba ↑</a>
-            <p>Cuero vegano · Hecho a mano</p>
+            <p>{{ t('footer.copyright') }}</p>
+            <a href="{{ home }}#top" class="footer-top-link">{{ t('footer.back_to_top') }}</a>
+            <p>{{ t('footer.badges') }}</p>
         </div>
 
         <!-- Shared Next Tech footer (renders into the site's footer background) -->
         <script defer src="https://nexttech.com.ar/static/js/nexttechFooter.js"></script>
         <nexttech-footer source="gluck-bags"></nexttech-footer>
     </footer>
+
+    {# The cart drawer and its feedback are rendered by cart.js, so its copy has to
+       reach the browser as data. Inline JSON (a few hundred bytes) keeps those
+       strings editable from the admin without a second request; cart.js falls back
+       to its own literals if this block is ever missing. #}
+    {# t_plain (not t): these are serialized to JSON, so they must not carry the
+       visual editor's key markers — they'd survive \uXXXX-escaped as literal text. #}
+    <script type="application/json" id="cartStrings">{{ {
+        'empty': t_plain('cart.page.empty'),
+        'emptyCta': t_plain('cart.page.empty_cta'),
+        'remove': t_plain('cart.line.remove'),
+        'removeAria': t_plain('cart.line.remove_aria'),
+        'qtyDecAria': t_plain('cart.line.qty_dec_aria'),
+        'qtyIncAria': t_plain('cart.line.qty_inc_aria'),
+        'emailError': t_plain('cart.checkout.email_error'),
+        'checkoutError': t_plain('cart.checkout.error'),
+    } | tojson }}</script>
 
     <script defer src="{{ url_for('static', filename='js/main.js') }}"></script>
     <script defer src="{{ url_for('static', filename='js/cart.js') }}"></script>

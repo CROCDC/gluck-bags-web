@@ -14,9 +14,16 @@ from typing import Any
 from app.models import Product
 from app.utils import slugify
 
+# Fallbacks only. The live values are editable from the admin (app/content), and the
+# routes pass them in — these keep the builders pure and directly unit-testable.
 BRAND = "GLÜCK"
 _LOGO = "/static/img/marca/avatar-perfil-gluck.jpg"
 INSTAGRAM = "https://www.instagram.com/gluck_bags/"
+ORGANIZATION_DESCRIPTION = (
+    "Bolsos y carteras de cuero vegano hechos a mano en Argentina, "
+    "con diseño minimalista y atemporal."
+)
+HOME_BREADCRUMB = "Inicio"
 
 
 def dump_jsonld(obj: Any) -> str:
@@ -34,7 +41,12 @@ def dump_jsonld(obj: Any) -> str:
     )
 
 
-def organization_jsonld(site_url: str) -> dict[str, Any]:
+def organization_jsonld(
+    site_url: str,
+    brand: str | None = None,
+    instagram: str | None = None,
+    description: str | None = None,
+) -> dict[str, Any]:
     # Stable @id so the brand entity consolidates across pages (products can point
     # their breadcrumb/brand back at this node). addressCountry + contactPoint are
     # the verifiable trust signals we can assert without inventing data.
@@ -42,29 +54,28 @@ def organization_jsonld(site_url: str) -> dict[str, Any]:
         "@context": "https://schema.org",
         "@type": "Organization",
         "@id": f"{site_url}/#organization",
-        "name": BRAND,
+        "name": brand or BRAND,
         "url": f"{site_url}/",
         "logo": f"{site_url}{_LOGO}",
-        "description": (
-            "Bolsos y carteras de cuero vegano hechos a mano en Argentina, "
-            "con diseño minimalista y atemporal."
-        ),
+        # `or` would resurrect the constant for a description the shop
+        # deliberately cleared, so the markup would assert copy nobody wrote.
+        "description": ORGANIZATION_DESCRIPTION if description is None else description,
         "address": {"@type": "PostalAddress", "addressCountry": "AR"},
         "contactPoint": {
             "@type": "ContactPoint",
             "contactType": "customer service",
-            "url": INSTAGRAM,
+            "url": instagram or INSTAGRAM,
             "availableLanguage": ["es"],
         },
-        "sameAs": [INSTAGRAM],
+        "sameAs": [instagram or INSTAGRAM],
     }
 
 
-def website_jsonld(site_url: str) -> dict[str, Any]:
+def website_jsonld(site_url: str, brand: str | None = None) -> dict[str, Any]:
     return {
         "@context": "https://schema.org",
         "@type": "WebSite",
-        "name": BRAND,
+        "name": brand or BRAND,
         "url": f"{site_url}/",
     }
 
@@ -95,8 +106,15 @@ def _cover_image(product: Product, site_url: str) -> str | None:
     return None
 
 
-def product_jsonld(product: Product, site_url: str) -> dict[str, Any]:
+def product_jsonld(
+    product: Product,
+    site_url: str,
+    brand: str | None = None,
+    description_fallback: str | None = None,
+    category_label: str | None = None,
+) -> dict[str, Any]:
     url = f"{site_url}/producto/{product.id}"
+    brand = brand or BRAND
     data: dict[str, Any] = {
         "@context": "https://schema.org",
         "@type": "Product",
@@ -104,15 +122,18 @@ def product_jsonld(product: Product, site_url: str) -> dict[str, Any]:
         # Stable per-product identifier (no DB column needed; derived from the id).
         "sku": f"GLUCK-{product.id:04d}",
         "url": url,
-        "brand": {"@type": "Brand", "name": BRAND},
+        "brand": {"@type": "Brand", "name": brand},
         "description": product.description
-        or f"{product.title} — {BRAND}, cartera de cuero vegano hecha a mano.",
+        or description_fallback
+        or f"{product.title} — {brand}, cartera de cuero vegano hecha a mano.",
     }
     image = _cover_image(product, site_url)
     if image:
         data["image"] = [image]
     if product.category:
-        data["category"] = product.category
+        # The visible chip/breadcrumb may show an edited label; keep the markup
+        # saying exactly what the page says.
+        data["category"] = category_label or product.category
     # Only emit an Offer when there is a real price — never fabricate one. The TN
     # mirror tracks real stock and the cart refuses out-of-stock adds — keep the
     # markup honest instead of promising InStock unconditionally.
@@ -131,13 +152,26 @@ def product_jsonld(product: Product, site_url: str) -> dict[str, Any]:
     return data
 
 
-def breadcrumb_jsonld(product: Product, site_url: str) -> dict[str, Any]:
+def breadcrumb_jsonld(
+    product: Product,
+    site_url: str,
+    home_label: str | None = None,
+    category_label: str | None = None,
+) -> dict[str, Any]:
     """Inicio › <categoría> › <producto>. The category node is included only when
-    the product has a category (it links to the real /categoria/<slug> page)."""
-    items: list[dict[str, Any]] = [{"name": "Inicio", "url": f"{site_url}/"}]
+    the product has a category (it links to the real /categoria/<slug> page).
+
+    `home_label`/`category_label` carry the (editable) labels the page actually
+    renders, so the markup can never disagree with the visible breadcrumb."""
+    items: list[dict[str, Any]] = [
+        {"name": home_label or HOME_BREADCRUMB, "url": f"{site_url}/"}
+    ]
     if product.category:
         items.append(
-            {"name": product.category, "url": f"{site_url}/categoria/{slugify(product.category)}"}
+            {
+                "name": category_label or product.category,
+                "url": f"{site_url}/categoria/{slugify(product.category)}",
+            }
         )
     items.append({"name": product.title, "url": f"{site_url}/producto/{product.id}"})
     return {
@@ -150,12 +184,17 @@ def breadcrumb_jsonld(product: Product, site_url: str) -> dict[str, Any]:
     }
 
 
-def category_breadcrumb_jsonld(category: str, site_url: str) -> dict[str, Any]:
+def category_breadcrumb_jsonld(
+    category: str,
+    site_url: str,
+    home_label: str | None = None,
+    label: str | None = None,
+) -> dict[str, Any]:
     """Inicio › <categoría>. Mirrors the visible breadcrumb on the category page so
     the markup matches the on-page navigation (no markup-vs-content mismatch)."""
     items = [
-        {"name": "Inicio", "url": f"{site_url}/"},
-        {"name": category, "url": f"{site_url}/categoria/{slugify(category)}"},
+        {"name": home_label or HOME_BREADCRUMB, "url": f"{site_url}/"},
+        {"name": label or category, "url": f"{site_url}/categoria/{slugify(category)}"},
     ]
     return {
         "@context": "https://schema.org",

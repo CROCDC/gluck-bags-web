@@ -1,0 +1,79 @@
+[content] width=device-width, initial-scale=1.0
+[content] website
+[content] https://gluckbags.com/terminos
+[content] Términos y condiciones · GLÜCK
+[content] Términos y condiciones de uso y de compra del sitio de GLÜCK: cómo comprar online, medios de pago, envíos y las condiciones generales del servicio.
+[content] https://gluckbags.com/static/img/og-image.jpg
+[content] image/jpeg
+[content] 1200
+[content] 630
+[content] Tote de cuero vegano cognac de GLÜCK en la playa
+[content] es_AR
+[content] GLÜCK
+[content] summary_large_image
+[content] Términos y condiciones · GLÜCK
+[content] Términos y condiciones de uso y de compra del sitio de GLÜCK: cómo comprar online, medios de pago, envíos y las condiciones generales del servicio.
+[content] https://gluckbags.com/static/img/og-image.jpg
+Términos y condiciones · GLÜCK
+[content] Términos y condiciones de uso y de compra del sitio de GLÜCK: cómo comprar online, medios de pago, envíos y las condiciones generales del servicio.
+[aria-label] GLÜCK inicio
+GLÜCK
+[aria-label] Principal
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+[aria-label] Abrir carrito
+0
+[aria-label] Abrir menú
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+GLÜCK
+Términos y condiciones
+Estos términos y condiciones regulan el uso del sitio de GLÜCK y la compra de nuestros productos. Al navegar o comprar, aceptás estas condiciones.
+Productos y precios
+Las imágenes son ilustrativas. Al tratarse de piezas artesanales pueden existir pequeñas variaciones de color y terminación. Los precios están publicados en el sitio y pueden cambiar sin previo aviso; el valor final de tu compra es el que se muestra en el checkout al confirmar el pedido.
+Compras
+Las compras se realizan online en este sitio: agregás tus productos al carrito y completás el pago en el checkout seguro de Tienda Nube. La compra queda confirmada cuando el pago se acredita, y recibís la confirmación del pedido por email. Si tenés dudas antes de comprar, podés escribirnos por Instagram.
+Pagos
+El pago se procesa a través de la plataforma Tienda Nube y sus medios de pago habilitados. GLÜCK no recibe ni almacena los datos de tu tarjeta.
+Propiedad intelectual
+Las marcas, textos, fotografías y diseños del sitio pertenecen a GLÜCK y no pueden reproducirse sin autorización.
+Contacto
+Ante cualquier duda, escribinos por
+Instagram
+o desde la página de
+contacto
+.
+[aria-label] Tu carrito
+Tu selección
+Carrito
+[aria-label] Cerrar carrito
+Subtotal
+$ 0
+El costo de envío se confirma en el checkout, antes de pagar.
+Email para la confirmación del pedido
+[placeholder] tu@email.com
+Finalizar compra
+¿Te gustó algo?
+Seguinos en Instagram
+GLÜCK
+Bolsos minimalistas de cuero vegano
+[aria-label] Pie de página
+Colección
+Bolsos
+Nosotras
+Contacto
+Envíos
+Cambios
+Instagram
+[aria-label] Legales
+Términos
+Privacidad
+© 2026 GLÜCK. Todos los derechos reservados.
+Volver arriba ↑
+Cuero vegano · Hecho a mano

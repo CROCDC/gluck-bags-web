@@ -10,17 +10,71 @@
     {% block head %}{% endblock %}
 </head>
 <body class="admin">
+    {# Three jobs, three slots, in order of how much they matter: where you are, where
+       you can go, and the way out. The sections are the primary navigation — they used
+       to be squeezed between the brand and an underlined "Salir" that read as the most
+       important control in the corner. #}
     <header class="adm-header">
-        <a class="adm-brand" href="{{ url_for('admin.products_list') if session.admin else url_for('admin.login') }}">{{ brand }} · Admin</a>
+        <a class="adm-brand" href="{{ url_for('admin.products_list') if session.admin else url_for('admin.login') }}">
+            <span class="adm-brand-mark">{{ brand }}</span>
+            <span class="adm-brand-tag">Admin</span>
+        </a>
+
         {% if session.admin %}
-        <form method="post" action="{{ url_for('admin.logout') }}">
-            <button type="submit" class="adm-link">Salir</button>
+        {# Two independent sections: the catalogue and the site copy. #}
+        <nav class="adm-sections" aria-label="Secciones">
+            <a href="{{ url_for('admin.products_list') }}"
+               class="adm-section-link{% if section == 'products' %} is-current{% endif %}"
+               {% if section == 'products' %}aria-current="page"{% endif %}>
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M6 8h12l-1 12H7L6 8Z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>
+                </svg>
+                <span>Productos</span>
+            </a>
+            <a href="{{ url_for('admin_content.editor') }}"
+               class="adm-section-link{% if section == 'content' %} is-current{% endif %}"
+               {% if section == 'content' %}aria-current="page"{% endif %}>
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M5 6h14M5 12h14M5 18h9"/>
+                </svg>
+                <span>Textos</span>
+            </a>
+        </nav>
+
+        {# One grid cell for both: the header is a 3-column grid, so a fourth child
+           would drop onto a second row. #}
+        <div class="adm-header-end">
+        {# The only way to check what customers actually see used to be typing the shop's
+           address into another tab from memory. #}
+        <a href="{{ url_for('index') }}" target="_blank" rel="noopener"
+           class="adm-pill adm-visit" aria-label="Ver la web, se abre en otra pestaña">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                 stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/>
+            </svg>
+            <span class="adm-exit-text">Ver la web</span>
+        </a>
+
+        <form method="post" action="{{ url_for('admin.logout') }}" class="adm-exit-form">
+            {# Icon-only on a narrow screen: the word is what used to wrap the header
+               onto a third line and push the content 300px down on a small phone. #}
+            <button type="submit" class="adm-exit" aria-label="Salir del panel">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                     stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M10 19H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4"/><path d="m16 16 4-4-4-4M20 12H10"/>
+                </svg>
+                <span class="adm-exit-text">Salir</span>
+            </button>
         </form>
+        </div>
         {% endif %}
     </header>
 
-    <main class="adm-main">
-        {% if session.admin and config.get('CATALOG_SOURCE') == 'tiendanube' %}
+    {# The visual editor needs the whole width; every other screen stays readable. #}
+    <main class="adm-main{% if full_bleed %} adm-main-wide{% endif %}">
+        {% if section != 'content' and session.admin and config.get('CATALOG_SOURCE') == 'tiendanube' %}
         <div class="adm-flashes">
             <div class="adm-flash adm-flash-notice">
                 El catálogo público se administra en <strong>Tienda Nube</strong>:

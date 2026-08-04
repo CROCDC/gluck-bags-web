@@ -1,0 +1,69 @@
+[content] width=device-width, initial-scale=1.0
+[content] website
+[content] https://gluckbags.com/gracias
+[content] ¡Gracias por tu compra! · GLÜCK
+[content] Recibimos tu pedido en GLÜCK. Tu pago se procesa en Tienda Nube y te llega la confirmación y el seguimiento del envío por email.
+[content] https://gluckbags.com/static/img/og-image.jpg
+[content] image/jpeg
+[content] 1200
+[content] 630
+[content] Tote de cuero vegano cognac de GLÜCK en la playa
+[content] es_AR
+[content] GLÜCK
+[content] summary_large_image
+[content] ¡Gracias por tu compra! · GLÜCK
+[content] Recibimos tu pedido en GLÜCK. Tu pago se procesa en Tienda Nube y te llega la confirmación y el seguimiento del envío por email.
+[content] https://gluckbags.com/static/img/og-image.jpg
+¡Gracias por tu compra! · GLÜCK
+[content] Recibimos tu pedido en GLÜCK. Tu pago se procesa en Tienda Nube y te llega la confirmación y el seguimiento del envío por email.
+[content] noindex, follow
+[aria-label] GLÜCK inicio
+GLÜCK
+[aria-label] Principal
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+[aria-label] Abrir carrito
+0
+[aria-label] Abrir menú
+Colección
+Bolsos
+Materia
+Nosotras
+Comprar
+Pedido confirmado
+¡Gracias por tu compra!
+Tu pago se está procesando en Tienda Nube. Cuando se acredite vas a recibir la confirmación por email con el detalle y el seguimiento del envío.
+¿Alguna duda con tu pedido? Escribinos y te ayudamos.
+Seguir mirando
+Escribinos por Instagram
+[aria-label] Tu carrito
+Tu selección
+Carrito
+[aria-label] Cerrar carrito
+Subtotal
+$ 0
+El costo de envío se confirma en el checkout, antes de pagar.
+Email para la confirmación del pedido
+[placeholder] tu@email.com
+Finalizar compra
+¿Te gustó algo?
+Seguinos en Instagram
+GLÜCK
+Bolsos minimalistas de cuero vegano
+[aria-label] Pie de página
+Colección
+Bolsos
+Nosotras
+Contacto
+Envíos
+Cambios
+Instagram
+[aria-label] Legales
+Términos
+Privacidad
+© 2026 GLÜCK. Todos los derechos reservados.
+Volver arriba ↑
+Cuero vegano · Hecho a mano

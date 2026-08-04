@@ -36,9 +36,24 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key")
 # make every admin-catalogue test serve an empty TN mirror.
 for _tn_var in ("TN_STORE_ID", "TN_ACCESS_TOKEN", "TN_CLIENT_ID", "TN_CLIENT_SECRET"):
     os.environ[_tn_var] = ""
-os.environ["CATALOG_SOURCE"] = "admin"
+# Pinned to the admin catalogue so the suite needs no Tienda Nube credentials. Set
+# TEST_CATALOG_SOURCE=tiendanube to run the content/editor files the way PRODUCTION
+# runs — that surface must not depend on where products come from, and pinning this
+# meant nothing ever exercised it under the real config.
+os.environ["CATALOG_SOURCE"] = os.environ.get("TEST_CATALOG_SOURCE", "admin")
 
 from app import app as flask_app
+
+
+def pytest_addoption(parser) -> None:
+    """`--snapshot-update` rewrites the public-copy snapshots (see
+    tests/test_public_copy_golden.py) instead of asserting against them."""
+    parser.addoption(
+        "--snapshot-update",
+        action="store_true",
+        default=False,
+        help="Rewrite the public-copy snapshots in tests/golden/.",
+    )
 
 
 def _free_port() -> int:

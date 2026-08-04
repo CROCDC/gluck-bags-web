@@ -1,0 +1,329 @@
+/* GLÜCK admin — visual editor shell (the chrome around the live site).
+   Loaded on top of admin.css + admin-content.css, only on /admin/content/. */
+
+.adm-main-wide { max-width: 1500px; padding-left: clamp(0.6rem, 2vw, 1.5rem); padding-right: clamp(0.6rem, 2vw, 1.5rem); }
+
+.ed { display: flex; flex-direction: column; gap: 0.8rem; }
+
+/* An explicit `display` beats the UA's [hidden] rule, so every element in here
+   that toggles with `hidden` needs it spelled out. */
+.ed [hidden] { display: none !important; }
+
+/* ---------- toolbar ---------- */
+.ed-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 0.8rem; flex-wrap: wrap;
+    background: var(--adm-card);
+    border: 1px solid var(--adm-line);
+    border-radius: var(--adm-radius);
+    padding: 0.6rem 0.9rem;
+    position: sticky; top: var(--adm-header-h); z-index: 30;
+}
+.ed-bar-group { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; }
+.ed-title { font-size: 1.05rem; }
+.ed-hint { font-size: 0.83rem; color: var(--adm-soft); }
+.ed-page {
+    font-family: inherit; font-size: 16px; color: var(--adm-ink);
+    background: var(--adm-paper); border: 1px solid var(--adm-line);
+    border-radius: 8px; padding: 0.45rem 0.6rem; max-width: 210px; min-height: 44px;
+}
+
+.ed-devices { gap: 0.25rem; }
+.ed-device {
+    background: none; border: 1px solid transparent; border-radius: 999px;
+    font-family: inherit; font-size: 0.88rem; color: var(--adm-soft);
+    padding: 0.45rem 0.8rem; cursor: pointer; min-height: 44px;
+}
+.ed-device:hover { border-color: var(--adm-line); }
+.ed-device.is-current { background: var(--adm-ink); color: #fff; }
+
+.ed-actions { gap: 0.5rem; }
+.ed-btn {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    font-family: inherit; font-size: 0.95rem; line-height: 1;
+    padding: 0.7rem 1rem; min-height: 44px;
+    border-radius: 10px; border: 1px solid transparent; cursor: pointer;
+}
+/* white on --adm-cognac is 4.13:1; the darker shade clears AA on the
+   highest-stakes button in the panel. */
+.ed-btn-primary { background: var(--adm-cognac-dk); color: #fff; }
+.ed-btn-primary:hover:not(:disabled) { background: #874c29; }
+.ed-btn-ghost { background: transparent; border-color: var(--adm-line); color: var(--adm-ink); }
+.ed-btn-ghost:hover:not(:disabled) { border-color: var(--adm-ink); }
+.ed-btn:disabled { opacity: 0.45; cursor: default; }
+.ed-badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px;
+    /* A 25%-white tint over the cognac button composited to 3.36:1. */
+    background: rgba(26, 23, 20, 0.55); font-size: 0.75rem;
+}
+.ed-btn-ghost .ed-badge { background: rgba(26, 23, 20, 0.1); }
+/* Reserved, not fitted: the bar's row count used to depend on whether there were
+   pending changes, so the first edit re-wrapped it and moved Guardar/Publicar. */
+.ed-status { flex: 1 1 12rem; min-width: 12rem; font-size: 0.85rem; color: var(--adm-soft); }
+/* Same idea for Descartar: it holds its box instead of appearing out of nowhere. */
+.ed-actions .ed-btn.is-off { visibility: hidden; }
+.ed-status.is-error { color: var(--adm-err); }
+
+/* ---------- canvas + panel ---------- */
+.ed-body { display: flex; gap: 0.8rem; align-items: stretch; }
+
+.ed-skip {
+    position: absolute; left: -9999px; top: auto;
+    background: var(--adm-ink); color: #fff; text-decoration: none;
+    padding: 0.7rem 1rem; border-radius: 8px; z-index: 50;
+}
+/* Stays absolutely positioned when focused: as a static flex item it stretched to
+   the full height of the row and pushed the canvas aside. */
+.ed-skip:focus { left: 0.6rem; top: -0.2rem; transform: translateY(-100%); }
+.ed-stage {
+    flex: 1 1 auto; min-width: 0;
+    display: flex; justify-content: center;
+    background: repeating-linear-gradient(45deg, #eae3db, #eae3db 10px, #f0eae3 10px, #f0eae3 20px);
+    border: 1px solid var(--adm-line); border-radius: var(--adm-radius);
+    padding: 0.8rem; overflow: hidden;
+}
+.ed-stage.is-fluid { padding: 0; background: none; border-color: transparent; }
+.ed-frame {
+    background: #fff; border-radius: 10px; overflow: hidden;
+    box-shadow: 0 10px 30px rgba(26, 23, 20, 0.18);
+    transform-origin: top center; flex: none;
+}
+.ed-stage.is-fluid .ed-frame { width: 100%; box-shadow: none; border-radius: var(--adm-radius); }
+.ed-frame iframe { display: block; border: 0; width: 100%; height: 100%; background: #fff; }
+
+.ed-panel {
+    flex: 0 0 360px; max-width: 360px; align-self: stretch;
+    background: var(--adm-card); border: 1px solid var(--adm-line);
+    border-radius: var(--adm-radius); overflow: hidden;
+    display: flex; flex-direction: column; max-height: 78vh;
+    /* Below the bar, and above nothing: at top:140px with the bar at z-index 30
+       the panel's close button sat underneath it and was unclickable. */
+    position: sticky; top: calc(var(--adm-header-h) + var(--ed-bar-h, 84px) + 0.8rem);
+    z-index: 10;
+}
+.ed-panel-head {
+    flex: none;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.8rem 0.9rem; border-bottom: 1px solid var(--adm-line);
+}
+.ed-panel-head h2 { font-size: 1rem; font-weight: 500; margin: 0; }
+.ed-panel-close {
+    background: none; border: none; cursor: pointer; font-size: 1.5rem; line-height: 1;
+    color: var(--adm-soft); width: 44px; height: 44px; border-radius: 8px;
+}
+.ed-panel-close:hover { color: var(--adm-ink); }
+
+.ed-panel-tabs { flex: none; display: flex; gap: 0.2rem; padding: 0.5rem 0.6rem 0; }
+.ed-tab {
+    flex: 1 1 auto; background: none; border: none; border-bottom: 2px solid transparent;
+    font-family: inherit; font-size: 0.88rem; color: var(--adm-soft);
+    padding: 0.5rem 0.3rem; cursor: pointer; min-height: 44px;
+}
+.ed-tab.is-current { color: var(--adm-ink); border-bottom-color: var(--adm-cognac); }
+.ed-tab .ed-badge { background: rgba(26, 23, 20, 0.1); }
+
+.ed-panel-body { flex: 1 1 auto; min-height: 0; padding: 0.8rem 0.9rem 1.2rem; overflow-y: auto; }
+.ed-panel-note { font-size: 0.82rem; color: var(--adm-soft); margin: 0 0 0.9rem; }
+.ed-filter {
+    font-family: inherit; font-size: 16px; width: 100%; margin-bottom: 0.8rem;
+    padding: 0.6rem 0.8rem; border: 1px solid var(--adm-line); border-radius: 10px;
+    background: var(--adm-paper); color: var(--adm-ink);
+}
+
+.ed-field { padding: 0.7rem 0; border-top: 1px solid var(--adm-line); }
+.ed-field:first-child { border-top: none; padding-top: 0; }
+.ed-field-label { display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 0.1rem; }
+.ed-field-where { display: block; font-size: 0.74rem; color: var(--adm-soft); margin-bottom: 0.35rem; }
+.ed-field-hint { font-size: 0.76rem; color: var(--adm-soft); margin: 0.2rem 0 0; }
+.ed-field input, .ed-field textarea {
+    font-family: inherit; font-size: 16px; width: 100%; color: var(--adm-ink);
+    background: var(--adm-paper); border: 1px solid var(--adm-line);
+    border-radius: 8px; padding: 0.5rem 0.6rem; resize: vertical;
+}
+.ed-field input:focus, .ed-field textarea:focus {
+    outline: 2px solid var(--adm-cognac); outline-offset: 1px; background: #fff;
+}
+.ed-field textarea[readonly], .ed-field input[readonly] {
+    cursor: pointer; background: var(--adm-card); border-style: dashed;
+}
+.ed-field.is-dirty { border-left: 3px solid var(--adm-cognac); padding-left: 0.6rem; margin-left: -0.6rem; }
+/* Saved, but the shop still shows the old wording. Dashed, so it reads as "parked"
+   next to the solid bar of an edit that has not been saved at all. */
+.ed-field.is-draft { border-left: 3px dashed var(--adm-cognac); padding-left: 0.6rem; margin-left: -0.6rem; }
+.ed-field.is-draft > label::after {
+    content: "sin publicar";
+    margin-left: 0.5rem;
+    padding: 0.05rem 0.4rem;
+    border-radius: 999px;
+    background: rgba(181, 106, 58, 0.14);
+    color: var(--adm-cognac-dk);
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+}
+.ed-field.is-invalid { border-left: 3px solid var(--adm-err); padding-left: 0.6rem; margin-left: -0.6rem; }
+.ed-field.is-invalid input, .ed-field.is-invalid textarea { border-color: var(--adm-err); }
+.ed-field-foot { display: flex; align-items: center; justify-content: space-between; gap: 0.9rem; flex-wrap: wrap; margin-top: 0.25rem; }
+.ed-field-count { font-size: 0.72rem; color: var(--adm-soft); }
+.ed-field-count.is-over { color: var(--adm-err); font-weight: 500; }
+.ed-field-restore {
+    background: none; border: none; cursor: pointer;
+    /* 101x17 was well under the 44px touch minimum. */
+    padding: 0.7rem 0; min-height: 44px;
+    font-family: inherit; font-size: 0.8rem; color: var(--adm-soft); text-decoration: underline;
+}
+.ed-field-restore:hover { color: var(--adm-cognac); }
+/* The everyday escape hatch, next to two buttons that go much further back. */
+.ed-field-undo { color: var(--adm-cognac-dk); }
+.ed-panel-empty { color: var(--adm-soft); font-size: 0.88rem; padding: 1rem 0; }
+
+.ed-card-kind {
+    font-size: 0.74rem; letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--adm-soft); margin: 1.2rem 0 0.6rem;
+}
+.ed-panel-body > .ed-card-kind:first-child { margin-top: 0; }
+
+.ed-footnote { font-size: 0.85rem; color: var(--adm-soft); margin: 0.2rem 0 0; }
+
+/* Stacking happens at 980px, not 1100px: an iPad in landscape is 1024px and was the
+   one touch device with room for canvas + panel side by side. */
+@media (max-width: 980px) {
+    .ed-body { flex-direction: column; }
+    /* In a COLUMN flex container the cross axis is the width, so `flex: 1 1 auto`
+       sized the height and both children shrank to fit — which pinned the canvas to
+       the iframe's intrinsic 300px on every phone, tablet and 150%+ zoom. */
+    .ed-stage, .ed-panel { width: 100%; align-self: stretch; }
+    .ed-panel { flex: 1 1 auto; max-width: none; position: static; }
+}
+
+/* The sticky bar was keyed to viewport WIDTH, so a landscape phone (750–802px) kept
+   231px of fixed chrome above a 342px viewport — at best 110px of canvas, at worst
+   none. What matters here is the height. */
+@media (max-width: 720px), (max-height: 560px) {
+    .ed-bar { position: static; }
+    /* The one sentence that explains the editor, on the devices with neither hover
+       nor a text cursor to hint with. Its own row, so it never competes with the
+       page picker for width. */
+    .ed-hint { flex: 1 0 100%; font-size: 0.8rem; }
+    /* A 1280px preview scaled to fit a phone renders 16px body text at 8px. */
+    .ed-devices { display: none; }
+
+    /* Save/Publish sat up to 1300px above the field being edited. `sticky` could not
+       help: its containing block is .ed-bar, which is `static` down here, so the box
+       could never leave it. Fixed is relative to the viewport. */
+    .ed-actions {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+        width: auto; margin: 0; padding: 0.6rem 0.8rem calc(0.6rem + env(safe-area-inset-bottom));
+        background: var(--adm-card); border-top: 1px solid var(--adm-line);
+        box-shadow: 0 -6px 20px rgba(26, 23, 20, 0.12);
+    }
+    /* The cap is the whole fix: a button left alone on the last row stretched to the
+       full width, so the biggest, lowest, easiest target on the screen belonged to the
+       one action that is irreversible and public. Capping beats forcing two columns —
+       this block also matches a landscape phone (~840px wide), where fixed 50% columns
+       render 400px buttons. */
+    .ed-actions .ed-btn { flex: 1 1 auto; justify-content: center; max-width: calc(50% - 0.25rem); }
+    /* Its own row: an error message names the field AND the screen it lives on now,
+       which does not fit beside four buttons. */
+    .ed-actions .ed-status { flex: 1 0 100%; order: -1; min-width: 0; }
+    .ed-actions .ed-status:empty { display: none; }
+    /* Nothing to reserve on a phone: the bar is fixed to the bottom and 390px wide, so a
+       held-open slot would just squeeze the two buttons that matter. */
+    .ed-actions .ed-btn.is-off { display: none; }
+    /* …and reserve the space it now floats over: 117px, or 169px once Descartar shows
+       up. The flat 76px left the field being edited underneath the bar. */
+    .ed { padding-bottom: var(--ed-actions-h, 180px); }
+}
+
+@media (max-width: 380px) {
+    .ed-page { min-width: 0; }
+}
+
+@media (max-width: 720px) {
+    .ed-actions { width: 100%; }
+    .ed-actions .ed-btn { flex: 1 1 auto; justify-content: center; }
+    .ed-page { max-width: none; flex: 1 1 auto; }
+}
+
+/* ---------- page-body editor ----------
+   A whole editorial page needs a readable column and a toolbar in words. Editing it
+   in a floating box over the site is where every reviewer got hurt. */
+body.ed-sheet-open { overflow: hidden; }
+
+.ed-sheet {
+    position: fixed; inset: 0; z-index: 200;
+    display: flex; align-items: center; justify-content: center;
+    padding: clamp(0.5rem, 3vw, 2rem);
+    background: rgba(26, 23, 20, 0.55);
+}
+.ed-sheet[hidden] { display: none; }
+.ed-sheet-panel {
+    display: flex; flex-direction: column;
+    width: min(900px, 100%); max-height: 100%;
+    background: var(--adm-card); border-radius: var(--adm-radius);
+    box-shadow: 0 20px 60px rgba(26, 23, 20, 0.35);
+    overflow: hidden;
+}
+.ed-sheet-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
+    padding: 0.9rem 1rem; border-bottom: 1px solid var(--adm-line);
+}
+.ed-sheet-head h2 { margin: 0; font-size: 1.05rem; font-weight: 500; }
+.ed-sheet-where { margin: 0.1rem 0 0; font-size: 0.78rem; color: var(--adm-soft); }
+.ed-sheet-close {
+    flex: none; width: 44px; height: 44px; border: none; background: none;
+    font-size: 1.6rem; line-height: 1; color: var(--adm-soft); cursor: pointer; border-radius: 8px;
+}
+.ed-sheet-close:hover { color: var(--adm-ink); }
+
+.ed-sheet-tokens {
+    margin: 0; padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--adm-line);
+    font-size: 0.8rem; line-height: 1.45; color: var(--adm-soft);
+}
+.ed-sheet-tokens[hidden] { display: none; }
+
+.ed-sheet-tools {
+    display: flex; flex-wrap: wrap; gap: 0.35rem;
+    padding: 0.6rem 1rem; border-bottom: 1px solid var(--adm-line);
+    background: var(--adm-paper);
+}
+.ed-tool {
+    min-height: 44px; padding: 0 0.8rem;
+    background: var(--adm-card); border: 1px solid var(--adm-line); border-radius: 8px;
+    font-family: inherit; font-size: 0.9rem; color: var(--adm-ink); cursor: pointer;
+}
+.ed-tool:hover { border-color: var(--adm-ink); }
+.ed-tool b { font-weight: 700; }
+.ed-tool i { font-style: italic; }
+
+.ed-sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 1.2rem 1rem; }
+.ed-sheet-doc {
+    max-width: 68ch; margin: 0 auto; min-height: 40vh;
+    font-size: 1rem; line-height: 1.6; color: var(--adm-ink);
+    outline: none;
+}
+.ed-sheet-doc:focus-visible { outline: 2px solid var(--adm-cognac); outline-offset: 6px; }
+.ed-sheet-doc h2 { font-size: 1.2rem; margin: 1.4rem 0 0.5rem; }
+.ed-sheet-doc p { margin: 0 0 0.9rem; }
+.ed-sheet-doc ul, .ed-sheet-doc ol { margin: 0 0 0.9rem 1.2rem; }
+.ed-sheet-doc a { color: var(--adm-cognac-dk); }
+
+.ed-sheet-foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    flex-wrap: wrap;
+    padding: 0.7rem 1rem calc(0.7rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--adm-line);
+}
+.ed-sheet-count { font-size: 0.8rem; color: var(--adm-soft); }
+.ed-sheet-count.is-over { color: var(--adm-err); font-weight: 500; }
+.ed-sheet-note { flex: 1 0 100%; margin: 0 0 0.4rem; font-size: 0.8rem; color: var(--adm-cognac-dk); }
+.ed-sheet-actions { display: flex; gap: 0.5rem; }
+
+@media (max-width: 720px) {
+    .ed-sheet { padding: 0; }
+    .ed-sheet-panel { width: 100%; height: 100%; max-height: 100%; border-radius: 0; }
+    .ed-sheet-actions { flex: 1 1 auto; }
+    .ed-sheet-actions .ed-btn { flex: 1 1 auto; justify-content: center; }
+}

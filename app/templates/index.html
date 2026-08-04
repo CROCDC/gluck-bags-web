@@ -27,22 +27,22 @@
                              {{ url_for('static', filename='img/hero/hero-tote-cognac-playa.jpg') }} 1080w"
                      sizes="100vw"
                      width="1080" height="1080"
-                     alt="Tote de cuero vegano cognac de GLÜCK en la playa" fetchpriority="high">
+                     alt="{{ t('home.hero.image_alt') }}" fetchpriority="high">
             </picture>
             <div class="hero-overlay"></div>
 
             <div class="hero-content">
-                <p class="hero-eyebrow">Cuero vegano · Sin costuras</p>
-                <h1 class="hero-title">{{ tagline }}</h1>
-                <p class="hero-sub">Bolsos de líneas puras, pensados para durar. Sin pieles, sin excesos.</p>
+                <p class="hero-eyebrow">{{ t('home.hero.eyebrow') }}</p>
+                <h1 class="hero-title">{{ t('home.hero.title') }}</h1>
+                <p class="hero-sub">{{ t('home.hero.subtitle') }}</p>
                 <div class="hero-actions">
-                    <a href="#categorias" class="btn btn-light">Ver la colección</a>
-                    <a href="#shop" class="btn btn-ghost" data-umami-event="ir-al-shop" data-umami-event-ubicacion="hero">Comprar ahora</a>
+                    <a href="#categorias" class="btn btn-light">{{ t('home.hero.cta_primary') }}</a>
+                    <a href="#shop" class="btn btn-ghost" data-umami-event="ir-al-shop" data-umami-event-ubicacion="hero">{{ t('home.hero.cta_secondary') }}</a>
                 </div>
             </div>
 
-            <a href="#categorias" class="hero-scroll" aria-label="Bajar a la colección">
-                <span class="hero-scroll-label">Scroll</span>
+            <a href="#categorias" class="hero-scroll" aria-label="{{ t('home.hero.scroll_aria') }}">
+                <span class="hero-scroll-label">{{ t('home.hero.scroll_label') }}</span>
                 <span class="hero-scroll-line"></span>
             </a>
         </section>
@@ -50,7 +50,7 @@
         <!-- ===================== MARQUEE ===================== -->
         <section class="marquee" aria-hidden="true">
             <div class="marquee-track">
-                {% set phrases = ["Cuero vegano minimalista", "De una sola pieza", "Diseño atemporal", "Sin crueldad"] %}
+                {% set phrases = t_lines('home.marquee.phrases') %}
                 {% for _ in range(2) %}{% for phrase in phrases %}<span class="marquee-item">{{ phrase }}</span><span class="marquee-sep">✦</span>{% endfor %}{% endfor %}
             </div>
         </section>
@@ -58,8 +58,8 @@
         <!-- ===================== CATEGORIES ===================== -->
         <section class="section categorias" id="categorias">
             <div class="section-head reveal">
-                <p class="eyebrow">La colección</p>
-                <h2 class="section-title">Cuatro siluetas, infinitas combinaciones</h2>
+                <p class="eyebrow">{{ t('home.categories.eyebrow') }}</p>
+                <h2 class="section-title">{{ t('home.categories.title') }}</h2>
             </div>
 
             <div class="cat-grid">
@@ -71,7 +71,7 @@
                 {% set tag = 'a' if has_products else 'div' %}
                 <{{ tag }} {% if has_products %}href="{{ url_for('category_page', slug=cat.name|slugify) }}"{% endif %}
                    class="cat-card reveal{% if not has_products %} is-soon{% endif %}" style="--i: {{ loop.index0 }}"
-                   {% if not has_products %}aria-label="{{ cat.name }} — próximamente"{% endif %}>
+                   >
                     <div class="cat-media">
                         <picture>
                             <source type="image/webp"
@@ -82,7 +82,7 @@
                                  srcset="{{ url_for('static', filename=cat.image ~ '-400.jpg') }} 400w,
                                          {{ url_for('static', filename=cat.image ~ '-600.jpg') }} 600w"
                                  sizes="(max-width: 768px) 50vw, 25vw"
-                                 width="600" height="800" alt="{{ cat.name }}" loading="lazy">
+                                 width="600" height="800" alt="{{ cat.label }}" loading="lazy">
                         </picture>
                         <span class="cat-index">{{ '%02d' % loop.index }}</span>
                         {% if has_products %}
@@ -92,11 +92,15 @@
                             </svg>
                         </span>
                         {% else %}
-                        <span class="cat-soon">Próximamente</span>
+                        <span class="cat-soon">{{ t('home.categories.soon') }}</span>
+                        {# On the non-linked card this lived in an aria-label on a
+                           <div>, whose `generic` role prohibits naming — so it was
+                           editable copy no screen reader could ever announce. #}
+                        <span class="sr-only">{{ t('home.categories.soon_aria', category=cat.label) }}</span>
                         {% endif %}
                     </div>
                     <div class="cat-info">
-                        <h3 class="cat-name">{{ cat.name }}</h3>
+                        <h3 class="cat-name">{{ cat.label }}</h3>
                         <span class="cat-tag">{{ cat.tagline }}</span>
                     </div>
                 </{{ tag }}>
@@ -120,32 +124,27 @@
                          srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero-768.jpg') }} 768w,
                                  {{ url_for('static', filename='img/hero/hero-tote-gris-velero.jpg') }} 1080w"
                          sizes="(max-width: 980px) 100vw, 50vw"
-                         width="1080" height="1080" alt="Tote GLÜCK en la cubierta de un velero" loading="lazy">
+                         width="1080" height="1080" alt="{{ t('home.feature.image_alt') }}" loading="lazy">
                 </picture>
             </div>
             <div class="feature-text reveal">
-                <p class="eyebrow">Diseño de autor</p>
-                <h2 class="section-title">El Tote que te sigue<br>a todas partes</h2>
-                <p class="feature-body">
-                    Cada bolso sale de una sola pieza de cuero vegano: la diseñamos, la
-                    cortamos con láser y la plegamos a mano. Sin costuras —
-                    la forma se sostiene con remaches y broches.
-                </p>
+                <p class="eyebrow">{{ t('home.feature.eyebrow') }}</p>
+                <h2 class="section-title">{{ t('home.feature.title') }}</h2>
+                <p class="feature-body">{{ t('home.feature.body') }}</p>
                 <ul class="feature-specs">
-                    <li>De una sola pieza, sin costuras</li>
-                    <li>Cortada con láser desde un molde propio</li>
-                    <li>Plegada y unida con remaches y broches</li>
+                    {% for spec in t_lines('home.feature.specs') %}<li>{{ spec }}</li>
+                    {% endfor %}
                 </ul>
                 {% set tote_url = url_for('category_page', slug='tote') if 'tote' in published_cats else '#shop' %}
-                <a href="{{ tote_url }}" class="btn btn-dark" data-umami-event="ir-al-shop" data-umami-event-ubicacion="feature">Quiero el mío</a>
+                <a href="{{ tote_url }}" class="btn btn-dark" data-umami-event="ir-al-shop" data-umami-event-ubicacion="feature">{{ t('home.feature.cta') }}</a>
             </div>
         </section>
 
         <!-- ===================== SHOP GRID ===================== -->
         <section class="section shop" id="shop">
             <div class="section-head reveal">
-                <p class="eyebrow">Bolsos</p>
-                <h2 class="section-title">Lo último de {{ brand }}</h2>
+                <p class="eyebrow">{{ t('home.shop.eyebrow') }}</p>
+                <h2 class="section-title">{{ t('home.shop.title') }}</h2>
             </div>
 
             {% if products %}
@@ -173,20 +172,20 @@
                              width="{{ cover.width or 640 }}" height="{{ cover.height or 800 }}"
                              alt="{{ product.title }}" loading="lazy">
                         {% endif %}
-                        <span class="product-badge">{% if product.videos %}▶ Ver video{% else %}Ver más{% endif %}</span>
+                        <span class="product-badge">{% if product.videos %}{{ t('home.shop.badge_video') }}{% else %}{{ t('home.shop.badge_more') }}{% endif %}</span>
                     </div>
                     <div class="product-info">
                         <div class="product-meta">
                             <h3 class="product-name">{{ product.title }}</h3>
-                            {% if product.category %}<span class="product-cat">{{ product.category }}</span>{% endif %}
+                            {% if product.category %}<span class="product-cat">{{ category_label(product.category) }}</span>{% endif %}
                         </div>
-                        <span class="product-price">{{ product.formatted_price or 'Consultar' }}</span>
+                        <span class="product-price">{{ product.formatted_price or t('product.price_fallback') }}</span>
                     </div>
                 </a>
                 {% endfor %}
             </div>
             {% else %}
-            <p class="shop-empty reveal">Muy pronto vas a ver acá nuestros bolsos.</p>
+            <p class="shop-empty reveal">{{ t('home.shop.empty') }}</p>
             {% endif %}
         </section>
 
@@ -203,40 +202,26 @@
             </video>
             <div class="materia-overlay"></div>
             <div class="materia-content reveal">
-                <p class="eyebrow light">La materia</p>
-                <h2 class="section-title light">Cuero vegano,<br>elegido a mano</h2>
-                <p class="materia-body">
-                    Seleccionamos cada rollo por su tacto y su color. Materiales libres de origen
-                    animal que envejecen con gracia, para que cada bolso cuente su propia historia.
-                </p>
+                <p class="eyebrow light">{{ t('home.materia.eyebrow') }}</p>
+                <h2 class="section-title light">{{ t('home.materia.title') }}</h2>
+                <p class="materia-body">{{ t('home.materia.body') }}</p>
             </div>
-            <span class="materia-caption">Detrás de escena · selección de materiales</span>
+            <span class="materia-caption">{{ t('home.materia.caption') }}</span>
         </section>
 
         <!-- ===================== MANIFESTO ===================== -->
         <section class="section manifiesto" id="manifiesto">
             <div class="manifiesto-inner reveal">
-                <p class="eyebrow">Nosotras</p>
-                <blockquote class="manifiesto-quote">
-                    Creemos en lo simple, en lo que dura y en lo que no le hace daño a nadie.
-                    Cada <em>{{ brand }}</em> nace de esa idea: belleza sin culpa.
-                </blockquote>
+                <p class="eyebrow">{{ t('home.manifesto.eyebrow') }}</p>
+                <blockquote class="manifiesto-quote">{{ t('home.manifesto.quote') }}</blockquote>
                 <div class="manifiesto-values">
+                    {% for n in [1, 2, 3] %}
                     <div class="value">
-                        <span class="value-index">01</span>
-                        <h3>100% vegano</h3>
-                        <p>Sin pieles ni derivados animales.</p>
+                        <span class="value-index">{{ '%02d' % n }}</span>
+                        <h3>{{ t('home.manifesto.value' ~ n ~ '_title') }}</h3>
+                        <p>{{ t('home.manifesto.value' ~ n ~ '_body') }}</p>
                     </div>
-                    <div class="value">
-                        <span class="value-index">02</span>
-                        <h3>Sin costuras</h3>
-                        <p>De una sola pieza, plegada y unida con remaches.</p>
-                    </div>
-                    <div class="value">
-                        <span class="value-index">03</span>
-                        <h3>Atemporal</h3>
-                        <p>Diseños que no pasan de moda.</p>
-                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </section>
@@ -253,18 +238,14 @@
                 </video>
             </div>
             <div class="closer-text reveal">
-                <p class="eyebrow">Listo para regalar</p>
-                <h2 class="section-title">Cada pedido llega<br>como un regalo</h2>
-                <p class="feature-body">
-                    Empaque kraft con el sello {{ brand }}. Hacé tu pedido en la tienda online
-                    y lo recibís listo para regalar; si tenés dudas, te acompañamos por Instagram.
-                </p>
+                <p class="eyebrow">{{ t('home.closer.eyebrow') }}</p>
+                <h2 class="section-title">{{ t('home.closer.title') }}</h2>
+                <p class="feature-body">{{ t('home.closer.body') }}</p>
                 <ul class="feature-specs closer-specs">
-                    <li>Envíos a todo el país</li>
-                    <li>Packaging de regalo incluido</li>
-                    <li>Atención personalizada por Instagram</li>
+                    {% for spec in t_lines('home.closer.specs') %}<li>{{ spec }}</li>
+                    {% endfor %}
                 </ul>
-                <a href="#shop" class="btn btn-light-on-dark" data-umami-event="ir-al-shop" data-umami-event-ubicacion="closer">Ver los bolsos</a>
+                <a href="#shop" class="btn btn-light-on-dark" data-umami-event="ir-al-shop" data-umami-event-ubicacion="closer">{{ t('home.closer.cta') }}</a>
             </div>
         </section>
 

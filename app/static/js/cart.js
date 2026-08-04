@@ -7,6 +7,32 @@
 
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
+  /* ---- Copy ----
+     The drawer is rendered here, not by Jinja, so its strings arrive as JSON in
+     #cartStrings (filled from the admin-editable text registry). The literals below
+     are the fallback: if that block is ever missing the cart still reads correctly. */
+  const STRINGS = Object.assign(
+    {
+      empty: "Tu carrito está vacío.",
+      emptyCta: "Ver bolsos",
+      remove: "Quitar",
+      removeAria: "Quitar {title}",
+      qtyDecAria: "Quitar uno",
+      qtyIncAria: "Agregar uno",
+      emailError: "Ingresá tu email para recibir la confirmación del pedido.",
+      checkoutError: "No pudimos iniciar el checkout. Probá de nuevo en un momento.",
+    },
+    (function () {
+      const node = document.getElementById("cartStrings");
+      if (!node) return null;
+      try {
+        return JSON.parse(node.textContent || "{}");
+      } catch (_) {
+        return null;
+      }
+    })()
+  );
+
   const drawer = document.getElementById("cartDrawer");
   if (!drawer) return; // sólo en las páginas públicas que incluyen el drawer
 
@@ -66,13 +92,15 @@
       '<a class="cart-line-title" href="' + url + '">' + escapeHtml(it.title) + "</a>" +
       '<span class="cart-line-price">' + it.price_formatted + "</span>" +
       '<div class="qty-stepper">' +
-      '<button class="qty-btn" data-qty-dec aria-label="Quitar uno">−</button>' +
+      '<button class="qty-btn" data-qty-dec aria-label="' + escapeHtml(STRINGS.qtyDecAria) + '">−</button>' +
       '<span class="qty-value" data-qty-value>' + it.qty + "</span>" +
-      '<button class="qty-btn" data-qty-inc aria-label="Agregar uno">+</button>' +
+      '<button class="qty-btn" data-qty-inc aria-label="' + escapeHtml(STRINGS.qtyIncAria) + '">+</button>' +
       "</div></div>" +
       '<div class="cart-line-end">' +
       '<span class="cart-line-total" data-line-total>' + it.line_total_formatted + "</span>" +
-      '<button class="cart-line-remove" data-cart-remove aria-label="Quitar">Quitar</button>' +
+      '<button class="cart-line-remove" data-cart-remove aria-label="' +
+      escapeHtml(STRINGS.removeAria.replace("{title}", it.title)) +
+      '">' + escapeHtml(STRINGS.remove) + "</button>" +
       "</div></li>"
     );
   }
@@ -80,8 +108,9 @@
   function renderDrawer(cart) {
     if (!cart.items.length) {
       body.innerHTML =
-        '<div class="cart-empty"><p>Tu carrito está vacío.</p>' +
-        '<a class="btn btn-dark" href="/#shop" data-cart-close>Ver bolsos</a></div>';
+        '<div class="cart-empty"><p>' + escapeHtml(STRINGS.empty) + "</p>" +
+        '<a class="btn btn-dark" href="/#shop" data-cart-close>' +
+        escapeHtml(STRINGS.emptyCta) + "</a></div>";
       if (foot) foot.hidden = true;
       return;
     }
@@ -227,7 +256,7 @@
       const emailInput = scope ? scope.querySelector("[data-checkout-email]") : null;
       const email = emailInput ? emailInput.value.trim() : "";
       if (emailInput && (!email || !emailInput.checkValidity())) {
-        showFeedback(checkout, "Ingresá tu email para recibir la confirmación del pedido.");
+        showFeedback(checkout, STRINGS.emailError);
         emailInput.focus();
         return;
       }
@@ -241,10 +270,7 @@
         return;
       }
       checkout.disabled = false;
-      showFeedback(
-        checkout,
-        d.message || "No pudimos iniciar el checkout. Probá de nuevo en un momento."
-      );
+      showFeedback(checkout, d.message || STRINGS.checkoutError);
     }
   });
 

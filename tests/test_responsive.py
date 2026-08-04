@@ -28,6 +28,10 @@ from playwright.sync_api import Browser, Page
 # Single source of truth (shared with the overflow guard): viewport matrix +
 # the structural containers we probe per page.
 from pages import (
+    ADMIN_CONTENT_EDITOR_CONTAINERS,
+    ADMIN_CONTENT_EDITOR_VISUAL_CONTAINERS,
+    ADMIN_CONTENT_INDEX_CONTAINERS,
+    ADMIN_CONTENT_PREVIEW_CONTAINERS,
     ADMIN_FORM_CONTAINERS,
     ADMIN_LIST_CONTAINERS,
     ADMIN_LOGIN_CONTAINERS,
@@ -242,3 +246,81 @@ def test_screenshots_dir_is_created(admin_live_server, browser: Browser) -> None
     assert SCREENSHOTS_DIR.is_dir()
     assert any(SCREENSHOTS_DIR.iterdir()), "no screenshots were written"
     assert os.path.getsize(SCREENSHOTS_DIR / "home-375.png") > 0
+
+
+# --- admin "Textos" section ---------------------------------------------------
+# Its screens are the widest thing in the admin (a card grid, a long form and a
+# device frame), so they get the same viewport sweep as the rest.
+
+
+@pytest.mark.parametrize("width", VIEWPORT_WIDTHS)
+def test_admin_content_index_no_horizontal_overflow(
+    admin_live_server, browser: Browser, width: int
+) -> None:
+    base_url, password = admin_live_server
+    page = _login(browser, base_url, password, width)
+    try:
+        page.goto(base_url.rstrip("/") + "/admin/content/list", wait_until="load")
+        page.wait_for_timeout(200)
+        _screenshot(page, f"admin-content-index-{width}.png")
+        _assert_no_overflow(
+            page, ADMIN_CONTENT_INDEX_CONTAINERS, f"admin content index @ {width}px"
+        )
+    finally:
+        page.context.close()
+
+
+@pytest.mark.parametrize("width", VIEWPORT_WIDTHS)
+def test_admin_content_editor_no_horizontal_overflow(
+    admin_live_server, browser: Browser, width: int
+) -> None:
+    base_url, password = admin_live_server
+    page = _login(browser, base_url, password, width)
+    try:
+        page.goto(base_url.rstrip("/") + "/admin/content/home", wait_until="load")
+        page.wait_for_timeout(200)
+        _screenshot(page, f"admin-content-editor-{width}.png")
+        _assert_no_overflow(
+            page, ADMIN_CONTENT_EDITOR_CONTAINERS, f"admin content editor @ {width}px"
+        )
+    finally:
+        page.context.close()
+
+
+@pytest.mark.parametrize("width", VIEWPORT_WIDTHS)
+def test_admin_content_preview_no_horizontal_overflow(
+    admin_live_server, browser: Browser, width: int
+) -> None:
+    """The device frame renders at a fixed CSS width and is scaled to fit, so this
+    is the screen most likely to spill past the viewport."""
+    base_url, password = admin_live_server
+    page = _login(browser, base_url, password, width)
+    try:
+        page.goto(base_url.rstrip("/") + "/admin/content/home/preview", wait_until="load")
+        # Let the iframe load and the scaling math run.
+        page.wait_for_timeout(700)
+        _screenshot(page, f"admin-content-preview-{width}.png")
+        _assert_no_overflow(
+            page, ADMIN_CONTENT_PREVIEW_CONTAINERS, f"admin content preview @ {width}px"
+        )
+    finally:
+        page.context.close()
+
+
+@pytest.mark.parametrize("width", VIEWPORT_WIDTHS)
+def test_admin_visual_editor_no_horizontal_overflow(
+    admin_live_server, browser: Browser, width: int
+) -> None:
+    """The visual editor puts the whole site inside a frame next to a side panel —
+    the densest layout in the admin."""
+    base_url, password = admin_live_server
+    page = _login(browser, base_url, password, width)
+    try:
+        page.goto(base_url.rstrip("/") + "/admin/content/", wait_until="load")
+        page.wait_for_timeout(900)  # the frame loads and the scaling math runs
+        _screenshot(page, f"admin-editor-{width}.png")
+        _assert_no_overflow(
+            page, ADMIN_CONTENT_EDITOR_VISUAL_CONTAINERS, f"visual editor @ {width}px"
+        )
+    finally:
+        page.context.close()

@@ -5,8 +5,8 @@
 {# No dark hero behind the fixed header here, so render it solid from the top. #}
 {% block body_class %}solid-header{% endblock %}
 
-{% block title %}{{ product.title }} · {{ product.category or 'Cartera' }} de cuero vegano | {{ brand }}{% endblock %}
-{% block description %}{{ product.title }}{% if product.category %}, {{ product.category | lower }}{% endif %} de cuero vegano hecho a mano por {{ brand }}. Diseño minimalista, sin crueldad animal.{% if product.formatted_price %} {{ product.formatted_price }}. Comprá online con envío a todo el país.{% else %} Consultá disponibilidad por Instagram.{% endif %}{% endblock %}
+{% block title %}{{ t('product.meta.title', title=product.title, category=category_name(product.category) or t('product.meta.category_fallback')) }}{% endblock %}
+{% block description %}{{ t('product.meta.description', title=product.title, category_clause=(t('product.meta.category_clause', category=category_name(product.category)|lower) if product.category else ''), price_clause=(t('product.meta.price_clause', price=product.formatted_price) if product.formatted_price else t('product.meta.no_price_clause'))) }}{% endblock %}
 
 {# Canonical to the normalized URL so /producto/01 and /producto/001 collapse to /producto/<id>. #}
 {% block canonical %}<link rel="canonical" href="{{ site_url }}{{ url_for('product_detail', product_id=product.id) }}">{% endblock %}
@@ -16,8 +16,8 @@
     {% set og_image = cover.og_image_url if cover else None %}
     <meta property="og:type"        content="product">
     <meta property="og:url"         content="{{ site_url }}{{ url_for('product_detail', product_id=product.id) }}">
-    <meta property="og:title"       content="{{ product.title }} · {{ brand }}">
-    <meta property="og:description" content="{{ product.title }}{% if product.formatted_price %} — {{ product.formatted_price }}{% endif %}. {{ brand }}, cuero vegano hecho a mano.">
+    <meta property="og:title"       content="{{ t('product.og.title', title=product.title) }}">
+    <meta property="og:description" content="{{ t('product.og.description', title=product.title, price_clause=(t('product.og.price_clause', price=product.formatted_price) if product.formatted_price else '')) }}">
     {% if og_image %}
     <meta property="og:image"        content="{{ og_image | absolute }}">
     <meta property="og:image:width"  content="1200">
@@ -28,12 +28,12 @@
     {% elif cover and cover.is_video %}
     <meta property="og:image"        content="{{ cover.poster_url | absolute }}">
     {% endif %}
-    <meta property="og:image:alt"   content="{{ product.title }} — {{ brand }}">
+    <meta property="og:image:alt"   content="{{ t('product.og.image_alt', title=product.title) }}">
     <meta property="og:site_name"   content="{{ brand }}">
     <meta property="og:locale"      content="es_AR">
     <meta name="twitter:card"        content="summary_large_image">
-    <meta name="twitter:title"       content="{{ product.title }} · {{ brand }}">
-    <meta name="twitter:description" content="{{ product.title }}{% if product.category %} · {{ product.category }}{% endif %} — {{ brand }}, cuero vegano hecho a mano.">
+    <meta name="twitter:title"       content="{{ t('product.og.title', title=product.title) }}">
+    <meta name="twitter:description" content="{{ t('product.twitter.description', title=product.title, category_clause=(t('product.twitter.category_clause', category=category_name(product.category)) if product.category else '')) }}">
     {% set tw_image = og_image or (cover.default_image_url if cover and cover.is_image else (cover.poster_url if cover and cover.is_video else None)) %}
     {% if tw_image %}<meta name="twitter:image" content="{{ tw_image | absolute }}">{% endif %}
 {% endblock %}
@@ -46,8 +46,8 @@
     <main class="pdp" id="top">
         {# Visible breadcrumb with a real <a> up to the parent category — matches the
            BreadcrumbList JSON-LD and gives the product a crawlable product→category link. #}
-        {% set crumbs = [("Inicio", url_for('index'))] %}
-        {% if product.category %}{% set crumbs = crumbs + [(product.category, url_for('category_page', slug=product.category|slugify))] %}{% endif %}
+        {% set crumbs = [(t('product.breadcrumb_home'), url_for('index'))] %}
+        {% if product.category %}{% set crumbs = crumbs + [(category_label(product.category), url_for('category_page', slug=product.category|slugify))] %}{% endif %}
         {% set crumbs = crumbs + [(product.title, None)] %}
         {{ breadcrumb(crumbs) }}
 
@@ -81,14 +81,14 @@
                 </div>
                 {% if product.media | length > 1 %}
                 <button class="pdp-gallery-arrow is-prev" type="button" data-gallery-prev
-                        aria-label="Imagen anterior">
+                        aria-label="{{ t('product.gallery.prev_aria') }}">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
                          stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="M15 5 8 12l7 7"/>
                     </svg>
                 </button>
                 <button class="pdp-gallery-arrow is-next" type="button" data-gallery-next
-                        aria-label="Imagen siguiente">
+                        aria-label="{{ t('product.gallery.next_aria') }}">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
                          stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                         <path d="m9 5 7 7-7 7"/>
@@ -97,10 +97,10 @@
                 {% endif %}
                 </div>
                 {% if product.media | length > 1 %}
-                <div class="pdp-thumbs" role="tablist" aria-label="Imágenes del producto">
+                <div class="pdp-thumbs" role="tablist" aria-label="{{ t('product.gallery.thumbs_aria') }}">
                     {% for m in product.media %}
                     <button class="pdp-thumb{% if loop.first %} is-current{% endif %}" type="button"
-                            data-gallery-thumb aria-label="Ver imagen {{ loop.index }} de {{ product.media | length }}">
+                            data-gallery-thumb aria-label="{{ t('product.gallery.thumb_aria', index=loop.index, total=product.media|length) }}">
                         <img src="{{ m.thumb_url or m.poster_url }}" alt="" width="64" height="80" loading="lazy">
                     </button>
                     {% endfor %}
@@ -109,9 +109,9 @@
             </div>
 
             <aside class="pdp-info">
-                <p class="eyebrow">{{ product.category or brand }}</p>
+                <p class="eyebrow">{{ category_label(product.category) or brand }}</p>
                 <h1 class="pdp-title">{{ product.title }}</h1>
-                <p class="pdp-price">{{ product.formatted_price or 'Consultar' }}</p>
+                <p class="pdp-price">{{ product.formatted_price or t('product.price_fallback') }}</p>
                 {% if product.description %}
                 <div class="pdp-desc">{{ product.description }}</div>
                 {% endif %}
@@ -119,22 +119,22 @@
                 {# Purchasable: add to the cart. Instagram stays as a secondary way to ask. #}
                 <button class="btn btn-dark pdp-cta" data-add-to-cart="{{ product.id }}"
                         data-umami-event="agregar-carrito" data-umami-event-producto="{{ product.title }}">
-                    Agregar al carrito
+                    {{ t('product.cta_add') }}
                 </button>
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="pdp-cta-alt" data-umami-event="consulta-instagram" data-umami-event-ubicacion="producto" data-umami-event-producto="{{ product.title }}">o consultá por Instagram</a>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="pdp-cta-alt" data-umami-event="consulta-instagram" data-umami-event-ubicacion="producto" data-umami-event-producto="{{ product.title }}">{{ t('product.cta_alt') }}</a>
                 {% else %}
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark pdp-cta" data-umami-event="consulta-instagram" data-umami-event-ubicacion="producto" data-umami-event-producto="{{ product.title }}">Consultar por Instagram</a>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark pdp-cta" data-umami-event="consulta-instagram" data-umami-event-ubicacion="producto" data-umami-event-producto="{{ product.title }}">{{ t('product.cta_consult') }}</a>
                 {% endif %}
             </aside>
         </div>
 
-        {{ category_nav(nav_categories, current=product.category, label='Explorá por categoría') }}
+        {{ category_nav(nav_categories, current=product.category, label=t('product.category_nav_label')) }}
 
         {% if related %}
         <section class="section shop pdp-related">
             <div class="section-head">
-                <p class="eyebrow">Seguí mirando</p>
-                <h2 class="section-title">Otros bolsos</h2>
+                <p class="eyebrow">{{ t('product.related.eyebrow') }}</p>
+                <h2 class="section-title">{{ t('product.related.title') }}</h2>
             </div>
             <div class="shop-grid">
                 {% for item in related %}{{ product_card(item) }}{% endfor %}
