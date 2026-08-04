@@ -239,10 +239,22 @@
   /** The bubble under the text being edited: hint, token warning and live count. */
   function showHint(node, field) {
     const length = (field.type === "rich" ? node.innerHTML : node.textContent).length;
+    const raw = String(CURRENT[parseTarget(node).key]);
     const parts = [];
-    if (field.hint) parts.push(field.hint);
-    if (/\{[a-z_]+\}/.test(String(CURRENT[parseTarget(node).key]))) {
-      parts.push("Dejá los {textos entre llaves} tal cual.");
+    // A value that is NOTHING BUT a token is the jarring case: the biggest text on the
+    // site turns into "{tagline}" the moment it is touched, and the generic pair of
+    // hints then contradicted itself — "escribí un texto propio" next to "dejá las
+    // llaves tal cual". Say what it is showing and what typing will do to it.
+    const only = raw.match(/^\{([a-z_]+)\}$/);
+    if (only) {
+      parts.push(
+        "Acá se completa solo con " +
+          (TOKENS[only[1]] ? "«" + TOKENS[only[1]] + "»" : "otro texto tuyo") +
+          ". Escribí encima para poner algo fijo, o tocá Escape para dejarlo como está."
+      );
+    } else {
+      if (field.hint) parts.push(field.hint);
+      if (/\{[a-z_]+\}/.test(raw)) parts.push("Dejá los {textos entre llaves} tal cual.");
     }
     parts.push(length + " / " + field.max + " caracteres");
     showTip(node, parts.join(" · "));
