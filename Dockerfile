@@ -23,6 +23,11 @@ ENV FLASK_DEBUG=0
 
 EXPOSE 7014
 
+# Take a safety DB backup before the app starts (see entrypoint.sh + scripts/
+# backup_db.py). chmod so a checkout that lost the exec bit still runs.
+RUN chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
+
 # Production WSGI server (Werkzeug's dev server is single-threaded and unhardened).
 # --timeout 300: admin video uploads are transcoded synchronously with ffmpeg,
 # which can take longer than gunicorn's 30s default on bigger clips.
