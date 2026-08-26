@@ -21,16 +21,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-FieldType = Literal["line", "text", "lines", "rich", "url"]
+FieldType = Literal["line", "text", "lines", "rich", "url", "image", "video"]
 
 # Default cap per type. Long enough for real copy, short enough that a paste
-# accident can't push a 1MB blob into every page render.
+# accident can't push a 1MB blob into every page render. `image`/`video` hold a
+# location (a URL or a /static path), not the bytes — roomy for signed CDN links.
 DEFAULT_MAX_LENGTH: dict[str, int] = {
     "line": 200,
     "text": 800,
     "lines": 600,
     "rich": 12000,
     "url": 300,
+    "image": 500,
+    "video": 500,
 }
 
 
@@ -269,6 +272,15 @@ HOME = Group(
                     "Tote de cuero vegano cognac de {brand} en la playa",
                     hint="La leen Google y los lectores de pantalla. Describí lo que se ve.",
                 ),
+                TextField(
+                    "home.hero.image",
+                    "Foto de portada",
+                    "/static/img/hero/hero-tote-cognac-playa.jpg",
+                    type="image",
+                    hint="Subí o pegá una imagen. Consejo: usá una foto grande y liviana "
+                    "(hasta ~1600px). Mientras no la cambies, se sirve la versión "
+                    "optimizada de origen.",
+                ),
             ),
         ),
         Section(
@@ -338,6 +350,13 @@ HOME = Group(
                     "Descripción de la foto",
                     "Tote {brand} en la cubierta de un velero",
                 ),
+                TextField(
+                    "home.feature.image",
+                    "Foto de la sección",
+                    "/static/img/hero/hero-tote-gris-velero.jpg",
+                    type="image",
+                    hint="Mientras no la cambies, se sirve la versión optimizada de origen.",
+                ),
             ),
         ),
         Section(
@@ -380,6 +399,13 @@ HOME = Group(
                     "home.materia.caption",
                     "Epígrafe",
                     "Detrás de escena · selección de materiales",
+                ),
+                TextField(
+                    "home.materia.poster",
+                    "Imagen del video (poster)",
+                    "/static/img/video-posters/cuero-materia-prima.jpg",
+                    type="image",
+                    hint="La imagen fija que se ve antes de que cargue el video.",
                 ),
             ),
         ),
@@ -447,6 +473,13 @@ HOME = Group(
                     type="lines",
                 ),
                 TextField("home.closer.cta", "Botón", "Ver los bolsos"),
+                TextField(
+                    "home.closer.poster",
+                    "Imagen del video (poster)",
+                    "/static/img/video-posters/packaging-unboxing.jpg",
+                    type="image",
+                    hint="La imagen fija que se ve antes de que cargue el video.",
+                ),
             ),
         ),
     ),
@@ -754,6 +787,14 @@ SEO = Group(
                     "seo.og.image_alt",
                     "Descripción de la imagen al compartir",
                     "Tote de cuero vegano cognac de {brand} en la playa",
+                ),
+                TextField(
+                    "seo.og.image",
+                    "Imagen al compartir el link",
+                    "/static/img/og-image.jpg",
+                    type="image",
+                    hint="1200×630. Es lo que aparece al compartir el sitio en WhatsApp, "
+                    "Instagram o Google.",
                 ),
                 TextField(
                     "seo.page_title_format",
