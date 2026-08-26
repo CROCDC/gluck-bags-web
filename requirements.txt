@@ -1,6 +1,9 @@
 flask==3.0.3
 flask-compress==1.15
 flask-sqlalchemy==3.1.1
+# In-place content editing (edit every site string from /admin/content, no deploy).
+# See app/content_registry.py. Deps are just Flask + MarkupSafe (already present).
+flask-sitecopy==0.5.0
 # Tienda Nube REST client (app/services/tiendanube_client.py). Imported at boot now
 # (webhook blueprint + sync scheduler), so it must be installed in the image.
 requests==2.32.5

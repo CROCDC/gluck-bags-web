@@ -284,11 +284,25 @@ def create_app() -> Flask:
             cart_count = cart_service.count()
         except Exception:  # noqa: BLE001 — the badge is cosmetic; degrade to 0
             cart_count = 0
+        # Brand / tagline / Instagram come from the sitecopy registry, so editing them
+        # in /admin/content updates every template that uses {{ brand }} etc. — not just
+        # the ones converted to t(). `t_plain` degrades to the registry default if the
+        # store is unreachable, and the except is a last resort for a pre-init render.
+        try:
+            from sitecopy import t_plain
+
+            brand = str(t_plain("global.brand"))
+            tagline = str(t_plain("global.tagline"))
+            instagram_url = str(t_plain("global.instagram_url"))
+        except Exception:  # noqa: BLE001 — copy must never break page rendering
+            brand = "GLÜCK"
+            tagline = "Bolsos minimalistas de cuero vegano"
+            instagram_url = "https://www.instagram.com/gluck_bags/"
         return {
             "current_year": datetime.now().year,
-            "brand": "GLÜCK",
-            "tagline": "Bolsos minimalistas de cuero vegano",
-            "instagram_url": "https://www.instagram.com/gluck_bags/",
+            "brand": brand,
+            "tagline": tagline,
+            "instagram_url": instagram_url,
             # Public/canonical origin for absolute OG, Twitter and canonical URLs.
             "site_url": app.config["SITE_URL"],
             # Bare host (no scheme), for the Umami data-domains scope.
@@ -311,6 +325,45 @@ def create_app() -> Flask:
         register_routes(app)
         register_admin(app)
         register_cart(app)
+
+        # --- flask-sitecopy: edit every site string from /admin/content ---------
+        # Mounted AFTER Compress(app) (which runs first at line ~174) so the editor's
+        # HTML rewrite sees the response while it is still uncompressed text — Flask
+        # runs after_request hooks in reverse registration order. Reuses the admin's
+        # own shared-password session (login_required / is_logged_in), so the content
+        # editor is behind the same login as the product admin. Uploads land in the
+        # persistent media volume and are served by the existing /media route.
+        from sitecopy import LocalFileStore, SiteCopy
+
+        from app.auth import is_logged_in as _admin_is_logged_in
+        from app.auth import login_required as _admin_login_required
+        from app.content_registry import REGISTRY
+
+        uploads_dir = os.path.join(media_root, "sitecopy-uploads")
+        os.makedirs(uploads_dir, exist_ok=True)
+
+        def _editor_pages() -> list[dict[str, str]]:
+            """Pages the visual editor may open in its canvas. The home carries all the
+            editable copy; the footer (also editable) is on every page."""
+            return [{"path": "/", "label": "Inicio"}]
+
+        sitecopy_ext = SiteCopy()
+        sitecopy_ext.init_app(
+            app,
+            registry=REGISTRY,
+            db=db,
+            login_required=_admin_login_required,
+            is_logged_in=_admin_is_logged_in,
+            site_url=app.config["SITE_URL"],
+            text_sizes=True,
+            files=LocalFileStore(uploads_dir, "/media/sitecopy-uploads"),
+            pages=_editor_pages,
+            external_content={
+                "selector": ".product, .cart-line, .cat-name, .cat-tag",
+                "message": "El nombre y el precio salen del catálogo (Productos), no de acá.",
+            },
+        )
+        sitecopy_ext.ensure_schema()
 
         # Tienda Nube wiring (webhook receiver, /tn/callback, `flask sync-tn` + the
         # hourly sync thread). Isolated in a guard so a failure here — a missing

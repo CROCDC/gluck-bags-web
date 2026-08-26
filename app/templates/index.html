@@ -3,6 +3,9 @@
 {# The home uses the base per-page social card (og:type=website, the home title +
    description, and the brand 1200x630 og-image.jpg) — no override needed. #}
 
+{% block title %}{{ t('home.meta.title') }}{% endblock %}
+{% block description %}{{ t('home.meta.description') }}{% endblock %}
+
 {% block head_extra %}
     <script type="application/ld+json">{{ jsonld | safe }}</script>
 {% endblock %}
@@ -32,12 +35,12 @@
             <div class="hero-overlay"></div>
 
             <div class="hero-content">
-                <p class="hero-eyebrow">Cuero vegano · Sin costuras</p>
-                <h1 class="hero-title">{{ tagline }}</h1>
-                <p class="hero-sub">Bolsos de líneas puras, pensados para durar. Sin pieles, sin excesos.</p>
+                <p class="hero-eyebrow">{{ t('home.hero.eyebrow') }}</p>
+                <h1 class="hero-title">{{ t('home.hero.title') }}</h1>
+                <p class="hero-sub">{{ t('home.hero.subtitle') }}</p>
                 <div class="hero-actions">
-                    <a href="#categorias" class="btn btn-light">Ver la colección</a>
-                    <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-ghost" data-umami-event="comprar-instagram" data-umami-event-ubicacion="hero">Comprar ahora</a>
+                    <a href="#categorias" class="btn btn-light">{{ t('home.hero.cta_primary') }}</a>
+                    <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-ghost" data-umami-event="comprar-instagram" data-umami-event-ubicacion="hero">{{ t('home.hero.cta_secondary') }}</a>
                 </div>
             </div>
 
@@ -50,7 +53,7 @@
         <!-- ===================== MARQUEE ===================== -->
         <section class="marquee" aria-hidden="true">
             <div class="marquee-track">
-                {% set phrases = ["Cuero vegano minimalista", "De una sola pieza", "Diseño atemporal", "Sin crueldad"] %}
+                {% set phrases = t_lines('home.marquee.phrases') %}
                 {% for _ in range(2) %}{% for phrase in phrases %}<span class="marquee-item">{{ phrase }}</span><span class="marquee-sep">✦</span>{% endfor %}{% endfor %}
             </div>
         </section>
@@ -58,8 +61,8 @@
         <!-- ===================== CATEGORIES ===================== -->
         <section class="section categorias" id="categorias">
             <div class="section-head reveal">
-                <p class="eyebrow">La colección</p>
-                <h2 class="section-title">Cuatro siluetas, infinitas combinaciones</h2>
+                <p class="eyebrow">{{ t('home.categorias.eyebrow') }}</p>
+                <h2 class="section-title">{{ t('home.categorias.title') }}</h2>
             </div>
 
             <div class="cat-grid">
@@ -124,27 +127,21 @@
                 </picture>
             </div>
             <div class="feature-text reveal">
-                <p class="eyebrow">Diseño de autor</p>
-                <h2 class="section-title">El Tote que te sigue<br>a todas partes</h2>
-                <p class="feature-body">
-                    Cada bolso sale de una sola pieza de cuero vegano: la diseñamos, la
-                    cortamos con láser y la plegamos a mano. Sin costuras —
-                    la forma se sostiene con remaches y broches.
-                </p>
+                <p class="eyebrow">{{ t('home.feature.eyebrow') }}</p>
+                <h2 class="section-title">{{ t('home.feature.title') }}</h2>
+                <p class="feature-body">{{ t('home.feature.body') }}</p>
                 <ul class="feature-specs">
-                    <li>De una sola pieza, sin costuras</li>
-                    <li>Cortada con láser desde un molde propio</li>
-                    <li>Plegada y unida con remaches y broches</li>
+                    {% for spec in t_lines('home.feature.specs') %}<li>{{ spec }}</li>{% endfor %}
                 </ul>
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark" data-umami-event="comprar-instagram" data-umami-event-ubicacion="feature">Quiero el mío</a>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-dark" data-umami-event="comprar-instagram" data-umami-event-ubicacion="feature">{{ t('home.feature.cta') }}</a>
             </div>
         </section>
 
         <!-- ===================== SHOP GRID ===================== -->
         <section class="section shop" id="shop">
             <div class="section-head reveal">
-                <p class="eyebrow">Bolsos</p>
-                <h2 class="section-title">Lo último de {{ brand }}</h2>
+                <p class="eyebrow">{{ t('home.shop.eyebrow') }}</p>
+                <h2 class="section-title">{{ t('home.shop.title') }}</h2>
             </div>
 
             {% if products %}
@@ -192,7 +189,7 @@
         <!-- ===================== RAW MATERIAL (VIDEO) ===================== -->
         <section class="materia" id="materia">
             <video class="materia-video js-lazy-video" muted loop playsinline preload="none"
-                   data-poster="{{ url_for('static', filename='img/video-posters/cuero-materia-prima.jpg') }}"
+                   data-poster="{{ t('home.materia.poster') }}"
                    data-desktop-webm="{{ url_for('static', filename='video/loops/cuero-loop-desktop.webm') }}"
                    data-desktop-mp4="{{ url_for('static', filename='video/loops/cuero-loop-desktop.mp4') }}"
                    data-mobile-webm="{{ url_for('static', filename='video/loops/cuero-loop-mobile.webm') }}"
@@ -202,39 +199,33 @@
             </video>
             <div class="materia-overlay"></div>
             <div class="materia-content reveal">
-                <p class="eyebrow light">La materia</p>
-                <h2 class="section-title light">Cuero vegano,<br>elegido a mano</h2>
-                <p class="materia-body">
-                    Seleccionamos cada rollo por su tacto y su color. Materiales libres de origen
-                    animal que envejecen con gracia, para que cada bolso cuente su propia historia.
-                </p>
+                <p class="eyebrow light">{{ t('home.materia.eyebrow') }}</p>
+                <h2 class="section-title light">{{ t('home.materia.title') }}</h2>
+                <p class="materia-body">{{ t('home.materia.body') }}</p>
             </div>
-            <span class="materia-caption">Detrás de escena · selección de materiales</span>
+            <span class="materia-caption">{{ t('home.materia.caption') }}</span>
         </section>
 
         <!-- ===================== MANIFESTO ===================== -->
         <section class="section manifiesto" id="manifiesto">
             <div class="manifiesto-inner reveal">
-                <p class="eyebrow">Nosotras</p>
-                <blockquote class="manifiesto-quote">
-                    Creemos en lo simple, en lo que dura y en lo que no le hace daño a nadie.
-                    Cada <em>{{ brand }}</em> nace de esa idea: belleza sin culpa.
-                </blockquote>
+                <p class="eyebrow">{{ t('home.manifiesto.eyebrow') }}</p>
+                <blockquote class="manifiesto-quote">{{ t('home.manifiesto.quote') }}</blockquote>
                 <div class="manifiesto-values">
                     <div class="value">
                         <span class="value-index">01</span>
-                        <h3>100% vegano</h3>
-                        <p>Sin pieles ni derivados animales.</p>
+                        <h3>{{ t('home.manifiesto.v1_title') }}</h3>
+                        <p>{{ t('home.manifiesto.v1_body') }}</p>
                     </div>
                     <div class="value">
                         <span class="value-index">02</span>
-                        <h3>Sin costuras</h3>
-                        <p>De una sola pieza, plegada y unida con remaches.</p>
+                        <h3>{{ t('home.manifiesto.v2_title') }}</h3>
+                        <p>{{ t('home.manifiesto.v2_body') }}</p>
                     </div>
                     <div class="value">
                         <span class="value-index">03</span>
-                        <h3>Atemporal</h3>
-                        <p>Diseños que no pasan de moda.</p>
+                        <h3>{{ t('home.manifiesto.v3_title') }}</h3>
+                        <p>{{ t('home.manifiesto.v3_body') }}</p>
                     </div>
                 </div>
             </div>
@@ -243,27 +234,22 @@
         <!-- ===================== PACKAGING / CTA FINAL ===================== -->
         <section class="closer">
             <div class="closer-media reveal">
-                <video class="js-lazy-video" muted loop playsinline preload="none"
-                       data-poster="{{ url_for('static', filename='img/video-posters/packaging-unboxing.jpg') }}"
-                       data-desktop-webm="{{ url_for('static', filename='video/packaging-desktop.webm') }}"
-                       data-desktop-mp4="{{ url_for('static', filename='video/packaging-desktop.mp4') }}"
-                       data-mobile-webm="{{ url_for('static', filename='video/packaging-mobile.webm') }}"
-                       data-mobile-mp4="{{ url_for('static', filename='video/packaging-mobile.mp4') }}">
-                </video>
+                {# Editable video (sitecopy `video` field): the src is editable copy, so
+                   the panel can upload or paste a new clip. Single source + muted loop
+                   autoplay (below the fold, preload=none) instead of the viewport-driven
+                   lazy multi-source used elsewhere. #}
+                <video class="closer-video" muted loop autoplay playsinline preload="none"
+                       poster="{{ url_for('static', filename='img/video-posters/packaging-unboxing.jpg') }}"
+                       src="{{ t('home.closer.video') }}"></video>
             </div>
             <div class="closer-text reveal">
-                <p class="eyebrow">Listo para regalar</p>
-                <h2 class="section-title">Cada pedido llega<br>como un regalo</h2>
-                <p class="feature-body">
-                    Empaque kraft con el sello {{ brand }}. Hacé tu pedido por Instagram y te
-                    acompañamos en todo el proceso.
-                </p>
+                <p class="eyebrow">{{ t('home.closer.eyebrow') }}</p>
+                <h2 class="section-title">{{ t('home.closer.title') }}</h2>
+                <p class="feature-body">{{ t('home.closer.body') }}</p>
                 <ul class="feature-specs closer-specs">
-                    <li>Envíos a todo el país</li>
-                    <li>Packaging de regalo incluido</li>
-                    <li>Atención personalizada por mensaje</li>
+                    {% for spec in t_lines('home.closer.specs') %}<li>{{ spec }}</li>{% endfor %}
                 </ul>
-                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-light-on-dark" data-umami-event="comprar-instagram" data-umami-event-ubicacion="closer">Escribinos por Instagram</a>
+                <a href="{{ instagram_url }}" target="_blank" rel="noopener" class="btn btn-light-on-dark" data-umami-event="comprar-instagram" data-umami-event-ubicacion="closer">{{ t('home.closer.cta') }}</a>
             </div>
         </section>
 
