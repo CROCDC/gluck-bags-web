@@ -136,3 +136,129 @@ def test_existing_overrides_survive_a_rebuild(app: "Flask") -> None:
         save()
     with app.test_request_context("/"):
         assert content.brand() == "GLÜCK Editado"
+
+
+# --- text sizes (flask-sitecopy 0.5.0) ---------------------------------------
+
+
+def test_text_size_override_renders_a_size_wrapper(app: "Flask", client: "FlaskClient") -> None:
+    with app.test_request_context("/"):
+        from sitecopy import current_store, save
+
+        current_store().set_published("size:home.hero.title", "lg")
+        save()
+    html = client.get("/").get_data(as_text=True)
+    assert "sc-s-lg" in html  # the sized value is wrapped and its rule is injected
+
+
+# --- editable images: override-aware, no perf regression by default ----------
+
+
+def test_hero_keeps_responsive_picture_by_default(client: "FlaskClient") -> None:
+    html = client.get("/").get_data(as_text=True)
+    # Default (no override): the optimized <picture> with AVIF/responsive srcset.
+    assert "hero-tote-cognac-playa.avif" in html
+    assert 'class="hero-img hero-media"' not in html
+
+
+def test_hero_switches_to_editable_image_when_overridden(app: "Flask", client: "FlaskClient") -> None:
+    with app.test_request_context("/"):
+        from sitecopy import current_store, save
+
+        current_store().set_published("home.hero.image", "/media/sitecopy-uploads/custom.jpg")
+        save()
+    html = client.get("/").get_data(as_text=True)
+    assert "/media/sitecopy-uploads/custom.jpg" in html
+
+
+def test_is_overridden_helper(app: "Flask") -> None:
+    with app.test_request_context("/"):
+        from sitecopy import current_store, save
+
+        assert content.is_overridden("home.hero.image") is False
+        current_store().set_published("home.hero.image", "/x.jpg")
+        save()
+        assert content.is_overridden("home.hero.image") is True
+
+
+# --- uploads (flask-sitecopy 0.4.0) ------------------------------------------
+
+
+def test_category_intro_and_tagline_helpers(app: "Flask") -> None:
+    with app.test_request_context("/"):
+        # Curated slug ("tote") has label/tagline/intro fields; unknown falls back.
+        assert isinstance(content.category_tagline("Tote"), str)
+        assert content.category_tagline("Inventada") == ""
+        assert content.category_intro("Inventada") is None
+        # Editable (marker-emitting) variants resolve without raising.
+        assert content.category_tagline_editable("Inventada") == ""
+        assert content.category_label_editable("Inventada") == "Inventada"
+        assert content.category_intro_editable("Inventada") is None
+        assert str(content.category_label_editable("Tote"))  # non-empty
+
+
+def test_editor_pages_lists_home_statics_and_a_product(app: "Flask") -> None:
+    with app.app_context():
+        ProductRepository.create(title="Tote", price=45000, category="Tote")
+        pages = content._editor_pages()
+    paths = [p["path"] for p in pages]
+    assert "/" in paths
+    assert "/nosotras" in paths
+    assert any(p.startswith("/producto/") for p in paths)
+
+
+def test_registry_lookup_helpers() -> None:
+    from app.content import registry
+
+    assert registry.field_for("global.brand") is not None
+    assert registry.field_for("no.existe") is None
+    assert registry.group_for("home") is not None
+    assert registry.group_for("no.existe") is None
+    # allowed_tokens merges per-field tokens with the global ones.
+    toks = registry.allowed_tokens("product.meta.title")
+    assert "title" in toks and "brand" in toks
+    # is_multiline distinguishes block fields from single-line ones.
+    assert registry.FIELDS["seo.home.description"].is_multiline is True
+    assert registry.FIELDS["global.brand"].is_multiline is False
+    buckets = registry.groups_by_category()
+    assert buckets and all(isinstance(v, list) for v in buckets.values())
+
+
+def test_image_upload_endpoint_stores_and_returns_a_media_url(app: "Flask", auth_client: "FlaskClient") -> None:
+    import io
+    import re
+    import struct
+    import zlib
+
+    def _png() -> bytes:
+        sig = b"\x89PNG\r\n\x1a\n"
+
+        def chunk(tag: bytes, data: bytes) -> bytes:
+            body = tag + data
+            return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+
+        return (
+            sig
+            + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+            + chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00"))
+            + chunk(b"IEND", b"")
+        )
+
+    token = re.search(
+        r'name="_sitecopy_csrf" value="([^"]+)"',
+        auth_client.get("/admin/content/home").get_data(as_text=True),
+    ).group(1)
+    res = auth_client.post(
+        "/admin/content/upload",
+        data={
+            "key": "home.hero.image",
+            "_sitecopy_csrf": token,
+            "file": (io.BytesIO(_png()), "hero.png", "image/png"),
+        },
+        headers={"X-Sitecopy-CSRF": token},
+        content_type="multipart/form-data",
+    )
+    assert res.status_code == 200
+    body = res.get_json()
+    assert body["ok"] is True
+    assert body["url"].startswith("/media/sitecopy-uploads/")

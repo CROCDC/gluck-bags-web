@@ -195,6 +195,19 @@ def category_intro_editable(name: str):
 # --- wiring ------------------------------------------------------------------
 
 
+def is_overridden(key: str) -> bool:
+    """True when the admin published a value for `key` (i.e. it's not the code default).
+
+    Lets a template keep its optimized responsive `<picture>` by default and switch to
+    the editable single-URL `<img>` only once the image is actually changed. Safe to
+    call outside a request / for an unknown key — degrades to False.
+    """
+    try:
+        return bool(field_state(key).get("is_overridden"))
+    except Exception:  # noqa: BLE001 — a rendering helper must never raise
+        return False
+
+
 def _editor_pages() -> list[dict[str, str]]:
     """Pages the visual editor may open in its canvas: the home, the static pages, and
     a live product resolved at request time."""
@@ -223,9 +236,18 @@ def register_content(app: "Flask") -> None:
     editor at /admin/content, and the response rewrite), then add the app-specific
     category globals. Must run AFTER Compress(app) so the editor's HTML rewrite sees an
     uncompressed body. Reuses the admin's shared-password session."""
+    import os
+
+    from sitecopy import LocalFileStore
+
     from app.auth import is_logged_in as _admin_is_logged_in
     from app.auth import login_required as _admin_login_required
     from app.factory import db
+
+    # Uploads land in the persistent media volume and are served by the existing
+    # /media route (content-addressed, so a re-upload is idempotent).
+    uploads_dir = os.path.join(app.config["MEDIA_ROOT"], "sitecopy-uploads")
+    os.makedirs(uploads_dir, exist_ok=True)
 
     _extension.init_app(
         app,
@@ -236,12 +258,16 @@ def register_content(app: "Flask") -> None:
         site_url=app.config.get("SITE_URL", ""),
         brand=brand,
         pages=_editor_pages,
-        files=False,  # main's editor had no uploads; keep parity (URLs only)
+        text_sizes=True,  # every text field gets a "Tamaño" control in the editor
+        files=LocalFileStore(uploads_dir, "/media/sitecopy-uploads"),
     )
     # App-specific globals the templates rely on, layered on sitecopy's resolver.
     app.jinja_env.globals["category_label"] = category_label_editable
     app.jinja_env.globals["category_name"] = category_label
     app.jinja_env.globals["content_preview"] = is_preview
+    # For override-aware images: templates keep the responsive <picture> by default and
+    # only switch to the editable single-URL <img> when the admin actually changed it.
+    app.jinja_env.globals["is_overridden"] = is_overridden
 
     # Create/repair the `site_texts` table. The in-house editor used to create it via
     # db.create_all() (its SiteText model); with that model gone, sitecopy owns the

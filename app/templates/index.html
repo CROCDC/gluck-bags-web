@@ -12,6 +12,15 @@
 
         <!-- ===================== HERO ===================== -->
         <section class="hero">
+            {# Override-aware image: keep the optimized responsive <picture> (AVIF/WebP +
+               srcset) by default, and only switch to the editable single-URL <img> when
+               the admin actually changed the photo — or inside the visual editor, so it
+               stays click-to-edit. No LCP regression unless a custom image is set. #}
+            {% if content_preview() or is_overridden('home.hero.image') %}
+            <img class="hero-img hero-media" src="{{ t('home.hero.image') }}"
+                 width="1080" height="1080" sizes="100vw"
+                 alt="{{ t('home.hero.image_alt') }}" fetchpriority="high">
+            {% else %}
             <picture class="hero-media">
                 <source type="image/avif"
                         srcset="{{ url_for('static', filename='img/hero/hero-tote-cognac-playa-768.avif') }} 768w,
@@ -29,6 +38,7 @@
                      width="1080" height="1080"
                      alt="{{ t('home.hero.image_alt') }}" fetchpriority="high">
             </picture>
+            {% endif %}
             <div class="hero-overlay"></div>
 
             <div class="hero-content">
@@ -111,6 +121,13 @@
         <!-- ===================== FEATURE / LIFESTYLE SPLIT ===================== -->
         <section class="feature">
             <div class="feature-media reveal">
+                {# Override-aware (see the hero): responsive <picture> by default, editable
+                   single-URL <img> only when changed or inside the editor. #}
+                {% if content_preview() or is_overridden('home.feature.image') %}
+                <img src="{{ t('home.feature.image') }}" width="1080" height="1080"
+                     sizes="(max-width: 980px) 100vw, 50vw"
+                     alt="{{ t('home.feature.image_alt') }}" loading="lazy">
+                {% else %}
                 <picture>
                     <source type="image/avif"
                             srcset="{{ url_for('static', filename='img/hero/hero-tote-gris-velero-768.avif') }} 768w,
@@ -126,6 +143,7 @@
                          sizes="(max-width: 980px) 100vw, 50vw"
                          width="1080" height="1080" alt="{{ t('home.feature.image_alt') }}" loading="lazy">
                 </picture>
+                {% endif %}
             </div>
             <div class="feature-text reveal">
                 <p class="eyebrow">{{ t('home.feature.eyebrow') }}</p>
@@ -192,7 +210,7 @@
         <!-- ===================== RAW MATERIAL (VIDEO) ===================== -->
         <section class="materia" id="materia">
             <video class="materia-video js-lazy-video" muted loop playsinline preload="none"
-                   data-poster="{{ url_for('static', filename='img/video-posters/cuero-materia-prima.jpg') }}"
+                   data-poster="{{ t('home.materia.poster') }}"
                    data-desktop-webm="{{ url_for('static', filename='video/loops/cuero-loop-desktop.webm') }}"
                    data-desktop-mp4="{{ url_for('static', filename='video/loops/cuero-loop-desktop.mp4') }}"
                    data-mobile-webm="{{ url_for('static', filename='video/loops/cuero-loop-mobile.webm') }}"
@@ -230,7 +248,7 @@
         <section class="closer">
             <div class="closer-media reveal">
                 <video class="js-lazy-video" muted loop playsinline preload="none"
-                       data-poster="{{ url_for('static', filename='img/video-posters/packaging-unboxing.jpg') }}"
+                       data-poster="{{ t('home.closer.poster') }}"
                        data-desktop-webm="{{ url_for('static', filename='video/packaging-desktop.webm') }}"
                        data-desktop-mp4="{{ url_for('static', filename='video/packaging-desktop.mp4') }}"
                        data-mobile-webm="{{ url_for('static', filename='video/packaging-mobile.webm') }}"
