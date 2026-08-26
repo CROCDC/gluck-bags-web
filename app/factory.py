@@ -363,7 +363,15 @@ def create_app() -> Flask:
                 "message": "El nombre y el precio salen del catálogo (Productos), no de acá.",
             },
         )
-        sitecopy_ext.ensure_schema()
+        # Same race guard as db.create_all() above: the init lock is already
+        # released here, so two workers booting on a fresh volume can both find the
+        # sitecopy tables missing and both issue CREATE. ensure_schema() uses
+        # checkfirst=True but that's a TOCTOU — swallow the loser's OperationalError
+        # instead of crashing the worker on startup.
+        try:
+            sitecopy_ext.ensure_schema()
+        except OperationalError:
+            db.session.rollback()
 
         # Tienda Nube wiring (webhook receiver, /tn/callback, `flask sync-tn` + the
         # hourly sync thread). Isolated in a guard so a failure here — a missing

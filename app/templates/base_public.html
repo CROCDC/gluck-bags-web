@@ -29,7 +29,7 @@
     <meta name="twitter:card"        content="summary_large_image">
     <meta name="twitter:title"       content="{{ self.title() }}">
     <meta name="twitter:description" content="{{ self.description() }}">
-    <meta name="twitter:image"       content="{% block twitter_image %}{{ site_url }}/static/img/og-image.jpg{% endblock %}">
+    <meta name="twitter:image"       content="{% block twitter_image %}{{ site_url }}{{ t('global.og_image') }}{% endblock %}">
     {% endblock %}
 
     <title>{% block title %}{{ brand }} · {{ tagline }}{% endblock %}</title>

@@ -235,12 +235,14 @@
         <section class="closer">
             <div class="closer-media reveal">
                 {# Editable video (sitecopy `video` field): the src is editable copy, so
-                   the panel can upload or paste a new clip. Single source + muted loop
-                   autoplay (below the fold, preload=none) instead of the viewport-driven
-                   lazy multi-source used elsewhere. #}
-                <video class="closer-video" muted loop autoplay playsinline preload="none"
-                       poster="{{ url_for('static', filename='img/video-posters/packaging-unboxing.jpg') }}"
-                       src="{{ t('home.closer.video') }}"></video>
+                   the panel can upload or paste a new clip. Kept on the viewport-driven
+                   lazy loader (js-lazy-video → main.js): the source is injected and plays
+                   only when scrolled into view, so mobile never eagerly downloads a
+                   below-the-fold clip. Single source instead of the desktop/mobile pair
+                   is the tradeoff for a single editable URL. #}
+                <video class="closer-video js-lazy-video" muted loop playsinline preload="none"
+                       data-poster="{{ url_for('static', filename='img/video-posters/packaging-unboxing.jpg') }}"
+                       data-src-mp4="{{ t('home.closer.video') }}"></video>
             </div>
             <div class="closer-text reveal">
                 <p class="eyebrow">{{ t('home.closer.eyebrow') }}</p>
