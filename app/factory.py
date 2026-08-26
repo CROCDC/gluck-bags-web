@@ -341,7 +341,6 @@ def create_app() -> Flask:
         # Importing these registers the Product/Media models with db.metadata
         # (admin/routes/seed all import app.models), so create_all sees them.
         from app.admin import register_admin
-        from app.admin_content import register_admin_content
         from app.cart import register_cart
         from app.content import register_content
         from app.routes import register_routes
@@ -349,11 +348,11 @@ def create_app() -> Flask:
 
         _initialize_schema(data_dir, seed_initial_products)
 
-        # Editable copy first: every template below renders through `t()`.
+        # Editable copy first: every template below renders through `t()`. The visual
+        # editor at /admin/content is mounted by flask-sitecopy inside register_content.
         register_content(app)
         register_routes(app)
         register_admin(app)
-        register_admin_content(app)
         register_cart(app)
 
         # Tienda Nube wiring (webhook receiver, /tn/callback, `flask sync-tn` + the

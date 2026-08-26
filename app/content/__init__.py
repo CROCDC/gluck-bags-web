@@ -1,38 +1,51 @@
-"""Editable site copy: the registry of every string plus its resolver.
+"""Editable site copy — backed by flask-sitecopy.
 
-Public surface:
-    from app.content import t, t_lines, register_content
-    from app.content import registry            # the catalogue itself
+Migrated from the in-house editor to the packaged **flask-sitecopy** engine (same
+design, now maintained as a versioned dependency). `app/content/registry.py` stays as
+the pure catalogue of strings; this module adapts it to a sitecopy `Registry`, wires
+the extension, and keeps the app-specific helpers (per-category labels) as thin
+wrappers over sitecopy's resolver.
 
-See docs/CONTENT-ADMIN.md for how to add a new editable string.
+Public surface is unchanged, so callers keep doing:
+    from app.content import t, t_lines, register_content, category_label
+    from app.content import registry
 """
 
-from app.content import registry
-from app.content.resolver import (
-    brand,
-    category_intro,
-    category_intro_editable,
-    category_label,
-    category_label_editable,
-    category_tagline,
-    category_tagline_editable,
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+# The engine, re-exported so the rest of the app keeps importing from app.content.
+from sitecopy import (
+    Group as _ScGroup,
+    Registry as _ScRegistry,
+    Section as _ScSection,
+    SiteCopy,
+    TextField as _ScField,
     field_state,
     group_states,
     has_stray_brace,
-    instagram_url,
     is_preview,
     override_count,
     pending_draft_count,
-    register_content,
+    sanitize,
+    strip_tags,
     t,
     t_lines,
     t_plain,
-    tagline,
     unknown_tokens,
+    visible_text,
 )
-from app.content.sanitizer import sanitize, strip_tags, visible_text
+from sitecopy import editable as _editable
+
+from app.content import registry
+from app.utils import slugify
+
+if TYPE_CHECKING:
+    from flask import Flask
 
 __all__ = [
+    "REGISTRY",
     "brand",
     "category_intro",
     "category_intro_editable",
@@ -51,10 +64,194 @@ __all__ = [
     "registry",
     "sanitize",
     "strip_tags",
-    "visible_text",
     "t",
     "t_lines",
     "t_plain",
     "tagline",
     "unknown_tokens",
+    "visible_text",
 ]
+
+
+# --- registry adapter: main's data -> a sitecopy Registry --------------------
+# The dataclasses share a shape (key/label/default/type/hint/max_length for a field;
+# key/title/note/fields for a section; key/title/description/preview_path for a group),
+# so this is a mechanical re-expression that reuses the exact copy in registry.py — no
+# retyping, no drift. Tokens map straight across: TOKEN_FIELDS -> sitecopy `tokens`,
+# FIELD_TOKENS -> sitecopy `field_tokens`.
+
+
+def build_registry() -> _ScRegistry:
+    groups = []
+    for group in registry.GROUPS:
+        sections = tuple(
+            _ScSection(
+                key=section.key,
+                title=section.title,
+                note=section.note,
+                fields=tuple(
+                    _ScField(
+                        field.key,
+                        field.label,
+                        field.default,
+                        type=field.type,
+                        hint=field.hint,
+                        max_length=field.max_length,
+                    )
+                    for field in section.fields
+                ),
+            )
+            for section in group.sections
+        )
+        groups.append(
+            _ScGroup(
+                key=group.key,
+                title=group.title,
+                description=group.description,
+                preview_path=group.preview_path,
+                sections=sections,
+            )
+        )
+    return _ScRegistry(
+        groups=tuple(groups),
+        tokens=registry.TOKEN_FIELDS,
+        field_tokens={key: tuple(vals) for key, vals in registry.FIELD_TOKENS.items()},
+    )
+
+
+REGISTRY = build_registry()
+
+_extension = SiteCopy()
+
+
+# --- brand tokens for the context processor ----------------------------------
+# These reach every template as {{ brand }} / {{ tagline }} / {{ instagram_url }} via
+# factory's context processor, and back the {brand}/{tagline}/{instagram_url} tokens.
+
+
+def brand() -> str:
+    return str(t_plain("global.brand"))
+
+
+def tagline() -> str:
+    return str(t_plain("global.tagline"))
+
+
+def instagram_url() -> str:
+    return str(t_plain("global.instagram_url"))
+
+
+# --- app-specific: per-category editable copy --------------------------------
+# The canonical category name is identity (URL slug + the value stored on products),
+# so it is not editable; only the *label* shown on screen is. A curated category has
+# `category.<slug>.{label,tagline,intro}` fields; anything else falls back to the name.
+
+
+def _category_key(name: str, suffix: str) -> str | None:
+    if not name:
+        return None
+    key = f"category.{slugify(name)}.{suffix}"
+    return key if key in registry.FIELDS else None
+
+
+def category_label(name: str) -> str:
+    """Plain label (no edit markers) — for logic, `t()` params, meta tags, breadcrumbs."""
+    key = _category_key(name, "label")
+    return str(t_plain(key)) if key else (name or "")
+
+
+def category_tagline(name: str) -> str:
+    key = _category_key(name, "tagline")
+    return str(t_plain(key)) if key else ""
+
+
+def category_intro(name: str) -> str | None:
+    key = _category_key(name, "intro")
+    if key is None:
+        return None
+    value = str(t_plain(key))
+    return value if value.strip() else None
+
+
+def category_label_editable(name: str):
+    """Rendered label with click-to-edit markers (visual editor). Use in templates."""
+    key = _category_key(name, "label")
+    return _editable(key) if key else (name or "")
+
+
+def category_tagline_editable(name: str):
+    key = _category_key(name, "tagline")
+    return _editable(key) if key else ""
+
+
+def category_intro_editable(name: str):
+    key = _category_key(name, "intro")
+    if key is None:
+        return None
+    value = _editable(key)
+    return value if str(value).strip() else None
+
+
+# --- wiring ------------------------------------------------------------------
+
+
+def _editor_pages() -> list[dict[str, str]]:
+    """Pages the visual editor may open in its canvas: the home, the static pages, and
+    a live product resolved at request time."""
+    pages = [
+        {"path": "/", "label": "Inicio"},
+        {"path": "/nosotras", "label": "Nosotras"},
+        {"path": "/contacto", "label": "Contacto"},
+        {"path": "/envios", "label": "Envíos"},
+        {"path": "/cambios-y-devoluciones", "label": "Cambios"},
+        {"path": "/terminos", "label": "Términos"},
+        {"path": "/privacidad", "label": "Privacidad"},
+    ]
+    try:
+        from app.repositories import ProductRepository
+
+        published = ProductRepository.get_published()
+        if published:
+            pages.append({"path": f"/producto/{published[0].id}", "label": "Producto"})
+    except Exception:  # noqa: BLE001 — the picker is a convenience, never a hard dep
+        pass
+    return pages
+
+
+def register_content(app: "Flask") -> None:
+    """Install flask-sitecopy on the app (registers `t`/`t_lines`/`t_plain`, the visual
+    editor at /admin/content, and the response rewrite), then add the app-specific
+    category globals. Must run AFTER Compress(app) so the editor's HTML rewrite sees an
+    uncompressed body. Reuses the admin's shared-password session."""
+    from app.auth import is_logged_in as _admin_is_logged_in
+    from app.auth import login_required as _admin_login_required
+    from app.factory import db
+
+    _extension.init_app(
+        app,
+        registry=REGISTRY,
+        db=db,
+        login_required=_admin_login_required,
+        is_logged_in=_admin_is_logged_in,
+        site_url=app.config.get("SITE_URL", ""),
+        brand=brand,
+        pages=_editor_pages,
+        files=False,  # main's editor had no uploads; keep parity (URLs only)
+    )
+    # App-specific globals the templates rely on, layered on sitecopy's resolver.
+    app.jinja_env.globals["category_label"] = category_label_editable
+    app.jinja_env.globals["category_name"] = category_label
+    app.jinja_env.globals["content_preview"] = is_preview
+
+    # Create/repair the `site_texts` table. The in-house editor used to create it via
+    # db.create_all() (its SiteText model); with that model gone, sitecopy owns the
+    # schema. On an existing prod volume the table + data are already there and this is
+    # a no-op. Same race guard as db.create_all(): two workers booting on a fresh
+    # volume can both issue CREATE — swallow the loser's error instead of crashing.
+    from sqlalchemy.exc import OperationalError
+
+    with app.app_context():
+        try:
+            _extension.ensure_schema()
+        except OperationalError:
+            db.session.rollback()
