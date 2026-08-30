@@ -75,7 +75,12 @@ def test_static_url_is_cache_busted_but_fonts_are_not(app: Flask) -> None:
     """Versioned static URLs (?v=mtime) force re-fetch on change, but fonts are
     deliberately NOT versioned: a versioned preload URL would differ from the
     @font-face url(), wasting the preload and double-downloading the font (LCP)."""
-    with app.app_context():
+    # A REQUEST context, not just an app context: `url_for` needs a URL adapter to
+    # build a relative URL, and outside a request Flask only has one when SERVER_NAME
+    # is configured — which this app deliberately does not set (the canonical origin
+    # lives in SITE_URL). The `?v=` cache-buster is a url_defaults hook, so it runs
+    # the same either way; this is how the templates call url_for in real life.
+    with app.test_request_context("/"):
         js_url = url_for("static", filename="js/main.js")
         font_url = url_for("static", filename="fonts/jost.woff2")
 
