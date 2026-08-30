@@ -1577,3 +1577,73 @@ body.cart-open { overflow: hidden; }
     .cart-page-grid { grid-template-columns: 1fr; }
     .cart-summary { position: static; }
 }
+
+/* ============================================================
+   FLOATING WHATSAPP BUTTON
+   Same on every public page (rendered in base_public.html), with the
+   message pre-written per page. Sits below the cart drawer (z-index 200)
+   so opening the cart covers it, and above everything else.
+   ============================================================ */
+.wa-fab {
+    position: fixed;
+    right: clamp(0.9rem, 3vw, 1.6rem);
+    bottom: clamp(0.9rem, 3vw, 1.6rem);
+    z-index: 150;
+    display: flex;
+    align-items: center;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    border-radius: 999px;
+    background: #25d366;                       /* WhatsApp green — the point is that it's recognisable */
+    color: #fff;
+    box-shadow: 0 10px 26px rgba(26, 23, 20, 0.24);
+    transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease), background-color 0.3s var(--ease);
+}
+.wa-fab:hover,
+.wa-fab:focus-visible {
+    background: #1eb457;
+    transform: translateY(-2px);
+    box-shadow: 0 14px 32px rgba(26, 23, 20, 0.28);
+}
+.wa-fab-icon {
+    width: 30px;
+    height: 30px;
+    margin: auto;
+    flex: none;
+}
+
+/* Hover label. Absolutely positioned so it never changes the button's own box
+   (the tap target stays a clean 56px circle) and never pushes past the edge. */
+.wa-fab-tip {
+    position: absolute;
+    right: calc(100% + 0.6rem);
+    white-space: nowrap;
+    padding: 0.42rem 0.75rem;
+    border-radius: 999px;
+    background: var(--ink);
+    color: var(--cream);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    opacity: 0;
+    transform: translateX(6px);
+    pointer-events: none;
+    transition: opacity 0.3s var(--ease), transform 0.3s var(--ease);
+}
+.wa-fab:hover .wa-fab-tip,
+.wa-fab:focus-visible .wa-fab-tip {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Coarse pointers get no hover, and a phone screen has no room for the label:
+   the icon alone is the universally understood affordance there. */
+@media (max-width: 700px), (hover: none) {
+    .wa-fab-tip { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wa-fab, .wa-fab-tip { transition: none; }
+    .wa-fab:hover, .wa-fab:focus-visible { transform: none; }
+}

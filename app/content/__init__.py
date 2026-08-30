@@ -13,7 +13,9 @@ Public surface is unchanged, so callers keep doing:
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
+from urllib.parse import quote
 
 # The engine, re-exported so the rest of the app keeps importing from app.content.
 from sitecopy import (
@@ -70,6 +72,8 @@ __all__ = [
     "tagline",
     "unknown_tokens",
     "visible_text",
+    "whatsapp_link",
+    "whatsapp_number",
 ]
 
 
@@ -139,6 +143,28 @@ def tagline() -> str:
 
 def instagram_url() -> str:
     return str(t_plain("global.instagram_url"))
+
+
+def whatsapp_number() -> str:
+    """The number as the shop owner writes it (+54 9 11 …) — for display."""
+    return str(t_plain("global.whatsapp_number"))
+
+
+def whatsapp_link(message: str = "") -> str:
+    """A wa.me deep link to the shop's number, with `message` already typed in the chat.
+
+    The number is editable copy, so it arrives however it was written (+, spaces,
+    hyphens, the Argentine mobile 9): wa.me wants digits only, so that is all we keep.
+    An empty/short number means "no WhatsApp" and returns "", which the templates read
+    as "don't render the button" — the alternative is a link to wa.me/ that opens an
+    error page.
+    """
+    digits = re.sub(r"\D", "", whatsapp_number())
+    if len(digits) < 8:
+        return ""
+    text = " ".join(message.split())
+    url = f"https://wa.me/{digits}"
+    return f"{url}?text={quote(text)}" if text else url
 
 
 # --- app-specific: per-category editable copy --------------------------------
@@ -265,6 +291,10 @@ def register_content(app: "Flask") -> None:
     app.jinja_env.globals["category_label"] = category_label_editable
     app.jinja_env.globals["category_name"] = category_label
     app.jinja_env.globals["content_preview"] = is_preview
+    # The floating WhatsApp button: every page builds its own href from the message
+    # its `whatsapp_message` block resolves (the product page passes the model and
+    # its URL), so the link has to be built at render time, not once per request.
+    app.jinja_env.globals["whatsapp_link"] = whatsapp_link
     # For override-aware images: templates keep the responsive <picture> by default and
     # only switch to the editable single-URL <img> when the admin actually changed it.
     app.jinja_env.globals["is_overridden"] = is_overridden
