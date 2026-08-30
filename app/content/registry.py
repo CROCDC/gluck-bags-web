@@ -93,6 +93,7 @@ GLOBAL_TOKENS: tuple[str, ...] = (
     "year",
     "instagram_url",
     "instagram_handle",
+    "whatsapp_number",
 )
 
 # The extra placeholders a SINGLE field may embed, because its one call site passes
@@ -119,6 +120,7 @@ FIELD_TOKENS: dict[str, tuple[str, ...]] = {
     "product.twitter.description": ("title", "category_clause"),
     "seo.page_title_format": ("title",),
     "seo.product.description_fallback": ("title",),
+    "whatsapp.message.product": ("title", "url"),
 }
 
 
@@ -159,6 +161,49 @@ GLOBAL = Group(
                     type="url",
                 ),
                 TextField("global.instagram_handle", "Usuario de Instagram", "@gluck_bags"),
+            ),
+        ),
+        Section(
+            key="whatsapp",
+            title="WhatsApp",
+            note=(
+                "El botón flotante de WhatsApp aparece en todas las páginas. El mensaje se "
+                "abre ya escrito en el chat: la clienta sólo tiene que enviarlo."
+            ),
+            fields=(
+                TextField(
+                    "global.whatsapp_number",
+                    "Número de WhatsApp",
+                    "+54 9 11 3605-3910",
+                    hint=(
+                        "Con código de país. Podés escribirlo con espacios, guiones o el 9 "
+                        "de celular: el link se arma sólo con los dígitos. Vaciá el campo "
+                        "para ocultar el botón."
+                    ),
+                ),
+                TextField(
+                    "whatsapp.aria",
+                    "Botón flotante (lectores de pantalla)",
+                    "Escribinos por WhatsApp",
+                ),
+                TextField("whatsapp.tooltip", "Globito del botón", "¿Consultas? Escribinos"),
+                TextField(
+                    "whatsapp.message.default",
+                    "Mensaje para toda la web",
+                    "¡Hola {brand}! Estoy viendo la web y quería hacerles una consulta.",
+                    type="text",
+                    hint="Es el mensaje que se abre desde cualquier página que no sea un producto.",
+                ),
+                TextField(
+                    "whatsapp.message.product",
+                    "Mensaje desde un producto",
+                    "¡Hola {brand}! Me interesa el modelo {title} y quería hacerles una consulta. {url}",
+                    type="text",
+                    hint=(
+                        "Sólo en la página de un bolso. {title} es el nombre del modelo y "
+                        "{url} el link a su página."
+                    ),
+                ),
             ),
         ),
         Section(
@@ -918,7 +963,8 @@ PAGE_CONTACT = _editorial_page(
     """<p>¿Tenés una consulta sobre un bolso, un envío o un pedido especial? Estamos para ayudarte. Te respondemos lo antes posible.</p>
 <h2>Canales</h2>
 <ul>
-<li><strong>Instagram:</strong> <a href="{instagram_url}" target="_blank" rel="noopener noreferrer">{instagram_handle}</a> — la vía más rápida para consultas y asesoramiento personalizado. Te respondemos por mensaje directo.</li>
+<li><strong>WhatsApp:</strong> {whatsapp_number} — tocá el botón verde que está abajo a la derecha en cualquier página y el mensaje se abre solo.</li>
+<li><strong>Instagram:</strong> <a href="{instagram_url}" target="_blank" rel="noopener noreferrer">{instagram_handle}</a> — consultas y asesoramiento personalizado por mensaje directo.</li>
 </ul>
 <h2>Horarios de atención</h2>
 <p>Respondemos de lunes a viernes. Las compras se hacen directamente en la <a href="/#shop">tienda online</a>; si necesitás ayuda con un pedido, escribinos con tu número de pedido.</p>""",
@@ -1033,6 +1079,7 @@ TOKEN_FIELDS: tuple[str, ...] = (
     "global.tagline",
     "global.instagram_url",
     "global.instagram_handle",
+    "global.whatsapp_number",
 )
 
 

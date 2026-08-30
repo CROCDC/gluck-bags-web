@@ -38,6 +38,11 @@
     {% if tw_image %}<meta name="twitter:image" content="{{ tw_image | absolute }}">{% endif %}
 {% endblock %}
 
+{# The floating WhatsApp button opens the chat already naming this model and linking
+   its page, so the consult arrives with the context the shop owner needs. #}
+{% block whatsapp_message %}{{ t_plain('whatsapp.message.product', title=product.title, url=site_url ~ url_for('product_detail', product_id=product.id)) }}{% endblock %}
+{% block whatsapp_location %}producto{% endblock %}
+
 {% block head_extra %}
     <script type="application/ld+json">{{ jsonld | safe }}</script>
 {% endblock %}

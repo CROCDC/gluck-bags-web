@@ -69,7 +69,7 @@ Any string may embed `{token}`. Unknown tokens are left literal — an editor ty
 stray brace never raises.
 
 Always available: `{brand}`, `{tagline}`, `{year}`, `{instagram_url}`,
-`{instagram_handle}`.
+`{instagram_handle}`, `{whatsapp_number}`.
 
 Per-call, passed by the template or route:
 
@@ -169,6 +169,13 @@ shows a hint, and the rendered text comes back on blur.
 The cart-drawer strings ship as inline JSON for `cart.js`, and the JSON-LD is built
 in Python. Both use `t_plain()` / `content.t()` — the marker-free variants — because
 a marker inside `json.dumps` output would survive as literal `\uXXXX` text.
+
+The WhatsApp message is the same case: it is URL-encoded into the floating button's
+`href` (see `whatsapp_link()` in `app/content/__init__.py`), so it resolves through
+`t_plain()` too — a marker there would ride into the chat as literal characters. The
+message is per page: `base_public.html` declares a `whatsapp_message` block with the
+site-wide default (`whatsapp.message.default`), and `product_detail.html` overrides it
+with `whatsapp.message.product`, which receives the model's `{title}` and `{url}`.
 
 ---
 

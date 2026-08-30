@@ -36,9 +36,11 @@ GLÜCK
 Contacto
 ¿Tenés una consulta sobre un bolso, un envío o un pedido especial? Estamos para ayudarte. Te respondemos lo antes posible.
 Canales
+WhatsApp:
++54 9 11 3605-3910 — tocá el botón verde que está abajo a la derecha en cualquier página y el mensaje se abre solo.
 Instagram:
 @gluck_bags
-— la vía más rápida para consultas y asesoramiento personalizado. Te respondemos por mensaje directo.
+— consultas y asesoramiento personalizado por mensaje directo.
 Horarios de atención
 Respondemos de lunes a viernes. Las compras se hacen directamente en la
 tienda online
@@ -53,6 +55,8 @@ El costo de envío se confirma en el checkout, antes de pagar.
 Email para la confirmación del pedido
 [placeholder] tu@email.com
 Finalizar compra
+[aria-label] Escribinos por WhatsApp
+¿Consultas? Escribinos
 ¿Te gustó algo?
 Seguinos en Instagram
 GLÜCK

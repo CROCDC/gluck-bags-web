@@ -130,6 +130,8 @@ El costo de envío se confirma en el checkout, antes de pagar.
 Email para la confirmación del pedido
 [placeholder] tu@email.com
 Finalizar compra
+[aria-label] Escribinos por WhatsApp
+¿Consultas? Escribinos
 ¿Te gustó algo?
 Seguinos en Instagram
 GLÜCK
