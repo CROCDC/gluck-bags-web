@@ -1,3 +1,4 @@
+import json
 import os
 import re
 import sqlite3
@@ -151,6 +152,27 @@ def _resolve_secret_key(data_dir: str) -> str:
             f"{key_path!r} ({exc}). Configurá SECRET_KEY como variable de entorno."
         ) from exc
     return key
+
+
+# Fonts are deliberately never versioned — see the cache-buster below. Kept in sync
+# with scripts/build_static.py, which skips the same extensions in the manifest.
+_UNVERSIONED_EXTENSIONS = ("woff2", "woff", "ttf", "otf", "eot")
+
+_STATIC_MANIFEST_PATH = os.path.join(os.path.dirname(__file__), "static_manifest.json")
+
+
+def _load_static_manifest() -> dict[str, str]:
+    """`filename -> content hash`, written by scripts/build_static.py at build time.
+
+    Empty when there is no manifest, which is the normal local-dev state: the
+    cache-buster then falls back to the file's mtime.
+    """
+    try:
+        with open(_STATIC_MANIFEST_PATH, encoding="utf-8") as fh:
+            manifest = json.load(fh)
+    except (OSError, ValueError):
+        return {}
+    return manifest if isinstance(manifest, dict) else {}
 
 
 def _normalize_database_url(url: str) -> str:
@@ -369,6 +391,10 @@ def create_app() -> Flask:
     # Cloudflare respects this Cache-Control instead of its default browser TTL.
     app.config["SEND_FILE_MAX_AGE_DEFAULT"] = timedelta(days=365)
 
+    # Read once at boot, not per URL: it is a small file and this runs for every static
+    # URL in every rendered page.
+    static_manifest = _load_static_manifest()
+
     @app.url_defaults
     def _static_cache_buster(endpoint: str, values: dict[str, Any]) -> None:
         if endpoint != "static" or "filename" not in values:
@@ -377,7 +403,16 @@ def create_app() -> Flask:
         # `?v=`, so adding it here would make the <link rel=preload> URL differ from
         # the @font-face URL — the preload would be wasted and the font downloaded
         # twice (which delays the font and, with font-display:swap, the LCP).
-        if values["filename"].rsplit(".", 1)[-1].lower() in ("woff2", "woff", "ttf", "otf", "eot"):
+        if values["filename"].rsplit(".", 1)[-1].lower() in _UNVERSIONED_EXTENSIONS:
+            return
+        # The build manifest first. Where a CDN serves these files they may not be in
+        # the deployed bundle at all, so stat'ing them would fail, the `?v=` would
+        # quietly disappear, and SEND_FILE_MAX_AGE_DEFAULT (one year) would pin every
+        # client to the pre-deploy asset. mtime remains the local-dev path, where it is
+        # the better answer anyway: it changes on save, with no build step to remember.
+        version = static_manifest.get(values["filename"])
+        if version is not None:
+            values["v"] = version
             return
         try:
             mtime = os.stat(os.path.join(app.static_folder, values["filename"])).st_mtime

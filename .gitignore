@@ -10,3 +10,8 @@ tests/screenshots/
 .pytest_cache/
 ig-gluck_bags/
 .claude/
+
+# Build output: `scripts/build_static.py` republishes app/static/ for the CDN and
+# regenerates the manifest on every deploy.
+public/
+app/static_manifest.json
