@@ -1,6 +1,9 @@
 flask==3.0.3
 flask-compress==1.15
 flask-sqlalchemy==3.1.1
+# Postgres driver, used only when DATABASE_URL is set (the serverless deploy has no
+# disk for SQLite). [binary] ships the wheels, so no libpq/compiler on the build host.
+psycopg[binary]==3.3.5
 # In-place content editing (edit every site string from /admin/content, no deploy).
 # Migrado del editor propio; ver app/content/ y docs/CONTENT-ADMIN.md.
 flask-sitecopy==0.7.0

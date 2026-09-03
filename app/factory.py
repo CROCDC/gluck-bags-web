@@ -1,5 +1,6 @@
 import os
 import re
+import sqlite3
 from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
@@ -27,13 +28,21 @@ db = SQLAlchemy()
 def _set_sqlite_pragmas(dbapi_connection: object, connection_record: object) -> None:
     """WAL + a long busy timeout for SQLite: readers never block the writer, and a
     second writer waits up to 30s instead of failing with 'database is locked'
-    (relevant while a video transcode briefly holds the write lock)."""
+    (relevant while a video transcode briefly holds the write lock).
+
+    Guarded on the driver rather than on the statements failing: on Postgres a PRAGMA is
+    a syntax error that ABORTS the transaction the fresh connection just opened, so
+    every later statement on it fails with "current transaction is aborted" — and the
+    swallow below would hide the cause.
+    """
+    if not isinstance(dbapi_connection, sqlite3.Connection):
+        return
     cursor = dbapi_connection.cursor()
     try:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA busy_timeout=30000")
         cursor.execute("PRAGMA synchronous=NORMAL")
-    except Exception:  # noqa: BLE001 — non-sqlite backends ignore these PRAGMAs
+    except Exception:  # noqa: BLE001 — a PRAGMA must never keep the app from connecting
         pass
     finally:
         cursor.close()
@@ -144,6 +153,50 @@ def _resolve_secret_key(data_dir: str) -> str:
     return key
 
 
+def _normalize_database_url(url: str) -> str:
+    """Turn a provider's connection string into one SQLAlchemy accepts.
+
+    Neon (like Heroku) hands out `postgres://…`, a scheme SQLAlchemy 2 dropped, and a
+    bare `postgresql://` resolves to psycopg2, which is not installed — psycopg 3 has to
+    be named. Doing it here means DATABASE_URL can be pasted from the dashboard as-is,
+    which is exactly how it will be set.
+    """
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
+    if url.startswith("postgresql://"):
+        url = "postgresql+psycopg://" + url[len("postgresql://") :]
+    return url
+
+
+def _configure_database(app: Flask, data_dir: str) -> None:
+    """Point SQLAlchemy at DATABASE_URL when set, else the SQLite file under DATA_DIR.
+
+    SQLite stays the default so local dev, the test suite and the Docker deploy are
+    unchanged; a serverless deploy has no persistent disk and sets DATABASE_URL.
+    """
+    database_url = os.environ.get("DATABASE_URL", "").strip()
+    if not database_url:
+        app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(data_dir, 'gluck.db')}"
+        # Wait (don't fail) if the DB is briefly write-locked by another worker.
+        # `timeout` is a sqlite3 connect arg and is rejected by every other driver.
+        app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"connect_args": {"timeout": 30}}
+        return
+
+    app.config["SQLALCHEMY_DATABASE_URI"] = _normalize_database_url(database_url)
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        # A pooled connection can be dropped between two invocations (a serverless
+        # instance freezes; the provider's pooler recycles). Without pre-ping, the
+        # first query after an idle period fails instead of reconnecting.
+        "pool_pre_ping": True,
+        # Modest: many short-lived instances each holding a big pool is how a serverless
+        # app exhausts a Postgres connection limit. The provider's pooled endpoint is
+        # what does the real pooling.
+        "pool_size": 5,
+        "max_overflow": 5,
+        "pool_recycle": 300,
+    }
+
+
 def _register_db_cli(app: Flask, data_dir: str) -> None:
     """`flask init-db`: the same bootstrap `create_app` runs when AUTO_INIT_DB is on,
     exposed as an explicit command for deploys that must not do it at boot."""
@@ -245,10 +298,8 @@ def create_app() -> Flask:
 
     app.config["DATA_DIR"] = data_dir
     app.config["MEDIA_ROOT"] = media_root
-    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{os.path.join(data_dir, 'gluck.db')}"
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-    # Wait (don't fail) if the DB is briefly write-locked by another worker.
-    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {"connect_args": {"timeout": 30}}
+    _configure_database(app, data_dir)
     app.config["SECRET_KEY"] = _resolve_secret_key(data_dir)
     app.config["ADMIN_PASSWORD"] = os.environ.get("ADMIN_PASSWORD", "")
     # Cap uploads. Phone clips fit comfortably; the file is compressed server-side
