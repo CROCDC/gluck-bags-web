@@ -90,6 +90,18 @@ def main() -> int:
         help="delete existing rows in the target tables before copying",
     )
     parser.add_argument("--dry-run", action="store_true", help="report, write nothing")
+    parser.add_argument(
+        "--only",
+        metavar="TABLE",
+        action="append",
+        choices=TABLES,
+        help=(
+            "copy just this table (repeatable). A cutover is rarely all-or-nothing: the "
+            "Tienda Nube mirror rebuilds itself from a sync, and product media that was "
+            "reprocessed into the new store must NOT be overwritten with rows pointing at "
+            "the old one — but `site_texts` still has to come across."
+        ),
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.sqlite):
@@ -114,7 +126,8 @@ def main() -> int:
                 )
                 return 1
 
-            for table in TABLES:
+            wanted = tuple(args.only) if args.only else TABLES
+            for table in wanted:
                 columns, rows = _read_table(source, table)
                 if not columns:
                     print(f"{table}: no está en el SQLite, se omite")
@@ -173,7 +186,7 @@ def main() -> int:
                 # site_texts, whose primary key is the copy `key` and which has no id
                 # column at all — asking for max(id) there is an error, not a no-op.
                 inspector = sqlalchemy.inspect(engine)
-                for table in TABLES:
+                for table in wanted:
                     if table not in existing_tables:
                         continue
                     if "id" not in {c["name"] for c in inspector.get_columns(table)}:
