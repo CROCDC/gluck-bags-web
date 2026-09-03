@@ -55,6 +55,7 @@ __all__ = [
     "category_label_editable",
     "category_tagline",
     "category_tagline_editable",
+    "ensure_content_schema",
     "field_state",
     "group_states",
     "has_stray_brace",
@@ -299,12 +300,25 @@ def register_content(app: "Flask") -> None:
     # only switch to the editable single-URL <img> when the admin actually changed it.
     app.jinja_env.globals["is_overridden"] = is_overridden
 
-    # Create/repair the `site_texts` table. The in-house editor used to create it via
-    # db.create_all() (its SiteText model); with that model gone, sitecopy owns the
-    # schema. On an existing prod volume the table + data are already there and this is
-    # a no-op. Same race guard as db.create_all(): two workers booting on a fresh
-    # volume can both issue CREATE — swallow the loser's error instead of crashing.
+    # Boot-time DDL only where boot is the right place for it (see AUTO_INIT_DB in
+    # app/factory.py). A serverless deploy runs `flask init-db` once instead, which
+    # calls ensure_content_schema directly.
+    if app.config.get("AUTO_INIT_DB", True):
+        ensure_content_schema(app)
+
+
+def ensure_content_schema(app: "Flask") -> None:
+    """Create/repair the `site_texts` table (and the media-versions table).
+
+    The in-house editor used to create it via db.create_all() (its SiteText model);
+    with that model gone, sitecopy owns the schema. On an existing prod volume the
+    table + data are already there and this is a no-op. Same race guard as
+    db.create_all(): two workers booting on a fresh volume can both issue CREATE —
+    swallow the loser's error instead of crashing.
+    """
     from sqlalchemy.exc import OperationalError
+
+    from app.factory import db
 
     with app.app_context():
         try:

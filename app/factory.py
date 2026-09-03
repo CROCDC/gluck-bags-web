@@ -117,6 +117,11 @@ def _resolve_secret_key(data_dir: str) -> str:
 
     Persisting it (instead of a per-process random) keeps admin sessions valid
     across restarts/redeploys without requiring the operator to set anything.
+
+    That fallback needs a writable, persistent DATA_DIR, which a serverless deploy does
+    not have. Refuse to boot rather than fall back to a per-process random key: the site
+    would come up green and log the admin out on every cold start, which is a far harder
+    thing to diagnose than a startup error naming the variable to set.
     """
     env_key = os.environ.get("SECRET_KEY")
     if env_key:
@@ -126,13 +131,35 @@ def _resolve_secret_key(data_dir: str) -> str:
         with open(key_path, encoding="utf-8") as fh:
             return fh.read().strip()
     except OSError:
-        key = os.urandom(32).hex()
-        try:
-            with open(key_path, "w", encoding="utf-8") as fh:
-                fh.write(key)
-        except OSError:
-            pass
-        return key
+        pass
+    key = os.urandom(32).hex()
+    try:
+        with open(key_path, "w", encoding="utf-8") as fh:
+            fh.write(key)
+    except OSError as exc:
+        raise RuntimeError(
+            f"No hay SECRET_KEY en el entorno y no se puede persistir una en "
+            f"{key_path!r} ({exc}). Configurá SECRET_KEY como variable de entorno."
+        ) from exc
+    return key
+
+
+def _register_db_cli(app: Flask, data_dir: str) -> None:
+    """`flask init-db`: the same bootstrap `create_app` runs when AUTO_INIT_DB is on,
+    exposed as an explicit command for deploys that must not do it at boot."""
+    import click
+
+    @app.cli.command("init-db")
+    def init_db_command() -> None:
+        """Create tables, seed the initial products and heal missing media variants."""
+        from app.content import ensure_content_schema
+        from app.seed import seed_initial_products
+
+        _initialize_schema(data_dir, seed_initial_products)
+        # sitecopy owns the site_texts schema and is only initialized once
+        # register_content has run, so it cannot ride along inside _initialize_schema.
+        ensure_content_schema(app)
+        click.echo("Base inicializada: tablas creadas, seed aplicado, media curada.")
 
 
 def _register_canonical_host(app: Flask) -> None:
@@ -250,6 +277,17 @@ def create_app() -> Flask:
     app.config["MEDIA_STORE"] = os.environ.get("MEDIA_STORE", media_store.SOURCE_LOCAL)
     app.extensions["media_store"] = media_store.build_store(app)
 
+    # Creating tables, seeding and healing media is deploy-time work, not per-request
+    # work. It is done at boot because the Docker deploy boots once against a volume;
+    # on serverless every cold start would re-run it inside the request that triggered
+    # it. Set AUTO_INIT_DB=0 there and run `flask init-db` once against the database.
+    app.config["AUTO_INIT_DB"] = os.environ.get("AUTO_INIT_DB", "1") not in (
+        "0",
+        "false",
+        "False",
+        "",
+    )
+
     # Where the storefront + cart read products from (see app/services/catalog.py).
     # "tiendanube" = the mirrored TN catalogue (production; cart lines carry TN ids
     # and the checkout resolves them to variants). "admin" = the legacy
@@ -354,7 +392,8 @@ def create_app() -> Flask:
         from app.routes import register_routes
         from app.seed import seed_initial_products
 
-        _initialize_schema(data_dir, seed_initial_products)
+        if app.config["AUTO_INIT_DB"]:
+            _initialize_schema(data_dir, seed_initial_products)
 
         # Editable copy first: every template below renders through `t()`. The visual
         # editor at /admin/content is mounted by flask-sitecopy inside register_content.
@@ -362,6 +401,7 @@ def create_app() -> Flask:
         register_routes(app)
         register_admin(app)
         register_cart(app)
+        _register_db_cli(app, data_dir)
 
         # Tienda Nube wiring (webhook receiver, /tn/callback, `flask sync-tn` + the
         # hourly sync thread). Isolated in a guard so a failure here — a missing
