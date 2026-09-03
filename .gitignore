@@ -28,3 +28,12 @@ uv.lock
 pyproject.toml
 # The uv binary `vercel build` downloads into the project (54 MB).
 _uv/
+.env*
+vercel-secrets.local.txt
+_vercel_env.sh
+.env.production.local
+
+# Agent skills dropped in by the Neon marketplace integration. Tooling config, not
+# part of the app.
+.agents/
+skills-lock.json

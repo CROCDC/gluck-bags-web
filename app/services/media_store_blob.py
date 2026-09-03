@@ -47,6 +47,11 @@ API_VERSION = "12"
 # Uploaded media is immutable, so it can be cached by the CDN and browsers forever.
 IMMUTABLE_MAX_AGE = 31_536_000
 
+# The Blob service answers an occasional 503, and processing one photo is a dozen calls
+# in a row, so a single blip would lose the whole upload.
+RETRY_ATTEMPTS = 4
+RETRY_BACKOFF_SECONDS = 0.5
+
 # How long a directory listing is trusted. Only matters for media written by ANOTHER
 # instance: this one invalidates on its own writes.
 LISTING_TTL_SECONDS = 300
@@ -73,7 +78,10 @@ def _store_id_from_token(token: str) -> str:
             "BLOB_READ_WRITE_TOKEN no tiene el formato esperado "
             "(vercel_blob_rw_<storeId>_<random>)."
         )
-    return parts[3]
+    # Lowercased because it becomes a hostname. DNS resolves either case, but the API
+    # returns the lowercase form, and a URL that differs from the canonical one only by
+    # case is a second cache key for the same bytes — in the CDN and in every browser.
+    return parts[3].lower()
 
 
 def content_type_for(filename: str) -> str:
@@ -116,20 +124,35 @@ class BlobMediaStore(MediaStore):
         return headers
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
-        response = self._session.request(
-            method, f"{API_BASE}{path}", timeout=self._timeout, **kwargs
-        )
-        if not response.ok:
-            raise BlobError(
-                f"Blob {method} {path} devolvió {response.status_code}: "
-                f"{response.text[:300]}"
-            )
-        if not response.content:
-            return None
-        try:
-            return response.json()
-        except ValueError:
-            return None
+        """One Blob API call, retried on the failures that are worth retrying.
+
+        The service answers an occasional 503, and a media upload is a dozen calls in a
+        row — without this, one blip in the middle of processing loses the whole upload
+        and leaves a half-written directory. Retries cover 5xx, 429 and transport errors;
+        a 4xx is a bug in the request and is raised immediately.
+        """
+        last_error: str = ""
+        for attempt in range(RETRY_ATTEMPTS):
+            try:
+                response = self._session.request(
+                    method, f"{API_BASE}{path}", timeout=self._timeout, **kwargs
+                )
+            except requests.RequestException as exc:
+                last_error = str(exc)
+            else:
+                if response.ok:
+                    if not response.content:
+                        return None
+                    try:
+                        return response.json()
+                    except ValueError:
+                        return None
+                last_error = f"{response.status_code}: {response.text[:300]}"
+                if response.status_code < 500 and response.status_code != 429:
+                    break
+            if attempt < RETRY_ATTEMPTS - 1:
+                time.sleep(RETRY_BACKOFF_SECONDS * (2**attempt))
+        raise BlobError(f"Blob {method} {path} falló — {last_error}")
 
     # --- MediaStore -----------------------------------------------------------
 

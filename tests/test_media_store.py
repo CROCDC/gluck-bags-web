@@ -339,3 +339,113 @@ class TestEditorUploads:
         pathname = next(iter(api.blobs))
         assert pathname.startswith("sitecopy-uploads/")
         assert ".." not in pathname
+
+
+# --- retries ------------------------------------------------------------------
+
+
+class TestBlobRetries:
+    """Processing one photo is a dozen Blob calls in a row, and the service answers the
+    occasional 503. Without retries a single blip loses the whole upload — which is
+    exactly what happened while seeding the production store."""
+
+    def _store(self, session):
+        from app.services.media_store_blob import BlobMediaStore
+
+        store = BlobMediaStore(token="vercel_blob_rw_store_secret", session=session)
+        store._listing_ttl = 0
+        return store
+
+    def test_retries_a_503_and_succeeds(self, monkeypatch) -> None:
+        import app.services.media_store_blob as blob_module
+        from fake_blob import FakeResponse
+
+        monkeypatch.setattr(blob_module.time, "sleep", lambda _s: None)
+        calls = []
+
+        class Flaky:
+            def request(self, method, url, **kwargs):
+                calls.append(method)
+                if len(calls) < 3:
+                    return FakeResponse(503, b'{"error":{"message":"unavailable"}}')
+                return FakeResponse(200, b'{"url":"https://x/y"}')
+
+        self._store(Flaky()).put("products/1/1/400.jpg", b"x", "image/jpeg")
+
+        assert len(calls) == 3
+
+    def test_gives_up_after_the_last_attempt(self, monkeypatch) -> None:
+        import app.services.media_store_blob as blob_module
+        from app.services.media_store_blob import BlobError
+        from fake_blob import FakeResponse
+
+        monkeypatch.setattr(blob_module.time, "sleep", lambda _s: None)
+        calls = []
+
+        class Down:
+            def request(self, method, url, **kwargs):
+                calls.append(method)
+                return FakeResponse(503, b"down")
+
+        with pytest.raises(BlobError):
+            self._store(Down()).put("products/1/1/400.jpg", b"x", "image/jpeg")
+
+        assert len(calls) == blob_module.RETRY_ATTEMPTS
+
+    def test_does_not_retry_a_client_error(self, monkeypatch) -> None:
+        """A 4xx is a bug in the request, not a blip — retrying it just delays the error
+        and, on a 401, hammers the API with a token that will never work."""
+        import app.services.media_store_blob as blob_module
+        from app.services.media_store_blob import BlobError
+        from fake_blob import FakeResponse
+
+        monkeypatch.setattr(blob_module.time, "sleep", lambda _s: None)
+        calls = []
+
+        class Unauthorized:
+            def request(self, method, url, **kwargs):
+                calls.append(method)
+                return FakeResponse(401, b"nope")
+
+        with pytest.raises(BlobError):
+            self._store(Unauthorized()).put("products/1/1/400.jpg", b"x", "image/jpeg")
+
+        assert len(calls) == 1
+
+    def test_retries_a_transport_error(self, monkeypatch) -> None:
+        import requests
+
+        import app.services.media_store_blob as blob_module
+        from fake_blob import FakeResponse
+
+        monkeypatch.setattr(blob_module.time, "sleep", lambda _s: None)
+        calls = []
+
+        class Dropping:
+            def request(self, method, url, **kwargs):
+                calls.append(method)
+                if len(calls) == 1:
+                    raise requests.ConnectionError("connection reset")
+                return FakeResponse(200, b"{}")
+
+        self._store(Dropping()).put("products/1/1/400.jpg", b"x", "image/jpeg")
+
+        assert len(calls) == 2
+
+
+class TestBlobStoreId:
+    def test_store_id_is_lowercased_for_the_hostname(self) -> None:
+        """It becomes a hostname. DNS resolves either case, but the API returns the
+        lowercase form, so a mixed-case URL is a second cache key for the same bytes."""
+        from app.services.media_store_blob import BlobMediaStore
+
+        store = BlobMediaStore(token="vercel_blob_rw_MiXeDCaSe123_secret", session=object())
+
+        assert store.store_id == "mixedcase123"
+        assert store.url_for("a/b.jpg").startswith("https://mixedcase123.public.blob.")
+
+    def test_rejects_a_malformed_token(self) -> None:
+        from app.services.media_store_blob import BlobError, BlobMediaStore
+
+        with pytest.raises(BlobError, match="BLOB_READ_WRITE_TOKEN"):
+            BlobMediaStore(token="not-a-real-token", session=object())
