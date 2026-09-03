@@ -316,7 +316,15 @@ def create_app() -> Flask:
     # locally it defaults to ./instance (gitignored).
     data_dir = os.path.abspath(os.environ.get("DATA_DIR", "instance"))
     media_root = os.path.join(data_dir, "media")
-    os.makedirs(media_root, exist_ok=True)
+    try:
+        os.makedirs(media_root, exist_ok=True)
+    except OSError:
+        # A read-only filesystem, which is the normal shape on a serverless host. When
+        # the database and the media store are both remote nothing needs this directory,
+        # so failing to create it must not take the app down at import time. The two
+        # things that DO need it say so themselves: _resolve_secret_key refuses to boot
+        # without SECRET_KEY, and LocalFileStore reports uploads as unavailable.
+        pass
 
     app.config["DATA_DIR"] = data_dir
     app.config["MEDIA_ROOT"] = media_root

@@ -221,8 +221,70 @@
     if (fileInput) fileInput.files = dt.files;
     orderField.value = JSON.stringify(tokens);
 
-    uploadForm();
+    // Where the bytes cannot travel through the app (a serverless request body is
+    // capped at 4.5 MB, and a phone photo clears that on its own), each file goes
+    // straight to object storage first and the form posts only the pathnames.
+    if (form.dataset.uploadTokenUrl) {
+      uploadDirect(Array.from(dt.files)).then(uploadForm).catch((err) => {
+        // Put the form back the way it was: leaving the overlay up would look like a
+        // hang, and leaving `uploading` set would keep warning on every navigation.
+        uploading = false;
+        const overlay = document.getElementById("admOverlay");
+        if (overlay) overlay.classList.remove("show");
+        window.alert(err && err.message ? err.message : "No pudimos subir los archivos.");
+      });
+    } else {
+      uploadForm();
+    }
   });
+
+  /* ---- Direct-to-storage upload (bypasses the request body limit) ---- */
+
+  const uploadedField = document.getElementById("uploadedField");
+
+  async function uploadDirect(files) {
+    const overlay = document.getElementById("admOverlay");
+    const bar = document.getElementById("admBar");
+    const text = document.getElementById("admText");
+    if (overlay) overlay.classList.add("show");
+    if (text) text.textContent = "Subiendo archivos…";
+    uploading = true;
+
+    const uploaded = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const ticket = await fetch(form.dataset.uploadTokenUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ filename: file.name }),
+      }).then((r) => (r.ok ? r.json() : r.json().then((b) => Promise.reject(new Error(b.error || "No pudimos preparar la subida.")))));
+
+      if (file.size > ticket.maxBytes) {
+        throw new Error("«" + file.name + "» supera el tamaño máximo permitido.");
+      }
+
+      const put = await fetch(ticket.uploadUrl, {
+        method: "PUT",
+        headers: {
+          authorization: "Bearer " + ticket.token,
+          "x-api-version": "12",
+          "x-content-type": file.type || "application/octet-stream",
+          "x-vercel-blob-access": "public",
+        },
+        body: file,
+      });
+      if (!put.ok) throw new Error("No pudimos subir «" + file.name + "».");
+
+      uploaded.push({ pathname: ticket.pathname, filename: file.name });
+      if (bar) bar.style.width = Math.round(((i + 1) / files.length) * 100) + "%";
+    }
+
+    uploadedField.value = JSON.stringify(uploaded);
+    // The bytes are already stored; posting them again would hit the very limit this
+    // whole path exists to avoid.
+    if (fileInput) fileInput.value = "";
+    if (text) text.textContent = "Optimizando fotos y videos…";
+  }
 
   // Warn before leaving mid-upload so the owner doesn't lose queued files.
   let uploading = false;

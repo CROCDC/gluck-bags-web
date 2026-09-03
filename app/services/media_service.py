@@ -11,6 +11,7 @@ Vercel Blob on serverless. Processing itself always happens in a local staging d
 
 from __future__ import annotations
 
+import functools
 import os
 import shutil
 import subprocess
@@ -173,9 +174,35 @@ def process_image(source: FileStorage | str, product_id: int, media_id: int) -> 
 # --- Videos ------------------------------------------------------------------
 
 
+@functools.lru_cache(maxsize=1)
+def ffmpeg_binary() -> str:
+    """The ffmpeg to run.
+
+    A serverless deploy has no system packages, so the encoder has to travel with the
+    code: `imageio-ffmpeg` ships a static build as a wheel, which is how ffmpeg reaches
+    the function bundle. A real system ffmpeg still wins where there is one — it is what
+    the Docker image installs and what a dev machine has — and FFMPEG_BINARY overrides
+    both. Cached: this resolves once per process, not once per transcode.
+    """
+    override = os.environ.get("FFMPEG_BINARY", "").strip()
+    if override:
+        return override
+    system = shutil.which("ffmpeg")
+    if system:
+        return system
+    try:
+        import imageio_ffmpeg
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception as exc:  # noqa: BLE001
+        raise MediaError(
+            "No hay ffmpeg disponible para procesar el video."
+        ) from exc
+
+
 def _run_ffmpeg(args: list[str]) -> None:
     proc = subprocess.run(
-        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *args],
+        [ffmpeg_binary(), "-y", "-hide_banner", "-loglevel", "error", *args],
         capture_output=True,
         text=True,
     )

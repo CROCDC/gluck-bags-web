@@ -14,11 +14,12 @@ Public surface is unchanged, so callers keep doing:
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 # The engine, re-exported so the rest of the app keeps importing from app.content.
 from sitecopy import (
+    FileStore as _ScFileStore,
     Group as _ScGroup,
     Registry as _ScRegistry,
     Section as _ScSection,
@@ -258,23 +259,67 @@ def _editor_pages() -> list[dict[str, str]]:
     return pages
 
 
+_SITECOPY_UPLOAD_PREFIX = "sitecopy-uploads"
+
+
+class BlobFileStore(_ScFileStore):
+    """Editor image uploads, into the same object store the product media uses.
+
+    Content-addressed exactly like sitecopy's LocalFileStore — the name is a hash of the
+    bytes — so a re-upload is idempotent (one object, one URL, no duplicate entries in
+    the version history) and the client's filename, the classic path-traversal vector,
+    never reaches storage.
+    """
+
+    def __init__(self, store: Any, prefix: str = _SITECOPY_UPLOAD_PREFIX) -> None:
+        self._store = store
+        self._prefix = prefix.strip("/")
+
+    def save(self, data: bytes, kind: Any) -> str:
+        import hashlib
+
+        rel_path = f"{self._prefix}/{hashlib.sha1(data).hexdigest()[:16]}{kind.ext}"
+        self._store.put(rel_path, data, kind.content_type)
+        return self._store.url_for(rel_path)
+
+
+def _build_file_store(app: "Flask") -> Any:
+    """Where the editor's uploads land — the app's media store, whichever it is.
+
+    The local store keeps sitecopy's own LocalFileStore: it already content-addresses,
+    and its `enabled` probe turns uploads off cleanly on a read-only filesystem instead
+    of 500ing on the first one.
+    """
+    import os
+
+    from sitecopy import LocalFileStore
+
+    from app.services import media_store
+
+    store = app.extensions["media_store"]
+    if not media_store.is_local():
+        return BlobFileStore(store)
+
+    # Uploads land in the persistent media volume and are served by the existing
+    # /media route.
+    uploads_dir = os.path.join(app.config["MEDIA_ROOT"], _SITECOPY_UPLOAD_PREFIX)
+    try:
+        os.makedirs(uploads_dir, exist_ok=True)
+    except OSError:
+        # LocalFileStore.enabled reports this as "uploads unavailable"; creating the
+        # directory eagerly would instead take the whole app down at boot.
+        pass
+    return LocalFileStore(uploads_dir, f"/media/{_SITECOPY_UPLOAD_PREFIX}")
+
+
 def register_content(app: "Flask") -> None:
     """Install flask-sitecopy on the app (registers `t`/`t_lines`/`t_plain`, the visual
     editor at /admin/content, and the response rewrite), then add the app-specific
     category globals. Must run AFTER Compress(app) so the editor's HTML rewrite sees an
     uncompressed body. Reuses the admin's shared-password session."""
-    import os
-
-    from sitecopy import LocalFileStore
-
     from app.auth import is_logged_in as _admin_is_logged_in
     from app.auth import login_required as _admin_login_required
     from app.factory import db
-
-    # Uploads land in the persistent media volume and are served by the existing
-    # /media route (content-addressed, so a re-upload is idempotent).
-    uploads_dir = os.path.join(app.config["MEDIA_ROOT"], "sitecopy-uploads")
-    os.makedirs(uploads_dir, exist_ok=True)
 
     _extension.init_app(
         app,
@@ -286,7 +331,7 @@ def register_content(app: "Flask") -> None:
         brand=brand,
         pages=_editor_pages,
         text_sizes=True,  # every text field gets a "Tamaño" control in the editor
-        files=LocalFileStore(uploads_dir, "/media/sitecopy-uploads"),
+        files=_build_file_store(app),
     )
     # App-specific globals the templates rely on, layered on sitecopy's resolver.
     app.jinja_env.globals["category_label"] = category_label_editable

@@ -9,7 +9,8 @@
 <form id="productForm" class="adm-form" method="post"
       action="{{ url_for('admin.product_update', product_id=product.id) if product else url_for('admin.product_new') }}"
       enctype="multipart/form-data"
-      data-list-url="{{ url_for('admin.products_list') }}">
+      data-list-url="{{ url_for('admin.products_list') }}"
+      {% if direct_upload %}data-upload-token-url="{{ url_for('admin.media_upload_token') }}"{% endif %}>
 
     <div class="adm-field">
         <label for="title">Título *</label>
@@ -75,6 +76,10 @@
             </ul>
 
             <input type="hidden" name="order" id="orderField" value="">
+            {# Filled by admin.js when the files go straight to object storage:
+               a serverless request body is capped at 4.5 MB, so the bytes bypass
+               the app and only their pathnames are posted here. #}
+            <input type="hidden" name="media_uploaded" id="uploadedField" value="">
         </div>
     </div>
 

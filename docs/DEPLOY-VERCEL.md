@@ -1,0 +1,154 @@
+# Deploying on Vercel
+
+The app runs as a single Python function. Everything that used to live on the container's
+disk lives somewhere else: the database in Postgres, uploaded media in Vercel Blob, the
+static assets on the CDN, and the hourly Tienda Nube sync in a GitHub Actions schedule.
+
+The Docker/Jenkins deploy is unaffected — every switch below defaults to the old
+behaviour, so the same code runs both ways.
+
+## What changes, and the flag that changes it
+
+| Concern | Docker | Vercel | Flag |
+| --- | --- | --- | --- |
+| Database | SQLite under `DATA_DIR` | Postgres | `DATABASE_URL` |
+| Uploaded media | `DATA_DIR/media`, served by `/media` | Vercel Blob's CDN | `MEDIA_STORE` |
+| Schema creation | at boot | `flask init-db`, once | `AUTO_INIT_DB` |
+| Static assets | served by Flask | `public/`, served by the CDN | build step |
+| Hourly TN sync | daemon thread | GitHub Actions → `/internal/sync-tn` | `TN_SYNC_ENABLED` |
+| Admin uploads | multipart POST | browser → Blob, direct | follows `MEDIA_STORE` |
+| ffmpeg | system package | `imageio-ffmpeg` wheel | `FFMPEG_BINARY` |
+
+## Files
+
+- `wsgi.py` — the entrypoint Vercel looks for (a top-level `app`).
+- `vercel.json` — the build command and `maxDuration`.
+- `.vercelignore` — what stays out of the upload. This is the control that works:
+  `excludeFiles` in `vercel.json` is **not honored** by the zero-config Flask preset —
+  verified with `vercel build`, where the bundle came out byte-identical (2749 files)
+  with it, without it, and with a single trivial `tests/**` pattern.
+- `requirements-dev.txt` — pytest and playwright. They are out of `requirements.txt`
+  because that is what the bundle installs, and playwright alone is 109 MB.
+- `.python-version` — 3.12, matching local.
+- `scripts/build_static.py` — publishes `app/static/` to `public/static/` and writes the
+  cache-busting manifest. Runs as the build command.
+
+## One-time setup
+
+0. **Set `VERCEL_SUPPORT_LARGE_FUNCTIONS=1`** as a project environment variable. The
+   bundle is ~309 MB — a static ffmpeg build (78 MB), the HEIC/AVIF codecs behind
+   Pillow, and the Postgres driver — which is over the standard limit. Without this the
+   build fails outright with `exceeds the maximum function size`.
+1. **Create the project** and point it at this repository.
+2. **Create a Postgres database** and put its pooled connection string in
+   `DATABASE_URL`. The string can be pasted exactly as the provider gives it —
+   `postgres://` and `postgresql://` are both rewritten to the psycopg driver.
+3. **Create a Blob store**, connect it to the project, and confirm
+   `BLOB_READ_WRITE_TOKEN` is in the environment.
+4. **Set the environment variables** (below), then deploy.
+5. **Create the schema**: `vercel env pull && flask init-db`, or run it locally against
+   the same `DATABASE_URL`. This is deliberately not automatic — see `AUTO_INIT_DB`.
+6. **Migrate the data** from the current SQLite volume:
+
+   ```bash
+   python scripts/migrate_sqlite_to_postgres.py \
+       --sqlite ./gluck.db --postgres "$DATABASE_URL"
+   ```
+
+   `site_texts` is the only table that cannot be rebuilt from elsewhere — it holds the
+   copy edited from `/admin/content`. The Tienda Nube mirror repopulates itself on the
+   next sync.
+7. **Add the sync workflow's secrets** in GitHub: `SYNC_TN_URL` (the deployment's
+   `/internal/sync-tn`) and `CRON_SECRET` (the same value as in the deployment).
+
+## Environment variables
+
+Required:
+
+```
+VERCEL_SUPPORT_LARGE_FUNCTIONS=1
+DATABASE_URL              the Postgres connection string
+BLOB_READ_WRITE_TOKEN     from the Blob store
+SECRET_KEY                any long random string — see below
+ADMIN_PASSWORD            the admin panel password
+MEDIA_STORE=blob
+AUTO_INIT_DB=0
+TN_SYNC_ENABLED=0
+CRON_SECRET               shared with the GitHub Actions workflow
+```
+
+Carried over from the current deploy:
+
+```
+SITE_URL=https://gluckbags.com
+FORCE_CANONICAL_HOST=1
+SESSION_COOKIE_SECURE=1
+CATALOG_SOURCE=tiendanube
+TN_STORE_ID, TN_ACCESS_TOKEN, TN_CLIENT_ID, TN_CLIENT_SECRET
+UMAMI_WEBSITE_ID
+```
+
+`SECRET_KEY` is not optional here. With a writable disk the app persists a generated key
+under `DATA_DIR`; with a read-only one there is nowhere to put it, and a per-process key
+would log the admin out on every cold start. The app refuses to boot instead.
+
+## Why each switch exists
+
+**`AUTO_INIT_DB=0`.** Creating tables, seeding and healing media variants happens in the
+app factory. That is right for a container that boots once against a volume and wrong
+here, where a cold start happens inside a request. `flask init-db` does the same work on
+demand — including the `site_texts` table, which flask-sitecopy creates separately.
+
+**`MEDIA_STORE=blob`.** The `/media` route then serves nothing (Blob's CDN owns the
+bytes) and `Media.path` resolves to a Blob URL. That URL is derived from the store id
+inside the token, so rendering a page makes no API calls.
+
+**`TN_SYNC_ENABLED=0`.** The in-process scheduler needs a process that outlives the
+request. `.github/workflows/sync-tiendanube.yml` calls `/internal/sync-tn` hourly
+instead, which also keeps the schedule in version control.
+
+**Admin uploads.** A function's request body is capped at 4.5 MB — less than one phone
+photo. When `MEDIA_STORE` is not local, the admin form asks
+`POST /admin/media/upload-token` for a short-lived, single-file token, PUTs the file
+straight to Blob, and posts only the pathname. The server reads it back, runs the same
+Pillow/ffmpeg pipeline, and deletes the staged original. The token's constraints
+(destination path, size, content types) are inside its signed payload, so the browser
+holding it cannot widen them.
+
+**ffmpeg.** Resolved once per process: `FFMPEG_BINARY` if set, else a system `ffmpeg`
+(what the Docker image installs), else the static build shipped by the `imageio-ffmpeg`
+wheel — which is how the encoder reaches a host with no system packages.
+
+## Cutover
+
+The DNS zone stays in Cloudflare, so the `tienda.gluckbags.com` redirect and the Single
+Redirect rule for the old Tienda Nube storefront are untouched.
+
+1. Deploy and keep the default `*.vercel.app` domain.
+2. Run the whole test suite, including the performance and Lighthouse tests, against
+   that URL. Those budgets were calibrated against the Pi behind Cloudflare; the CDN and
+   cold starts change the numbers, so re-measure rather than assume.
+3. Repoint `gluckbags.com` and `www` at Vercel, keeping SSL on Full (strict).
+4. Leave the Pi running. `gluck.nexttech.com.ar` stays pointed at it, which is the
+   rollback.
+
+## Testing
+
+The suite runs against SQLite and the local filesystem by default, so nothing here
+changes how you run it — except that pytest and playwright now live in
+`requirements-dev.txt`:
+
+```bash
+pip install -r requirements-dev.txt
+
+# The Blob adapter, against an in-memory stand-in for the Blob API
+pytest tests/test_media_store.py tests/test_direct_upload.py tests/test_serverless_boot.py
+
+# The Postgres-specific behaviour, against a real Postgres
+docker run -d --name gluck-pg -e POSTGRES_PASSWORD=gluck -e POSTGRES_USER=gluck \
+    -e POSTGRES_DB=gluck -p 55432:5432 postgres:16-alpine
+TEST_DATABASE_URL=postgresql://gluck:gluck@localhost:55432/gluck \
+    pytest tests/test_postgres.py tests/test_migrate_to_postgres.py
+```
+
+The Postgres tests skip themselves when `TEST_DATABASE_URL` is unset.

@@ -13,10 +13,14 @@ This table remains the local-dev source and the rollback fallback.
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import tempfile
 import time
 import uuid
 from collections import defaultdict
-from typing import Any
+from contextlib import contextmanager
+from typing import Any, Iterator
 
 from flask import (
     Blueprint,
@@ -24,6 +28,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -107,7 +112,7 @@ def _apply_media(product: Product) -> list[str]:
     Returns a list of human-friendly error strings for files that failed.
     """
     errors: list[str] = []
-    new_files = [f for f in request.files.getlist("media") if f and f.filename]
+    new_files = _pending_uploads()
 
     # Stage everything WITHOUT flushing: the heavy Pillow/ffmpeg work and the new
     # rows must not open SQLite's write transaction, or its lock would be held for
@@ -174,8 +179,79 @@ def _apply_media(product: Product) -> list[str]:
     return errors
 
 
-def _store_new_file(product: Product, file_storage: Any, errors: list[str]) -> Media | None:
-    name = file_storage.filename or "archivo"
+# Where a browser upload lands before the server processes it into products/<id>/<slug>/.
+UPLOAD_STAGING_PREFIX = "uploads"
+
+
+def _pending_uploads() -> list[Any]:
+    """The new gallery items posted with this form, in `new:<index>` order.
+
+    Two shapes, because the 4.5 MB cap on a serverless request body means the file
+    cannot always travel through the app: either FileStorages from the multipart form,
+    or `{"pathname", "filename"}` entries naming bytes the browser already PUT into the
+    object store. The multipart list wins when both are present, so a browser that
+    failed to reach the store still saves through the ordinary path.
+    """
+    files = [f for f in request.files.getlist("media") if f and f.filename]
+    if files:
+        return files
+
+    try:
+        parsed = json.loads(request.form.get("media_uploaded") or "[]")
+    except ValueError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+
+    uploads: list[Any] = []
+    for entry in parsed:
+        if not isinstance(entry, dict):
+            continue
+        pathname = str(entry.get("pathname") or "")
+        # The pathname decides what the server reads back, so it is confined to the
+        # staging area: a crafted value must not be able to name another blob.
+        if not pathname.startswith(f"{UPLOAD_STAGING_PREFIX}/") or ".." in pathname:
+            continue
+        uploads.append({"pathname": pathname, "filename": str(entry.get("filename") or "")})
+    return uploads
+
+
+@contextmanager
+def _as_source(item: Any) -> Iterator[Any]:
+    """Yield something `media_service` can process, whichever way the bytes arrived.
+
+    A multipart form hands over a FileStorage, which the pipeline already accepts. A
+    browser upload that went straight to the object store hands over a pathname instead,
+    so the bytes come back down into a temp file — Pillow and ffmpeg both want a real
+    path, and the staged original is removed either way once it has been processed.
+    """
+    if not isinstance(item, dict):
+        yield item
+        return
+
+    from app.services.media_store import get_store
+
+    store = get_store()
+    pathname = item["pathname"]
+    suffix = os.path.splitext(pathname)[1] or ".bin"
+    handle, temp_path = tempfile.mkstemp(suffix=suffix)
+    os.close(handle)
+    try:
+        with store.open(pathname) as remote, open(temp_path, "wb") as local:
+            shutil.copyfileobj(remote, local)
+        yield temp_path
+    finally:
+        os.unlink(temp_path)
+        # The staged original has served its purpose; leaving it behind would bill for
+        # a second copy of every photo in the store, forever.
+        try:
+            store.delete_prefix(pathname)
+        except Exception:  # noqa: BLE001 — a stray original must not fail the save
+            current_app.logger.warning("No se pudo borrar el original %s", pathname)
+
+
+def _store_new_file(product: Product, item: Any, errors: list[str]) -> Media | None:
+    name = (item.get("filename") if isinstance(item, dict) else item.filename) or "archivo"
     kind = media_service.classify(name)
     if kind is None:
         errors.append(f"«{name}»: formato no soportado.")
@@ -185,12 +261,16 @@ def _store_new_file(product: Product, file_storage: Any, errors: list[str]) -> M
     # BEFORE the row is flushed — no write lock is held during Pillow/ffmpeg.
     slug = uuid.uuid4().hex
     try:
-        if kind == "image":
-            info = media_service.process_image(file_storage, product.id, slug)
-        else:
-            info = media_service.process_video(file_storage, product.id, slug)
+        with _as_source(item) as source:
+            if kind == "image":
+                info = media_service.process_image(source, product.id, slug)
+            else:
+                info = media_service.process_video(source, product.id, slug)
     except media_service.MediaError as exc:
         errors.append(f"«{name}»: {exc}")
+        return None
+    except OSError as exc:
+        errors.append(f"«{name}»: no pudimos recuperar el archivo subido ({exc}).")
         return None
 
     media = Media(
@@ -207,6 +287,85 @@ def _store_new_file(product: Product, file_storage: Any, errors: list[str]) -> M
 
 
 # --- routes ------------------------------------------------------------------
+
+
+# What a client token will accept, by kind. Narrow on purpose: the token is handed to a
+# browser, and these travel inside its signed payload, so this is the only thing standing
+# between a leaked token and arbitrary content in the store.
+_UPLOAD_CONTENT_TYPES = {
+    "image": [
+        "image/jpeg",
+        "image/png",
+        "image/webp",
+        "image/gif",
+        "image/heic",
+        "image/heif",
+        "image/avif",
+        "image/tiff",
+        "image/bmp",
+    ],
+    "video": [
+        "video/mp4",
+        "video/quicktime",
+        "video/webm",
+        "video/x-m4v",
+        "video/x-matroska",
+        "video/3gpp",
+        "video/mpeg",
+        "video/ogg",
+        "video/x-msvideo",
+    ],
+}
+
+
+@admin_bp.context_processor
+def _inject_upload_mode() -> dict[str, Any]:
+    """Whether the form must upload to object storage itself.
+
+    Injected for every admin template rather than passed by each view, so a new view
+    cannot forget it and silently fall back to a multipart POST the platform rejects.
+    """
+    from app.services import media_store
+
+    return {"direct_upload": not media_store.is_local()}
+
+
+@admin_bp.route("/media/upload-token", methods=["POST"])
+@login_required
+def media_upload_token() -> Any:
+    """Issue a one-file, short-lived token so the browser can upload straight to the store.
+
+    This is what gets a 60 MB clip past the 4.5 MB cap on a function's request body: the
+    bytes never pass through the app. Only meaningful for the object-store backend — on a
+    filesystem there is nowhere to upload to and the plain multipart form already works.
+    """
+    from app.services import media_store
+
+    if media_store.is_local():
+        abort(404)
+
+    payload = request.get_json(silent=True) or {}
+    filename = str(payload.get("filename") or "")
+    kind = media_service.classify(filename)
+    if kind is None:
+        return jsonify({"error": f"«{filename}»: formato no soportado."}), 400
+
+    extension = media_service.ext_of(filename)
+    rel_path = f"{UPLOAD_STAGING_PREFIX}/{uuid.uuid4().hex}.{extension}"
+    store = media_store.get_store()
+    max_bytes = current_app.config["MAX_CONTENT_LENGTH"]
+    return jsonify(
+        {
+            "token": store.client_upload_token(
+                rel_path,
+                allowed_content_types=_UPLOAD_CONTENT_TYPES[kind],
+                maximum_size_in_bytes=max_bytes,
+            ),
+            "pathname": rel_path,
+            "uploadUrl": store.upload_url(rel_path),
+            "maxBytes": max_bytes,
+        }
+    )
 
 
 @admin_bp.route("/login", methods=["GET", "POST"])

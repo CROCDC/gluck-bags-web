@@ -13,6 +13,7 @@ requests==2.32.5
 pillow==12.2.0
 pillow-heif==1.4.0
 gunicorn==23.0.0
+# A static ffmpeg build shipped as a wheel. The Docker image installs a system ffmpeg
+# and wins; this is how the encoder reaches a host with no system packages.
+imageio-ffmpeg==0.6.0
 python-dotenv==1.0.1
-pytest==8.3.3
-playwright==1.47.0

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "python scripts/build_static.py",
+  "functions": {
+    "wsgi.py": {
+      "maxDuration": 300
+    }
+  }
+}

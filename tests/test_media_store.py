@@ -6,8 +6,10 @@ local filesystem or on object storage. These tests pin the behaviour every backe
 to honour, so a second adapter can be checked against the same expectations rather
 than against a reading of the local one.
 
-`LocalMediaStore` is exercised directly (no app context needed) plus through the app
-factory, which is what wires the store into `app.extensions`.
+Every contract test below runs against BOTH adapters — the local filesystem and Vercel
+Blob (against tests/fake_blob.py, an in-memory stand-in for the Blob HTTP API). That is
+the point of writing them as a contract: the Blob adapter is checked against the same
+expectations as the local one, not against a re-reading of its own implementation.
 """
 
 from __future__ import annotations
@@ -24,11 +26,21 @@ from app.services.media_store import (
     is_local,
     source,
 )
+from fake_blob import FakeBlobApi
 
 
-@pytest.fixture
-def store(tmp_path) -> LocalMediaStore:
-    return LocalMediaStore(str(tmp_path / "media"), MEDIA_URL_PREFIX)
+@pytest.fixture(params=["local", "blob"])
+def store(request, tmp_path):
+    if request.param == "local":
+        return LocalMediaStore(str(tmp_path / "media"), MEDIA_URL_PREFIX)
+
+    from app.services.media_store_blob import BlobMediaStore
+
+    api = FakeBlobApi()
+    blob_store = BlobMediaStore(token=api.token, session=api)
+    # Zero TTL: a cached listing must never be what makes a contract test pass.
+    blob_store._listing_ttl = 0
+    return blob_store
 
 
 def _staging(tmp_path, name: str, files: dict[str, bytes]) -> str:
@@ -179,14 +191,37 @@ class TestDeletePrefix:
 
 
 class TestUrlFor:
-    def test_builds_a_media_url(self, store) -> None:
+    def test_ends_with_the_stored_path(self, store) -> None:
+        """`Media.path` lives in the database and every render turns it into a URL, so
+        this has to be a pure function of the path — no network call, no lookup."""
+        assert store.url_for("products/1/7/400.jpg").endswith("products/1/7/400.jpg")
+
+    def test_is_stable_across_calls(self, store) -> None:
+        assert store.url_for("products/1/7/400.jpg") == store.url_for("products/1/7/400.jpg")
+
+    def test_local_serves_from_the_media_route(self, tmp_path) -> None:
+        store = LocalMediaStore(str(tmp_path), MEDIA_URL_PREFIX)
+
         assert store.url_for("products/1/7/400.jpg") == "/media/products/1/7/400.jpg"
 
     @pytest.mark.parametrize("prefix", ["media", "/media", "/media/"])
-    def test_normalizes_the_prefix(self, tmp_path, prefix: str) -> None:
+    def test_local_normalizes_the_prefix(self, tmp_path, prefix: str) -> None:
         store = LocalMediaStore(str(tmp_path), prefix)
 
         assert store.url_for("a/b.jpg") == "/media/a/b.jpg"
+
+    def test_blob_points_at_the_public_cdn_host(self) -> None:
+        """The whole reason `/media` 404s under MEDIA_STORE=blob: the bytes are served
+        by Blob's own CDN, never by the function."""
+        from app.services.media_store_blob import BlobMediaStore
+
+        api = FakeBlobApi()
+
+        url = BlobMediaStore(token=api.token, session=api).url_for("products/1/7/400.jpg")
+
+        assert url == (
+            f"https://{api.store_id}.public.blob.vercel-storage.com/products/1/7/400.jpg"
+        )
 
 
 # --- selection ---------------------------------------------------------------
@@ -240,3 +275,67 @@ class TestSelection:
 
         assert response.status_code == 200
         assert response.data == b"hi"
+
+
+# --- editor uploads -----------------------------------------------------------
+
+
+class TestEditorUploads:
+    """flask-sitecopy's image uploads have to follow the same store as product media,
+    or the editor writes to a disk the serverless deploy does not have."""
+
+    def test_local_app_uses_sitecopys_own_local_store(self, app) -> None:
+        from sitecopy import LocalFileStore
+
+        with app.app_context():
+            from sitecopy.state import current_state
+
+            assert isinstance(current_state().file_store, LocalFileStore)
+
+    def test_blob_store_writes_through_the_media_store(self) -> None:
+        from app.content import BlobFileStore
+        from app.services.media_store_blob import BlobMediaStore
+        from sitecopy.media import MediaKind
+
+        api = FakeBlobApi()
+        store = BlobMediaStore(token=api.token, session=api)
+
+        url = BlobFileStore(store).save(b"\x89PNG\r\n\x1a\nfake", MediaKind("image", ".png", "image/png"))
+
+        assert url.startswith(f"https://{api.store_id}.public.blob.vercel-storage.com/")
+        assert url.endswith(".png")
+        stored = [p for p in api.blobs if p.startswith("sitecopy-uploads/")]
+        assert len(stored) == 1
+
+    def test_blob_store_is_content_addressed(self) -> None:
+        """Re-uploading the same picture must reuse one object and one URL, or the
+        editor's version history fills with duplicates of the same image."""
+        from app.content import BlobFileStore
+        from app.services.media_store_blob import BlobMediaStore
+        from sitecopy.media import MediaKind
+
+        api = FakeBlobApi()
+        file_store = BlobFileStore(BlobMediaStore(token=api.token, session=api))
+        kind = MediaKind("image", ".png", "image/png")
+
+        first = file_store.save(b"same-bytes", kind)
+        second = file_store.save(b"same-bytes", kind)
+
+        assert first == second
+        assert len(api.blobs) == 1
+
+    def test_blob_store_never_uses_the_client_filename(self) -> None:
+        """The stored name is a hash of the bytes; a client filename is the classic
+        path-traversal vector and sitecopy's contract keeps it out of the store."""
+        from app.content import BlobFileStore
+        from app.services.media_store_blob import BlobMediaStore
+        from sitecopy.media import MediaKind
+
+        api = FakeBlobApi()
+        file_store = BlobFileStore(BlobMediaStore(token=api.token, session=api))
+
+        file_store.save(b"payload", MediaKind("image", ".png", "image/png"))
+
+        pathname = next(iter(api.blobs))
+        assert pathname.startswith("sitecopy-uploads/")
+        assert ".." not in pathname
