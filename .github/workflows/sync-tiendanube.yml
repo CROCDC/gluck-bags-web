@@ -1,0 +1,58 @@
+# Hourly Tienda Nube mirror sync.
+#
+# The app used to do this from a daemon thread inside gunicorn, which needs a process
+# that outlives the request. Driving it from here instead keeps the cadence in version
+# control, works on any host, and does not depend on a plan's cron limits.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   SYNC_TN_URL     the deployment's endpoint, e.g. https://gluckbags.com/internal/sync-tn
+#   CRON_SECRET     the same value set in the deployment's environment
+name: Sync Tienda Nube
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  # So a stale mirror can be fixed without waiting for the next hour.
+  workflow_dispatch:
+
+# A slow sync must not overlap with the next hour's run.
+concurrency:
+  group: sync-tiendanube
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger the mirror sync
+        env:
+          SYNC_TN_URL: ${{ secrets.SYNC_TN_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SYNC_TN_URL}" ] || [ -z "${CRON_SECRET}" ]; then
+            echo "::error::Faltan los secrets SYNC_TN_URL y/o CRON_SECRET."
+            exit 1
+          fi
+
+          # --max-time: a full resync is bounded; hanging until the job timeout would
+          # hold the concurrency group and block the next hour's run too.
+          http_code=$(curl -sS --max-time 300 \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            -o response.json -w "%{http_code}" \
+            "${SYNC_TN_URL}")
+
+          echo "HTTP ${http_code}"
+          cat response.json || true
+          echo
+
+          if [ "${http_code}" != "200" ]; then
+            echo "::error::El sync devolvió HTTP ${http_code}."
+            exit 1
+          fi
+
+          # 200 covers both a real sync and a deliberate skip; only "ok" moved data.
+          status=$(python3 -c "import json;print(json.load(open('response.json')).get('status',''))")
+          if [ "${status}" != "ok" ]; then
+            echo "::warning::El sync se omitió (status=${status})."
+          fi

@@ -13,6 +13,11 @@ missed). Two entry points share one core (`run_sync`):
   off to another.
 - **CLI** (`flask sync-tn`): a manual/forced sync, handy for the first population and
   for an external cron if that's ever preferred over the in-process scheduler.
+- **HTTP** (`GET /internal/sync-tn`, see app/tiendanube/): the same forced sync behind a
+  shared secret, for a scheduler that lives outside the process. That is the only option
+  where no process survives between requests (serverless), and it is driven by a GitHub
+  Actions schedule so the cadence stays in version control rather than in a host's
+  dashboard.
 
 The core never raises into its callers: a sync failure logs nothing louder than a
 skipped return, so a transient API hiccup can't crash a worker or the CLI.
@@ -23,7 +28,8 @@ from __future__ import annotations
 import os
 import threading
 import time
-from typing import Any, Optional
+from contextlib import contextmanager
+from typing import Any, Iterator, Optional
 
 import click
 from flask import Flask, current_app
@@ -75,30 +81,55 @@ def _touch_stamp(app: Flask) -> None:
         pass
 
 
-def _acquire_lock(app: Flask) -> Optional[Any]:
-    """Non-blocking exclusive lock so only one worker syncs. None if another holds it
-    (or the platform lacks fcntl — then the scheduler simply won't run, which is safe)."""
+def _open_lock_file(app: Flask) -> Optional[Any]:
+    """The lock file handle, or None when this platform can't have one."""
     try:
-        import fcntl
-
-        fh = open(os.path.join(app.config["DATA_DIR"], _LOCK_FILE), "w")
-        fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        return fh
-    except (ImportError, OSError):
+        import fcntl  # noqa: F401 — presence is the thing being tested
+    except ImportError:
+        return None
+    try:
+        return open(os.path.join(app.config["DATA_DIR"], _LOCK_FILE), "w")
+    except OSError:
         return None
 
 
-def _release_lock(handle: Any) -> None:
-    try:
-        import fcntl
+@contextmanager
+def _sync_lock(app: Flask) -> Iterator[bool]:
+    """Yield whether this caller may sync.
 
-        fcntl.flock(handle, fcntl.LOCK_UN)
-    except Exception:  # noqa: BLE001
-        pass
+    The lock is here for gunicorn's workers: each runs its own scheduler thread against
+    one shared DATA_DIR, and only one of them should sync. Two situations look identical
+    to `open`/`flock` but mean opposite things — another worker HOLDING the lock means
+    skip, while no lock being *possible* (no fcntl, or a read-only DATA_DIR, which is
+    what a serverless deploy has) means there is no second worker to race, so proceed.
+    Treating both as "skip" made every sync a silent no-op exactly where the cron
+    endpoint is the only caller.
+    """
+    handle = _open_lock_file(app)
+    if handle is None:
+        yield True
+        return
+
+    import fcntl
+
     try:
+        try:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            yield False
+            return
+        try:
+            yield True
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+    finally:
         handle.close()
-    except Exception:  # noqa: BLE001
-        pass
+
+
+def is_configured() -> bool:
+    """Whether Tienda Nube credentials are present, so a caller can tell a real
+    misconfiguration apart from a sync that was merely skipped."""
+    return _build_client() is not None
 
 
 def run_sync(
@@ -113,22 +144,20 @@ def run_sync(
     client = client or _build_client()
     if client is None:
         return None
-    handle = _acquire_lock(app)
-    if handle is None:
-        return None
-    try:
-        if not force:
-            elapsed = _seconds_since_last(app)
-            if elapsed is not None and elapsed < interval:
-                return None
-        with app.app_context():
-            result = catalog_sync.sync_products(client)
-        _touch_stamp(app)
-        return result
-    except Exception:  # noqa: BLE001 — a sync must never crash the caller/worker
-        return None
-    finally:
-        _release_lock(handle)
+    with _sync_lock(app) as may_sync:
+        if not may_sync:
+            return None
+        try:
+            if not force:
+                elapsed = _seconds_since_last(app)
+                if elapsed is not None and elapsed < interval:
+                    return None
+            with app.app_context():
+                result = catalog_sync.sync_products(client)
+            _touch_stamp(app)
+            return result
+        except Exception:  # noqa: BLE001 — a sync must never crash the caller/worker
+            return None
 
 
 # --- scheduler ---------------------------------------------------------------
