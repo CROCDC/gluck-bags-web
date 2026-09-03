@@ -24,7 +24,7 @@ from app.maintenance import backfill_media_variants  # noqa: E402
 def main() -> int:
     app = create_app()  # startup already heals; this re-runs the (idempotent) backfill
     with app.app_context():
-        counts = backfill_media_variants(app.config["MEDIA_ROOT"])
+        counts = backfill_media_variants()
     print(
         f"Backfilled og.jpg: {counts['og']} | AVIF variants: {counts['avif']}"
         f" | failed: {counts['failed']}"

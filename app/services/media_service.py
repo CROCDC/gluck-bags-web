@@ -3,9 +3,10 @@
 Images -> responsive WebP + JPEG variants (Pillow).
 Videos -> a compressed, web-friendly MP4 + a poster frame (ffmpeg).
 
-Everything is written under MEDIA_ROOT/<rel_dir>/, where rel_dir is
-`products/<product_id>/<media_id>`. The public site serves these via the
-`media_file` route.
+Everything is written under `products/<product_id>/<media_id>/` in whichever backend
+`app/services/media_store.py` is configured with — the local filesystem by default,
+Vercel Blob on serverless. Processing itself always happens in a local staging dir
+(Pillow and ffmpeg need real paths); the store only sees the finished directory.
 """
 
 from __future__ import annotations
@@ -15,11 +16,14 @@ import shutil
 import subprocess
 import tempfile
 import warnings
+from contextlib import contextmanager, suppress
+from typing import Iterator
 
-from flask import current_app
 from PIL import Image, ImageOps
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
+
+from app.services.media_store import get_store
 
 # Decompression-bomb guard: cap the pixel budget and promote Pillow's warning to
 # an error, so a tiny-on-disk but huge-dimension image can't exhaust worker memory.
@@ -75,16 +79,25 @@ def classify(filename: str) -> str | None:
     return None
 
 
-def _media_root() -> str:
-    return current_app.config["MEDIA_ROOT"]
-
-
 def _rel_dir(product_id: int, media_id: int) -> str:
     return f"products/{product_id}/{media_id}"
 
 
-def _abs_dir(rel_dir: str) -> str:
-    return os.path.join(_media_root(), rel_dir)
+@contextmanager
+def _staging(rel_dir: str) -> Iterator[str]:
+    """Yield a scratch directory, and publish it under `rel_dir` only on success.
+
+    Processing writes here rather than straight to the store because Pillow and ffmpeg
+    need real paths and the store may be remote. Publishing in one step is the point: a
+    transcode that raises leaves the store untouched, so a half-written variant set is
+    never reachable and there is no directory to clean up afterwards.
+    """
+    tmp = tempfile.mkdtemp(prefix="gluck-media-")
+    try:
+        yield tmp
+        get_store().publish(rel_dir, tmp)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
 
 
 # --- Images ------------------------------------------------------------------
@@ -93,8 +106,6 @@ def _abs_dir(rel_dir: str) -> str:
 def process_image(source: FileStorage | str, product_id: int, media_id: int) -> dict:
     """Generate responsive WebP+JPEG variants. Returns dict for the Media row."""
     rel_dir = _rel_dir(product_id, media_id)
-    abs_dir = _abs_dir(rel_dir)
-    os.makedirs(abs_dir, exist_ok=True)
 
     try:
         img = Image.open(source.stream if isinstance(source, FileStorage) else source)
@@ -110,10 +121,8 @@ def process_image(source: FileStorage | str, product_id: int, media_id: int) -> 
         elif img.mode != "RGB":
             img = img.convert("RGB")
     except (Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
-        shutil.rmtree(abs_dir, ignore_errors=True)
         raise MediaError("La imagen es demasiado grande. Probá con una más chica.") from exc
     except Exception as exc:  # noqa: BLE001 — surface a friendly error
-        shutil.rmtree(abs_dir, ignore_errors=True)
         raise MediaError("No pudimos leer la imagen. Probá con un JPG o PNG.") from exc
 
     # Cap the original so we never store/serve anything huge.
@@ -125,24 +134,32 @@ def process_image(source: FileStorage | str, product_id: int, media_id: int) -> 
     # in newer Pillow, or pillow-avif-plugin). If the first save fails (no encoder),
     # we stop trying — WebP/JPEG already cover every browser, so nothing breaks.
     avif_ok = True
-    for width in widths:
-        if width == img.width:
-            resized = img
-        else:
-            height = round(img.height * width / img.width)
-            resized = img.resize((width, height), Image.LANCZOS)
-        resized.save(os.path.join(abs_dir, f"{width}.webp"), "WEBP", quality=80, method=6)
-        resized.save(os.path.join(abs_dir, f"{width}.jpg"), "JPEG", quality=82, optimize=True)
-        if avif_ok:
-            try:
-                resized.save(os.path.join(abs_dir, f"{width}.avif"), "AVIF", quality=60)
-            except Exception:  # noqa: BLE001 — no AVIF encoder available; skip silently
-                avif_ok = False
+    with _staging(rel_dir) as out_dir:
+        for width in widths:
+            if width == img.width:
+                resized = img
+            else:
+                height = round(img.height * width / img.width)
+                resized = img.resize((width, height), Image.LANCZOS)
+            resized.save(os.path.join(out_dir, f"{width}.webp"), "WEBP", quality=80, method=6)
+            resized.save(os.path.join(out_dir, f"{width}.jpg"), "JPEG", quality=82, optimize=True)
+            if avif_ok:
+                try:
+                    resized.save(os.path.join(out_dir, f"{width}.avif"), "AVIF", quality=60)
+                except Exception:  # noqa: BLE001 — no AVIF encoder available
+                    avif_ok = False
+                    # Drop the widths that did encode: a `<picture>` source does not
+                    # fall back on a 404, so a partial AVIF set would show a broken
+                    # image. All or nothing, decided here rather than re-derived from
+                    # the file listing on every render.
+                    for done in widths:
+                        with suppress(OSError):
+                            os.unlink(os.path.join(out_dir, f"{done}.avif"))
 
-    # 1200x630 social-share crop (centered cover-fit) for og:image / twitter:image.
-    ImageOps.fit(img, OG_SIZE, Image.LANCZOS).save(
-        os.path.join(abs_dir, "og.jpg"), "JPEG", quality=82, optimize=True
-    )
+        # 1200x630 social-share crop (centered cover-fit) for og:image / twitter:image.
+        ImageOps.fit(img, OG_SIZE, Image.LANCZOS).save(
+            os.path.join(out_dir, "og.jpg"), "JPEG", quality=82, optimize=True
+        )
 
     return {
         "kind": "image",
@@ -169,8 +186,6 @@ def _run_ffmpeg(args: list[str]) -> None:
 def process_video(source: FileStorage | str, product_id: int, media_id: int) -> dict:
     """Transcode to a compressed web MP4 + extract a poster. Returns Media dict."""
     rel_dir = _rel_dir(product_id, media_id)
-    abs_dir = _abs_dir(rel_dir)
-    os.makedirs(abs_dir, exist_ok=True)
 
     # ffmpeg needs a real input path; stream the upload to a temp file first.
     tmp_path: str | None = None
@@ -183,9 +198,6 @@ def process_video(source: FileStorage | str, product_id: int, media_id: int) -> 
     else:
         input_path = source
 
-    out_mp4 = os.path.join(abs_dir, "video.mp4")
-    poster = os.path.join(abs_dir, "poster.jpg")
-
     # Scale longest side down to VIDEO_MAX_DIM (never upscale), keep even dims for
     # yuv420p, drop the audio track (players are muted), faststart for streaming.
     scale = (
@@ -193,30 +205,32 @@ def process_video(source: FileStorage | str, product_id: int, media_id: int) -> 
         "force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2"
     )
     try:
-        # -protocol_whitelist file: the input is always a local temp file, so a
-        # crafted container can't make ffmpeg pull external resources.
-        _run_ffmpeg([
-            "-protocol_whitelist", "file",
-            "-i", input_path,
-            "-vf", scale,
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
-            "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an",
-            out_mp4,
-        ])
-        _run_ffmpeg(["-protocol_whitelist", "file", "-i", out_mp4, "-frames:v", "1", "-q:v", "3", poster])
-    except MediaError:
-        shutil.rmtree(abs_dir, ignore_errors=True)
-        raise
+        with _staging(rel_dir) as out_dir:
+            out_mp4 = os.path.join(out_dir, "video.mp4")
+            poster = os.path.join(out_dir, "poster.jpg")
+            # -protocol_whitelist file: the input is always a local temp file, so a
+            # crafted container can't make ffmpeg pull external resources.
+            _run_ffmpeg([
+                "-protocol_whitelist", "file",
+                "-i", input_path,
+                "-vf", scale,
+                "-c:v", "libx264", "-preset", "veryfast", "-crf", "28",
+                "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an",
+                out_mp4,
+            ])
+            _run_ffmpeg(["-protocol_whitelist", "file", "-i", out_mp4, "-frames:v", "1", "-q:v", "3", poster])
+
+            # Read the encoded dimensions off the poster (matches the video exactly).
+            # Inside the staging block: after publishing, `poster` may not be a local
+            # path any more.
+            try:
+                with Image.open(poster) as pimg:
+                    width, height = pimg.width, pimg.height
+            except Exception:  # noqa: BLE001
+                width = height = None
     finally:
         if tmp_path:
             os.unlink(tmp_path)
-
-    # Read the encoded dimensions off the poster (matches the video exactly).
-    try:
-        with Image.open(poster) as pimg:
-            width, height = pimg.width, pimg.height
-    except Exception:  # noqa: BLE001
-        width = height = None
 
     return {"kind": "video", "path": rel_dir, "width": width, "height": height, "widths": None}
 
@@ -225,8 +239,8 @@ def process_video(source: FileStorage | str, product_id: int, media_id: int) -> 
 
 
 def delete_media_files(rel_dir: str) -> None:
-    shutil.rmtree(_abs_dir(rel_dir), ignore_errors=True)
+    get_store().delete_prefix(rel_dir)
 
 
 def delete_product_files(product_id: int) -> None:
-    shutil.rmtree(os.path.join(_media_root(), "products", str(product_id)), ignore_errors=True)
+    get_store().delete_prefix(f"products/{product_id}")

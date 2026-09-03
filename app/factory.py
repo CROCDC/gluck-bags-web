@@ -14,6 +14,8 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
 from werkzeug.exceptions import HTTPException
 
+from app.services import media_store
+
 load_dotenv()
 
 # Extension instance defined at module scope so models/repositories can import it
@@ -63,7 +65,7 @@ def _initialize_schema(data_dir: str, seed_fn: "object") -> None:
         try:
             from app.maintenance import backfill_media_variants
 
-            backfill_media_variants(os.path.join(data_dir, "media"))
+            backfill_media_variants()
         except Exception:  # noqa: BLE001
             pass
     finally:
@@ -241,6 +243,12 @@ def create_app() -> Flask:
     )
 
     app.config["UMAMI_WEBSITE_ID"] = os.environ.get("UMAMI_WEBSITE_ID")
+
+    # Where processed media bytes live (see app/services/media_store.py). "local" is
+    # the filesystem under MEDIA_ROOT — the code default, so dev, tests and the Docker
+    # deploy are unchanged. "blob" is Vercel Blob, for a read-only serverless FS.
+    app.config["MEDIA_STORE"] = os.environ.get("MEDIA_STORE", media_store.SOURCE_LOCAL)
+    app.extensions["media_store"] = media_store.build_store(app)
 
     # Where the storefront + cart read products from (see app/services/catalog.py).
     # "tiendanube" = the mirrored TN catalogue (production; cart lines carry TN ids

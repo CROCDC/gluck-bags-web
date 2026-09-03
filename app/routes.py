@@ -211,9 +211,15 @@ def register_routes(app: Flask) -> None:
 
     @app.route("/media/<path:filename>")
     def media_file(filename: str) -> Response:
-        # Uploaded media is immutable (new upload = new path), so cache forever.
+        # Only the local store is served from here; every other backend hands out its
+        # own CDN URLs, so nothing ever asks this route for them.
         from flask import send_from_directory
 
+        from app.services import media_store
+
+        if not media_store.is_local():
+            abort(404)
+        # Uploaded media is immutable (new upload = new path), so cache forever.
         resp = send_from_directory(app.config["MEDIA_ROOT"], filename, conditional=True)
         resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
         return resp
