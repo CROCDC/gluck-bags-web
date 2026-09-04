@@ -63,6 +63,12 @@ behaviour, so the same code runs both ways.
 
 ## Environment variables
 
+The Vercel project's environment variables are the source of truth for the live site.
+Infisical is still wired into `Jenkinsfile`/`docker-compose.yml`, which are the ROLLBACK
+path to the Pi — a separate store holding the pre-migration values. Nothing syncs between
+them, so a rotated secret has to be changed in whichever one you intend to run, and a
+rollback will come up with the OLD admin password and session key.
+
 Required:
 
 ```

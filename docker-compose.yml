@@ -25,11 +25,14 @@ services:
       VIRTUAL_HOST: gluckbags.com,www.gluckbags.com,gluck.nexttech.com.ar
       VIRTUAL_PORT: 7014
       UMAMI_WEBSITE_ID: 4badbd28-ea2a-4c67-9520-fe0814abcd1d
-      # Tienda Nube headless storefront. Values come from Infisical (prod) via
-      # `infisical run`. Production serves the TN mirror; the fallback matches it so
-      # a missing Infisical var can never silently revert prod to the legacy admin
-      # catalogue (set "admin" explicitly to roll back). The TN_* vars are read by
-      # the checkout handoff, the webhook HMAC check and the hourly sync.
+      # Tienda Nube headless storefront. This compose file is the ROLLBACK path now
+      # that production runs on Vercel (see docs/DEPLOY-VERCEL.md); its values still
+      # come from Infisical via `infisical run`, which is a SEPARATE store from the
+      # Vercel env vars the live site uses — so a secret rotated in one is not
+      # rotated in the other. The fallback matches production so a missing var can
+      # never silently revert to the legacy admin catalogue (set "admin" explicitly
+      # to roll back). The TN_* vars are read by the checkout handoff, the webhook
+      # HMAC check and the hourly sync.
       CATALOG_SOURCE: ${CATALOG_SOURCE:-tiendanube}
       TN_STORE_ID: ${TN_STORE_ID:-}
       TN_ACCESS_TOKEN: ${TN_ACCESS_TOKEN:-}
