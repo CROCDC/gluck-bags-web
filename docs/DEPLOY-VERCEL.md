@@ -121,9 +121,14 @@ wheel — which is how the encoder reaches a host with no system packages.
 
 ## Deploys
 
-`vercel deploy --prod` from a checkout, until one of the two options in
-`.github/workflows/deploy-vercel.yml` is set up. The Jenkins trigger that deployed to
-the Pi is gone; the Pi itself is left running as the rollback.
+Automatic: the project is connected to this GitHub repository, so a push to `main`
+deploys to production and any other branch gets a preview. `vercel deploy --prod` from a
+checkout still works for an out-of-band deploy.
+
+The Jenkins trigger that deployed to the Pi is gone; the Pi itself is left running as the
+rollback. Note that `vercel git connect` fails with a confusing "make sure there aren't
+any typos" if the local `origin` is stale — this repository moved from `CROCDC/` to
+`gluckbags/`, and the CLI reads the remote rather than following GitHub's redirect.
 
 ## Cutover
 
