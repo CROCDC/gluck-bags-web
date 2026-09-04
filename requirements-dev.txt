@@ -1,0 +1,8 @@
+# Test-only dependencies. Kept out of requirements.txt because that file is what the
+# production image and the serverless bundle install: playwright alone is 109 MB, which
+# is most of the way to the 500 MB function size limit, for a browser the app never
+# drives at runtime.
+-r requirements.txt
+
+pytest==8.3.3
+playwright==1.47.0

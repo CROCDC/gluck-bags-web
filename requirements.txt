@@ -1,6 +1,9 @@
 flask==3.0.3
 flask-compress==1.15
 flask-sqlalchemy==3.1.1
+# Postgres driver, used only when DATABASE_URL is set (the serverless deploy has no
+# disk for SQLite). [binary] ships the wheels, so no libpq/compiler on the build host.
+psycopg[binary]==3.3.5
 # In-place content editing (edit every site string from /admin/content, no deploy).
 # Migrado del editor propio; ver app/content/ y docs/CONTENT-ADMIN.md.
 flask-sitecopy==0.7.0
@@ -10,6 +13,7 @@ requests==2.32.5
 pillow==12.2.0
 pillow-heif==1.4.0
 gunicorn==23.0.0
+# A static ffmpeg build shipped as a wheel. The Docker image installs a system ffmpeg
+# and wins; this is how the encoder reaches a host with no system packages.
+imageio-ffmpeg==0.6.0
 python-dotenv==1.0.1
-pytest==8.3.3
-playwright==1.47.0

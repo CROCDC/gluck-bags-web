@@ -2,23 +2,21 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from flask import has_app_context
+
 from app.factory import db
+from app.services.media_store import MEDIA_URL_PREFIX, get_store
 
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
-# Public URL prefix served by the `media_file` route from MEDIA_ROOT. Uploaded
-# files are immutable (a new upload = a new directory), so URLs need no cache
-# buster and can be cached aggressively.
-MEDIA_URL_PREFIX = "/media"
-
 
 class Media(db.Model):
     """One photo or video belonging to a product.
 
-    Files live under `MEDIA_ROOT/<path>/`. Images store responsive variants
-    `<width>.jpg` / `<width>.webp`; videos store `video.mp4` + `poster.jpg`.
+    Files live under `<path>/` in the configured media store. Images store responsive
+    variants `<width>.jpg` / `<width>.webp`; videos store `video.mp4` + `poster.jpg`.
     """
 
     __tablename__ = "product_media"
@@ -51,7 +49,12 @@ class Media(db.Model):
         return self.kind == "video"
 
     def _url(self, name: str) -> str:
-        return f"{MEDIA_URL_PREFIX}/{self.path}/{name}"
+        rel = f"{self.path}/{name}"
+        # Outside an app context (a bare model in a unit test) there is no configured
+        # store, and the local layout is the honest default.
+        if not has_app_context():
+            return f"{MEDIA_URL_PREFIX}/{rel}"
+        return get_store().url_for(rel)
 
     # Images ---
     def image_url(self, width: int | None, ext: str = "jpg") -> str | None:
@@ -86,39 +89,26 @@ class Media(db.Model):
         can add a `<source type="image/avif">`. It must be all-or-nothing because
         `image_srcset('avif')` emits a candidate per width, and a `<picture>` source
         does NOT fall back on a network 404 (only on an unsupported type) — so a
-        partial AVIF set would show a broken image. A partial set (interrupted
-        backfill, mid-loop encoder failure) therefore degrades cleanly to WebP/JPEG."""
-        import os
-
-        from flask import current_app, has_app_context
-
+        partial AVIF set would show a broken image. A partial set (an interrupted
+        backfill, media processed before AVIF existed) degrades cleanly to WebP/JPEG."""
         if not self.is_image or not has_app_context():
             return False
         widths = self.widths or []
-        root = current_app.config.get("MEDIA_ROOT")
-        if not widths or not root:
+        if not widths:
             return False
-        return all(
-            os.path.exists(os.path.join(root, self.path, f"{w}.avif")) for w in widths
-        )
+        names = get_store().list_dir(self.path)
+        return all(f"{w}.avif" in names for w in widths)
 
     @property
     def og_image_url(self) -> str | None:
         """The 1200x630 social-share crop (image/jpeg) when it has been generated,
         else None. Returns None for media processed before the og variant existed,
         so callers can fall back to the regular cover without a 404."""
-        import os
-
-        from flask import current_app, has_app_context
-
-        if not self.is_image:
+        if not self.is_image or not has_app_context():
             return None
-        rel = f"{self.path}/og.jpg"
-        if has_app_context():
-            root = current_app.config.get("MEDIA_ROOT")
-            if root and os.path.exists(os.path.join(root, rel)):
-                return f"{MEDIA_URL_PREFIX}/{rel}"
-        return None
+        if "og.jpg" not in get_store().list_dir(self.path):
+            return None
+        return self._url("og.jpg")
 
     # Videos ---
     @property

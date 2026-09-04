@@ -1,0 +1,46 @@
+# What never leaves this machine.
+#
+# This is the control that actually works: `excludeFiles` in vercel.json is not honored
+# by the zero-config Flask preset (verified with `vercel build` — the bundle was
+# byte-identical with and without it), so anything that must stay out has to be listed
+# here, where it is dropped from the upload itself.
+#
+# A Git-connected deploy only ever uploads tracked files, so the secrets below are
+# already safe there. This covers `vercel deploy` run from a working directory.
+
+# Secrets and real data. `.env` holds live credentials and instance/ holds the local
+# database and uploaded media.
+.env
+.env.*
+!.env.example
+instance/
+
+# Never needed at runtime.
+tests/
+plans/
+docs/
+scripts/tn_oauth.py
+scripts/tn_spike.py
+scripts/local-docker-debug.sh
+
+# Local clutter.
+ig-gluck_bags/
+relevamiento-seo-*/
+.pytest_cache/
+.mypy_cache/
+.coverage
+.DS_Store
+**/.DS_Store
+__pycache__/
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+.vercel/
+_uv/
+Jenkinsfile
+docker-compose.yml
+Dockerfile
+
+# NOT ignored on purpose: app/static/** (the build copies it into public/ for the CDN)
+# and requirements.txt (the build installs from it).

@@ -180,7 +180,7 @@ def test_backfill_skips_corrupt_file_and_heals_the_rest(tmp_path, monkeypatch) -
         with open(os.path.join(d, f"{smallest}.jpg"), "wb") as fh:
             fh.write(b"not a real jpeg")
 
-        counts = backfill_media_variants(root)
+        counts = backfill_media_variants()
 
         # The corrupt width's AVIF failed; the rest healed; og.jpg rebuilt from a
         # larger intact jpg — the backfill did NOT abort on the bad file.
