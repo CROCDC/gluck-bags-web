@@ -119,18 +119,35 @@ holding it cannot widen them.
 (what the Docker image installs), else the static build shipped by the `imageio-ffmpeg`
 wheel — which is how the encoder reaches a host with no system packages.
 
+## Deploys
+
+`vercel deploy --prod` from a checkout, until one of the two options in
+`.github/workflows/deploy-vercel.yml` is set up. The Jenkins trigger that deployed to
+the Pi is gone; the Pi itself is left running as the rollback.
+
 ## Cutover
 
 The DNS zone stays in Cloudflare, so the `tienda.gluckbags.com` redirect and the Single
 Redirect rule for the old Tienda Nube storefront are untouched.
 
-1. Deploy and keep the default `*.vercel.app` domain.
-2. Run the whole test suite, including the performance and Lighthouse tests, against
-   that URL. Those budgets were calibrated against the Pi behind Cloudflare; the CDN and
-   cold starts change the numbers, so re-measure rather than assume.
-3. Repoint `gluckbags.com` and `www` at Vercel, keeping SSL on Full (strict).
-4. Leave the Pi running. `gluck.nexttech.com.ar` stays pointed at it, which is the
-   rollback.
+**Done on 2026-09-03.** `gluckbags.com` and `www` are A records to `216.198.79.1` and
+`64.29.17.1`, DNS-only (grey cloud) in Cloudflare. What the cutover actually taught:
+
+- `site_texts` had 26 rows of copy edited from `/admin/content` — including the "15% OFF"
+  and "6 cuotas" promotions. Cutting without migrating it would have silently reverted
+  the shop's own words to the code defaults. Migrate it FIRST and diff the rendered text
+  of both sites before touching DNS; it is the only table that cannot be rebuilt.
+- Expect roughly two minutes of `525` while Vercel issues the certificate. It cannot
+  issue one before DNS points at it, so there is no way to pre-warm this.
+- `gluck.nexttech.com.ar` is NOT a usable rollback view: the Pi has
+  `FORCE_CANONICAL_HOST=1`, so it 301s to gluckbags.com. The real rollback is restoring
+  the two Cloudflare records to `CNAME 392770c8-a3e4-4b8e-8899-5b76b552b737.cfargotunnel.com`,
+  proxied.
+- `tienda.gluckbags.com` is a separate, unproxied hostname pointing at Tienda Nube. The
+  apex going grey does not affect it; verified before and after.
+- Set `FORCE_CANONICAL_HOST=1` only AFTER the DNS flip. With it on beforehand, the
+  `*.vercel.app` URL 301s to a domain that still resolves elsewhere, and the deployment
+  becomes impossible to test.
 
 ## Testing
 
